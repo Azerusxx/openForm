@@ -1,0 +1,31 @@
+# Dependencies / local builds
+node_modules/
+frontend/node_modules/
+api/node_modules/
+frontend/dist/
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/local.properties
+frontend/android/.idea/
+frontend/ios/Pods/
+*.log
+.DS_Store
+
+# Secrets / user data
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+data/
+**/data/private/
+*.keystore
+*.jks
+**/google-services.json
+
+# Locally generated
+coverage/
+junit.xml
+frontend/bundle-size.json

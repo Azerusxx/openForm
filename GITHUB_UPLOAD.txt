@@ -1,0 +1,17 @@
+OPENFORM -> GITHUB / SO GEHT ES
+=======================================
+1. GitHub Desktop oeffnen, Azerusxx/openForm klonen.
+2. DIESES ZIP in einen LEEREN Ordner entpacken.
+3. Saemtliche Dateien UND Ordner aus diesem entpackten Ordner in
+   den lokalen Klon von openForm kopieren. NICHT die ZIP-Datei hochladen!
+4. Pruefen: <lokaler-Klon>/frontend/package.json muss existieren.
+5. GitHub Desktop: Commit to main, Push origin.
+6. GitHub > Actions > openForm Android APK > neuesten Lauf anklicken.
+7. Bei Gruen: Artifacts > openForm-0.1.0-debug herunterladen, entpacken.
+
+ENTHALTEN: frontend (inkl Android), api, scripts, katalogisierte
+Uebungsinformationen, Lizenzdateien, README und der Workflow.
+NICHT ENTHALTEN: fremdlizenzierte Uebungsfotos und Animationen,
+node_modules, Build-Ergebnisse, private Daten oder API-Schluessel.
+
+Der Workflow baut eine Debug-APK; sie ist kein fertiges Produktionsrelease.
