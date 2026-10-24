@@ -1,0 +1,45 @@
+openForm 0.2.0 - erster Ernährungs-Ausbau
+===========================================
+
+Bestehendes GitHub-Repository: Azerusxx/openForm
+
+1. VORHER: In der aktuell installierten openForm-Test-App unter Essen > Analyse ein Ernährungsbackup exportieren. Das alte Trainingsbackup ebenfalls sichern.
+2. GitHub Desktop: Azerusxx/openForm klonen oder vorhandenen lokalen Klon öffnen.
+3. Dieses ZIP separat entpacken. DEN INHALT auf oberster Ebene in den lokalen Klon kopieren.
+   NICHT das ZIP oder den äußeren Entpack-Ordner hochladen. Die vorhandenen Dateien nach Prüfung ersetzen.
+4. GitHub Desktop: Änderungen prüfen, Commit und Push origin.
+5. Auf GitHub Actions -> openForm Android APK -> neuesten Lauf öffnen.
+6. Bei grünem Build: Artifact openForm-0.2.0-debug herunterladen und APK installieren.
+
+WICHTIG ZUR ANDROID-INSTALLATION:
+GitHub Debug-APKs werden auf unterschiedlichen CI-Runnern unter Umständen mit einem anderen
+Debug-Schlüssel signiert. Android kann dann ein Update der installierten Test-App verweigern.
+Alte Test-App ERST nach Backup deinstallieren, falls die Installation nicht funktioniert.
+Die lokale Speicherung der alten Test-App geht sonst verloren. Bei einer neuen Test-App
+Ernährung per Essen > Analyse > Import wiederherstellen.
+
+In 0.2:
+- Essen bleibt Tab mit Flammenicon; Trainings-FAB wird Hantel
+- Essen > Heute: Mahlzeiten, Favoriten und Wiederholen
+- Essen > Lebensmittel: Barcode, Textsuche über Open Food Facts, Portionen, Bearbeiten
+- Essen > Rezepte: aus gespeicherten Zutaten zusammenstellen, Portionsmultiplikator
+- Essen > Analyse: 7 Tage mit Erfassungslücken, eigenes Ernährungsbackup
+- Essen > Supplements: eigene Produkte und Tageshäkchen, keine automatische Dosierempfehlung
+- Einstellungen > Ernährungsprofil: Tageskalorien & Makroziele
+
+Datenhaltung: v1 im lokalen Key openform_nutrition_v1 bleibt lesbar.
+Neue Felder recipes, favorites, supplements werden ergänzt. Das Training liegt weiter in gym_state_v1.
+
+Noch nicht in dieser Version:
+- USDA API (API-Key/Backend sicher einrichten)
+- echte KI-Fotoanalyse (Bild in Galerie = Barcode aus Foto, keine Essens-KI)
+- kompletter gemeinsamer Backup/Cloud-Sync für Training + Ernährung
+- Rezepteditor mit Zutaten aus externer Suche statt nur bereits erfassten Lebensmitteln
+- automatische Supplement-Dosis bzw. Wechselwirkungsberatung
+- vollständige Replikation aller OpenNutriTracker-Funktionen
+
+Geprüft: 11 JS-Datentests und JSX-Syntax. Kein vollständiger Android-Build lokal,
+weil npm ci in dieser Umgebung nicht abschließen konnte. GitHub Actions prüft den Build.
+
+Open-Source-Lizenzen und Urheberhinweise (LICENSE, NOTICE.md) erhalten.
+Übungsmedien, die nicht zur eigenständigen Veröffentlichung freigegeben sind, fehlen bewusst.

@@ -1,3 +1,4 @@
+import { cleanFavorites, cleanRecipes, cleanSupplements } from './nutrition-extra.js'
 // openForm nutrition v0.1: intentionally separate from gym_state_v1 until sync/merge
 // and complete-backup support have been implemented and tested.
 export const NUTRITION_KEY = 'openform_nutrition_v1'
@@ -6,7 +7,9 @@ export const NEW_NUTRITION = () => ({
   schemaVersion: NUTRITION_VERSION,
   goals: { kcal: 2200, protein: 150, carbs: null, fat: null },
   entries: [],
-  favorites: []
+  favorites: [],
+  recipes: [],
+  supplements: []
 })
 const n = x => {
   const v = typeof x === 'string' ? Number(x.replace(',', '.')) : Number(x)
@@ -38,7 +41,15 @@ export function normalizedNutrition(data) {
     pieceSize: positive(e.pieceSize) ? n(e.pieceSize) : null,
     source: typeof e.source === 'string' ? e.source : 'manual'
   })).filter(e => e.unit !== 'piece' || positive(e.pieceSize))
-  d.favorites = Array.isArray(data.favorites) ? data.favorites.filter(f => typeof f === 'string').slice(0, 100) : []
+  // Old alpha backups kept favorites as entry IDs; resolve them to snapshots when possible.
+  const oldFavoriteIds = Array.isArray(data.favorites) ? data.favorites.filter(x => typeof x === 'string') : []
+  const migratedFavorites = oldFavoriteIds.flatMap(id => {
+    const meal = d.entries.find(e => e.id === id)
+    return meal ? [{ id, food: meal }] : []
+  })
+  d.favorites = cleanFavorites([...(Array.isArray(data.favorites) ? data.favorites : []), ...migratedFavorites])
+  d.recipes = cleanRecipes(data.recipes)
+  d.supplements = cleanSupplements(data.supplements)
   return d
 }
 export const loadNutrition = (store = globalThis.localStorage) => {
@@ -82,7 +93,9 @@ export function mergeNutrition(existing, imported) {
   const entries = new Map(old.entries.map(e => [e.id, e]))
   // Existing entries win for duplicate IDs; import never silently replaces a meal.
   incoming.entries.forEach(e => { if (!entries.has(e.id)) entries.set(e.id, e) })
-  return { ...old, entries: [...entries.values()], favorites: [...new Set([...old.favorites, ...incoming.favorites])] }
+  const keepNew = (a, b) => { const found = new Map(a.map(v => [v.id, v])); b.forEach(v => { if (!found.has(v.id)) found.set(v.id, v) }); return [...found.values()] }
+  return { ...old, entries: [...entries.values()], favorites: keepNew(old.favorites, incoming.favorites),
+    recipes: keepNew(old.recipes, incoming.recipes), supplements: keepNew(old.supplements, incoming.supplements) }
 }
 export function readNutritionBackup(raw) {
   const data = typeof raw === 'string' ? JSON.parse(raw) : raw
@@ -123,4 +136,18 @@ export async function fetchFoodByBarcode(rawCode, fetcher = globalThis.fetch) {
   const response = await fetcher(`https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(code)}?fields=code,product_name,product_name_de,generic_name,nutriments`, { headers: { Accept: 'application/json' } })
   if (!response.ok) throw new Error(response.status === 404 ? 'Produkt nicht gefunden.' : 'Open Food Facts ist gerade nicht erreichbar.')
   return parseOpenFoodFacts(await response.json(), code)
+}
+
+
+// Free text search is user initiated, never triggered by each keystroke.
+export async function searchFoodByName(raw, fetcher = globalThis.fetch) {
+  const term = String(raw || '').trim()
+  if (term.length < 2) throw new Error('Bitte mindestens zwei Zeichen eingeben.')
+  const url = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(term)}&page_size=20&fields=code,product_name,product_name_de,generic_name,nutriments`
+  const response = await fetcher(url, { headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error('Lebensmittelsuche gerade nicht erreichbar.')
+  const payload = await response.json()
+  return (payload.products || []).flatMap(p => {
+    try { return [parseOpenFoodFacts({ product: p, status: 'success' }, p.code || '')] } catch { return [] }
+  })
 }

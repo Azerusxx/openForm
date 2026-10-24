@@ -11,18 +11,30 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 50
 
     steps:
       - name: Projekt laden
         uses: actions/checkout@v4
+
+      - name: Projektstruktur pruefen
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in frontend/package.json frontend/package-lock.json frontend/android/gradlew frontend/android/gradle/wrapper/gradle-wrapper.jar frontend/capacitor.config.json frontend/scripts/check-mobile-bundle.mjs api/coach/core; do
+            if [ ! -e "$path" ]; then
+              echo "::error::Fehlt im GitHub-Repository: $path"
+              exit 1
+            fi
+          done
+          echo "Alle erforderlichen Projektdateien vorhanden."
 
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Java 21 einrichten
+      - name: Java einrichten
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -31,28 +43,26 @@ jobs:
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Projektstruktur pruefen
-        run: |
-          test -f frontend/package.json
-          test -f frontend/package-lock.json
-          test -f frontend/android/gradlew
-
-      - name: Abhaengigkeiten installieren
+      - name: Frontend-Abhaengigkeiten installieren
         working-directory: frontend
         run: npm ci
 
-      - name: Weboberflaeche fuer Android bauen
+      - name: Ernaehrungsberechnungen testen
+        working-directory: frontend
+        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs
+
+      - name: Mobile Web-App bauen
         working-directory: frontend
         env:
           VITE_MOBILE: '1'
         run: npm run build
 
-      - name: Capacitor synchronisieren und pruefen
+      - name: Capacitor Android synchronisieren
         working-directory: frontend
         run: |
           npx cap sync android
@@ -74,7 +84,7 @@ jobs:
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: openForm-0.1.0-debug
+          name: openForm-0.2.0-debug
           path: frontend/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
