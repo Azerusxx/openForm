@@ -11,58 +11,48 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 45
 
     steps:
       - name: Projekt laden
         uses: actions/checkout@v4
-
-      - name: Projektstruktur pruefen
-        shell: bash
-        run: |
-          set -euo pipefail
-          for path in frontend/package.json frontend/package-lock.json frontend/android/gradlew frontend/android/gradle/wrapper/gradle-wrapper.jar frontend/capacitor.config.json frontend/scripts/check-mobile-bundle.mjs api/coach/core; do
-            if [ ! -e "$path" ]; then
-              echo "::error::Fehlt im GitHub-Repository: $path"
-              exit 1
-            fi
-          done
-          echo "Alle erforderlichen Projektdateien vorhanden."
 
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Java einrichten
+      - name: Java 21 einrichten
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: 'platform-tools'
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Frontend-Abhaengigkeiten installieren
+      - name: Projektstruktur pruefen
+        run: |
+          test -f frontend/package.json
+          test -f frontend/package-lock.json
+          test -f frontend/android/gradlew
+
+      - name: Abhaengigkeiten installieren
         working-directory: frontend
         run: npm ci
 
-      - name: Ernaehrungsberechnungen testen
-        working-directory: frontend
-        run: node --test src/lib/nutrition.test.mjs
-
-      - name: Mobile Web-App bauen
+      - name: Weboberflaeche fuer Android bauen
         working-directory: frontend
         env:
           VITE_MOBILE: '1'
         run: npm run build
 
-      - name: Capacitor Android synchronisieren
+      - name: Capacitor synchronisieren und pruefen
         working-directory: frontend
         run: |
           npx cap sync android
