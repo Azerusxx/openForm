@@ -33,8 +33,8 @@ export default function Nutrition() {
   const [drawer, setDrawer] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
   const [showWater, setShowWater] = useState(false)
-  const [showNutritionExtras, setShowNutritionExtras] = useState(false)
-  const [showMicros, setShowMicros] = useState(false)
+  const [showNutritionExtras, setShowNutritionExtras] = useState(true)
+  const [showMicros, setShowMicros] = useState(true)
   const [showSupplements, setShowSupplements] = useState(false)
   const [selectedMeal, setSelectedMeal] = useState('breakfast')
   const [activityName, setActivityName] = useState('')
@@ -80,7 +80,6 @@ export default function Nutrition() {
     if (Number.isFinite(value) && value > 0) supplementMicros[key] = (supplementMicros[key] || 0) + value
   }
   const micros = Object.fromEntries(MICRO_NUTRIENTS.map(({key}) => [key, Math.round(((foodMicros[key] || 0) + (supplementMicros[key] || 0)) * 100) / 100]))
-  const hasMicros = MICRO_NUTRIENTS.some(({key}) => Number(micros[key]) > 0)
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -271,7 +270,7 @@ export default function Nutrition() {
           <button type="button" className="of-micros-toggle" aria-expanded={showMicros} onClick={() => setShowMicros(v => !v)}>
             <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{Object.values(micros).filter(v => Number(v) > 0).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
-          {(showMicros || (hasMicros && !data.supplements.length)) && <div className="of-micros-content">
+          {showMicros && <div className="of-micros-content">
             <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
             {MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).length
               ? <div className="of-micro-cards">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => {
