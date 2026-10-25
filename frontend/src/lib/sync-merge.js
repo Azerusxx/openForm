@@ -1127,6 +1127,7 @@ export function localExtras(local, server) {
   const setup = ['gymCards', 'equipProfiles'].reduce((n, f) => n + list(local?.[f]).filter(x => x && x.id != null && !ids(f).has(x.id)).length, 0) +
     list(local?.measurements).filter(e => e && e.d != null && !measured.has(e.d)).length +
     Object.entries(isMap(local?.dayNotes) ? local.dayNotes : {}).filter(([k, v]) => readNote(v) && !readNote(server?.dayNotes?.[k])).length +
+    Object.entries(isMap(local?.illnessPeriods) ? local.illnessPeriods : {}).filter(([id,r]) => r?.start && !(isMap(server?.illnessPeriods) && server.illnessPeriods[id]?.start)).length +
     keysNew('week') + keysNew('dayPlan') + keysNew('exNotes')
   return {
     workouts: list(local?.workouts).filter(w => !have.has(workoutKey(w))).length,

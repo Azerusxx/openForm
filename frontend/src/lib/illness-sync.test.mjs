@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mergeStates,STAMPED_MAPS,stampChange,resetIdsOf} from './sync-merge.js'
+import {mergeStates,STAMPED_MAPS,stampChange,resetIdsOf,localExtras} from './sync-merge.js'
 import * as Server from '../../../api/sync-stamps.js'
 import {putIllness,clearIllness,illnessOnDay} from './illness.js'
 
@@ -34,4 +34,13 @@ test('older clients do not wipe stored sick periods on server',()=>{
  const old={_ts:200,workouts:[]}
  Server.stampPut(cur,old,{overRead:true,now:200})
  assert.deepEqual(old.illnessPeriods,cur.illnessPeriods)
+})
+
+
+
+test('guest-only sickness is counted as unsynced setup, protecting it at sign-in',()=>{
+ const local={illnessPeriods:putIllness({},'a',{start:'2026-10-25'},100)}
+ const setup=localExtras(local,{illnessPeriods:{}})
+ assert.ok(setup.setup>=1)
+ assert.equal(localExtras({illnessPeriods:clearIllness(local.illnessPeriods,'a',200)},{illnessPeriods:{}}).setup||0,0)
 })
