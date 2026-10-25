@@ -18,7 +18,7 @@ import './Nutrition.css'
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(), mealType: 'breakfast',
-  per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, fiberSource: null, barcode: null, source: 'manual' })
+  per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, microsSources: {}, fiberSource: null, barcode: null, source: 'manual' })
 const MEAL_GROUPS = [
   { id: 'breakfast', title: 'Frühstück', icon: 'coffee' },
   { id: 'lunch', title: 'Mittagessen', icon: 'plate' },
@@ -95,7 +95,7 @@ export default function Nutrition() {
   const update = fn => commit(fn(loadNutrition()))
   const startNew = (type = selectedMeal) => { setSelectedMeal(type); setForm({ ...EMPTY(), date, mealType: type }); setEditing(null); setShowForm(true); setTab('food'); setAddMenu(false); setNotice('') }
   const edit = e => {
-    setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 }, per100Micros: { ...e.per100Micros } })
+    setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 }, per100Micros: { ...e.per100Micros }, microsSources: { ...(e.microsSources || {}) } })
     setSelectedMeal(e.mealType || 'other'); setEditing(e.id); setShowForm(true); setTab('food'); setNotice('')
   }
   const log = (food, type = selectedMeal) => {
@@ -117,25 +117,39 @@ export default function Nutrition() {
       }
     } catch (err) { setNotice(err.message) }
   }
-  const estimateFormFiber = async () => {
-    if (form.per100Micros?.fiber !== '' && form.per100Micros?.fiber != null) {
-      if (!window.confirm('Vorhandenen Ballaststoffwert durch eine KI-Schätzung ersetzen?')) return
-    }
+  const estimateFormMicros = async () => {
+    if (form.basis !== 'g') { setNotice('KI-Schätzung nur für Lebensmittel auf Gramm-Basis.'); return }
+    if (!form.name.trim()) { setNotice('Bitte einen Lebensmittelnamen angeben.'); return }
     setFiberBusy(true)
     try {
-      if (form.basis !== 'g') throw new Error('KI-Schätzungen derzeit nur für Lebensmittel auf Gramm-Basis.')
-      const estimate = await estimateFood(form.name + ' (' + form.quantity + ' ' + form.unit + ')')
-      const fiber = estimate.per100Micros?.fiber
-      if (!Number.isFinite(fiber) || fiber < 0) throw new Error('KI konnte keine verwertbare Ballaststoffmenge schätzen.')
-      setForm(old => ({...old, per100Micros:{...old.per100Micros,fiber},
-        fiberSource:'ai_estimate'}))
-      setNotice('Ballaststoffe KI-geschätzt. Bitte Wert und Portionsgröße prüfen, bevor du speicherst.')
-    } catch(err) {setNotice(err?.message || 'KI-Schätzung fehlgeschlagen.')}
-    finally {setFiberBusy(false)}
+      const estimated = await estimateFood(form.name + ' (' + form.quantity + ' ' + form.unit + ')')
+      const suggestions = Object.entries(estimated.per100Micros || {})
+        .filter(([key,value]) => Number.isFinite(value) && value >= 0 &&
+          MICRO_NUTRIENTS.some(n => n.key === key && !n.supplementOnly))
+      if (!suggestions.length) throw new Error('KI konnte keine ausreichend plausiblen Mikronährstoffe schätzen.')
+      const missing = suggestions.filter(([key]) => form.per100Micros?.[key] == null ||
+        form.per100Micros?.[key] === '')
+      if (!missing.length) { setNotice('Für alle geschätzten Nährstoffe liegen bereits Werte vor. Keine vorhandenen Daten überschrieben.'); return }
+      setForm(old => {
+        const micros = { ...old.per100Micros }
+        const sources = { ...old.microsSources }
+        let count = 0
+        for (const [key,value] of missing) {
+          if (micros[key] != null && micros[key] !== '') continue
+          micros[key] = value
+          sources[key] = 'ai_estimate'
+          count++
+        }
+        return { ...old, per100Micros:micros, microsSources:sources,
+          fiberSource:sources.fiber || old.fiberSource }
+      })
+      setNotice(missing.length + ' fehlende Nährstoffwerte durch KI geschätzt. Werte vor dem Speichern prüfen.')
+    } catch(err) { setNotice(err?.message || 'KI-Schätzung fehlgeschlagen.') }
+    finally { setFiberBusy(false) }
   }
   const setProduct = p => {
     setForm({ ...EMPTY(), name: p.name, quantity: String(p.estimatedGrams || 100), basis: p.basis, unit: p.basis,
-      source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, fiberSource: p.fiberSource || (p.per100Micros?.fiber != null ? 'database' : null), date, mealType: selectedMeal })
+      source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, microsSources: p.microsSources || {}, fiberSource: p.fiberSource || (p.per100Micros?.fiber != null ? 'database' : null), date, mealType: selectedMeal })
     setEditing(null); setShowForm(true); setTab('food'); setNotice('Produkt gefunden. Nährwerte und Portion vor dem Speichern prüfen.')
   }
   const lookup = async candidate => {
@@ -330,7 +344,7 @@ export default function Nutrition() {
               <p className="of-dim">{fiberReport.complete ? `Noch ${fmt(fiberReport.remaining)} g bis zum Orientierungswert.` : `${fmt(fiberReport.recorded)} g nachgewiesen. ${fiberReport.unknownCount} Lebensmittel ohne verwertbare Ballaststoffangabe, tatsächliche Tagesmenge unbekannt.`}</p>
               <details className="of-fiber-sources"><summary>Lebensmittelquellen ({fiberReport.knownCount}) und Datenlücken ({fiberReport.unknownCount})</summary>
                 {fiberReport.sources.length ? <div className="of-fiber-source-list">{fiberReport.sources.map((food,i) => <div key={food.id || i}><span>{food.name} <small>{fmt(food.quantity)} {food.unit}{food.estimated ? ' · KI-Schätzung' : ' · erfasster Wert'}</small></span><strong>{fmt(food.fiber)} g</strong></div>)}</div> : <p className="of-dim">Noch keine Lebensmittel mit verlässlichen Ballaststoffangaben erfasst.</p>}
-                {fiberReport.missing.length > 0 && <div className="of-fiber-missing"><strong>Angaben fehlen</strong>{fiberReport.missing.map((food,i) => <div key={food.id || i}>{food.name} ({fmt(food.quantity)} {food.unit})</div>)}<p>Lebensmittel bei Bedarf bearbeiten und den Ballaststoffwert pro 100 g/ml vom Etikett nachtragen. Keine automatische Schätzung.</p></div>}
+                {fiberReport.missing.length > 0 && <div className="of-fiber-missing"><strong>Angaben fehlen</strong>{fiberReport.missing.map((food,i) => <div key={food.id || i}>{food.name} ({fmt(food.quantity)} {food.unit})</div>)}<p>Lebensmittel bearbeiten: verfügbare Nährstoffwerte ergänzen oder fehlende Werte als KI-Schätzung vorschlagen lassen.</p></div>}
               </details>
             </section>
             {nutrientRows.some(n => n.known && n.key !== 'fiber')
@@ -467,12 +481,13 @@ export default function Nutrition() {
             <input type="number" min="0" step="any" placeholder="Unbekannt"
               value={form.per100Micros?.fiber ?? ''}
               onChange={e => setForm(old => ({...old,per100Micros:{...old.per100Micros,fiber:e.target.value},
+                microsSources:{...old.microsSources, fiber:e.target.value === '' ? null : 'manual'},
                 fiberSource:e.target.value === '' ? null : 'manual'}))} />
           </label>
-          <div className="of-dim">Quelle: {form.fiberSource === 'ai_estimate' ? 'KI-Schätzung, nicht verifiziert' : form.fiberSource === 'database' ? 'Lebensmitteldatenbank' : form.per100Micros?.fiber !== undefined && form.per100Micros?.fiber !== '' ? 'Manuelle Angabe' : 'Unbekannt'}</div>
-          <button type="button" disabled={fiberBusy || !form.name.trim() || form.basis !== 'g'} onClick={estimateFormFiber}>{fiberBusy ? 'KI schätzt…' : 'Fehlende Ballaststoffe mit KI schätzen'}</button>
+          <div className="of-dim">Quelle: {(form.microsSources?.fiber || form.fiberSource) === 'ai_estimate' ? 'KI-Schätzung, nicht verifiziert' : (form.microsSources?.fiber || form.fiberSource) === 'database' ? 'Lebensmitteldatenbank' : form.per100Micros?.fiber !== undefined && form.per100Micros?.fiber !== '' ? 'Manuelle Angabe' : 'Unbekannt'}</div>
+          <button type="button" disabled={fiberBusy || !form.name.trim() || form.basis !== 'g'} onClick={estimateFormMicros}>{fiberBusy ? 'KI analysiert…' : 'Fehlende Mikronährstoffe mit KI schätzen'}</button>
         </section>
-        <details className="of-optional-micros"><summary>Weitere Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.map(({key,label,unit}) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value}, fiberSource: key === 'fiber' ? (e.target.value === '' ? null : 'manual') : f.fiberSource }))} /></label>)}</div></details>
+        <details className="of-optional-micros"><summary>Weitere Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.filter(n => n.key !== 'fiber' && !n.supplementOnly && !['omega3','epa','dha'].includes(n.key)).map(({key,label,unit}) => <label key={key}>{label} ({unit}){form.microsSources?.[key] === 'ai_estimate' ? ' · KI' : form.microsSources?.[key] === 'database' ? ' · DB' : ''}<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value}, microsSources: {...f.microsSources, [key]: e.target.value === '' ? null : 'manual'} }))} /></label>)}</div></details>
         <div className="of-macro-sub">Portion: {fmt(entryTotals(form).kcal)} kcal · {fmt(entryTotals(form).protein)} g Protein</div>
         <div className="of-form-buttons"><button type="button" onClick={() => setShowForm(false)}>Abbrechen</button><button type="submit">{editing ? 'Aktualisieren' : 'Eintragen'}</button></div>
       </form>}
