@@ -58,6 +58,7 @@ export default function Nutrition() {
   const [suppNutrient, setSuppNutrient] = useState('magnesium')
   const [suppAmount, setSuppAmount] = useState('')
   const [editingSupplement, setEditingSupplement] = useState(null)
+  const [suppFormOpen, setSuppFormOpen] = useState(false)
   const fileInput = useRef(null)
   const backupInput = useRef(null)
   const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
@@ -183,8 +184,10 @@ export default function Nutrition() {
     const previous = data.supplements.find(s => s.id === editingSupplement)
     const amount = suppAmount === '' ? null : Number(suppAmount)
     if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Nährstoffmenge prüfen.'); return }
+    const sameName = data.supplements.find(s => s.id !== editingSupplement && s.name.trim().toLocaleLowerCase('de') === suppName.trim().toLocaleLowerCase('de'))
+    if (sameName && !window.confirm(`„${sameName.name}“ ist bereits vorhanden. Wirklich einen weiteren Eintrag anlegen?`)) return
     const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: amount === null ? {} : { [suppNutrient]: amount }, logs: previous?.logs || [] }
-    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setEditingSupplement(null) }
+    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setEditingSupplement(null); setSuppFormOpen(false) }
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
@@ -269,12 +272,13 @@ export default function Nutrition() {
           </div>}
           <h3>Supplements heute</h3>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
-            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v * s.dose)} ${nutrient.unit} ${nutrient.label}` : '' }).join('')}</small></span></label>
-            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)) }}><Icon name="pencil" /></button>
+            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
+            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
             <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
           </div>)}
           {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
-          <form className="of-inline-supp-form" onSubmit={addSupplement}>
+          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { setEditingSupplement(null); setSuppName(""); setSuppDose(""); setSuppUnit("piece"); setSuppAmount(""); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
+          {suppFormOpen && <form className="of-inline-supp-form" onSubmit={addSupplement}>
             <label className="of-supp-field">Supplement<input aria-label="Supplementname" placeholder="z. B. Magnesium" value={suppName} onChange={e => setSuppName(e.target.value)} required /></label>
             <div className="of-supp-form-row">
               <label className="of-supp-field">Tägliche Menge<input aria-label="Tägliche Menge" type="number" min="0.01" step="any" placeholder="1" value={suppDose} onChange={e => setSuppDose(e.target.value)} required /></label>
@@ -289,7 +293,8 @@ export default function Nutrition() {
               </div>
             </details>
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
-          </form>
+            <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
+          </form>}
           <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Nährstoffmengen werden ohne Produktangaben nicht automatisch berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
         </div>}
       </section>
