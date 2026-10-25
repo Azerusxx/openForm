@@ -187,9 +187,16 @@ public class HealthConnectPlugin extends Plugin {
         if (!"available".equals(sdkStatus())) { call.reject("Health Connect unavailable", "unavailable"); return; }
         Set<String> requested=new HashSet<>();
         requested.add(READ_STEPS);
-        requested.add(READ_EXERCISE);
         ActivityResultContract<Set<String>, Set<String>> contract = PermissionController.createRequestPermissionResultContract(PROVIDER);
         startActivityForResult(call, contract.createIntent(getContext(),requested), "stepPermissionResult");
+    }
+
+    @PluginMethod
+    public void requestExercisePermission(PluginCall call) {
+        if (!"available".equals(sdkStatus())) {call.reject("Health Connect unavailable","unavailable");return;}
+        Set<String> requested=Collections.singleton(READ_EXERCISE);
+        ActivityResultContract<Set<String>, Set<String>> contract=PermissionController.createRequestPermissionResultContract(PROVIDER);
+        startActivityForResult(call,contract.createIntent(getContext(),requested),"stepPermissionResult");
     }
 
     @ActivityCallback
