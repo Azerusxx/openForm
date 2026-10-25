@@ -90,14 +90,14 @@ export default function Nutrition() {
   const activityEstimate=activityEnergy({type:activityTypeId,level:activityLevel,minutes:activityMinutes,
     weightKg:activityWeight,distanceKm:activityDistance,steps:activitySteps})
   const activitySelection=ACTIVITY_CATALOG.find(a=>a.id===activityTypeId)
-  const trendData=trendSeries(data.entries,gym.bodyweight,date,weightWindow,gym.unit)
-  const chartPoints=(weightWindow==='7'||weightWindow==='30')?trendData.daily:trendData.weekly
   // Recorded and estimated exercise is displayed, but does not increase the deficit budget.
   const remaining = Math.round((data.goals.kcal || 0) + activeBonus - totals.kcal)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = nutritionWeekAnalysis(data.entries, date, macroGoals, gym.bodyweight, gym.unit)
   const [weightWindow, setWeightWindow] = useState('30')
+  const trendData=trendSeries(data.entries,gym.bodyweight,date,weightWindow,gym.unit)
+  const chartPoints=(weightWindow==='7'||weightWindow==='30')?trendData.daily:trendData.weekly
   const fullWeightTrend = analyzeWeightTrend(gym.bodyweight, date, weightWindow === 'all' ? 'all' : Number(weightWindow), gym.unit)
   const suggestedMeals = similarMealSuggestions(data.entries)
   const frequent = frequentMeals(data.entries)
