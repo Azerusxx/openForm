@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { restProgress } from '../lib/rest-circle.js'
 import { useUI } from '../store/useUI.js'
 import { t } from '../lib/i18n.js'
 import { REST_MAX } from '../lib/duration.js'
@@ -78,7 +80,11 @@ function useSkipFits(actsRef, deps) {
 export default function RestTimer() {
   const timer = useUI(s => s.timer)
   const work = useUI(s => s.work)
-  const { addRest, stopRest, pauseRest, resumeRest, finishWorkEarly, stopWork } = useUI()
+  const { pathname } = useLocation()
+  // Only a real new rest opens the full-screen overlay again; pausing or adding 15 seconds
+  // must not undo the user's choice to keep the workout visible.
+  const [minimizedRestId, setMinimizedRestId] = useState(null)
+  const { addRest, stopRest, pauseRest, resumeRest, setSmartRestEffort, finishWorkEarly, stopWork } = useUI()
   const on = work || timer
   const actsRef = useRef(null)
   const skipFits = useSkipFits(actsRef, [!!timer && !work, t('Skip'), t('Dismiss')])
@@ -89,7 +95,7 @@ export default function RestTimer() {
     return () => document.body.classList.remove('resting')
   }, [!!on])
   if (!on) return null
-  const pct = Math.max(0, Math.min(100, (on.left / on.total) * 100))
+  const pct = restProgress(on.left, on.total)
 
   if (work) return (
     <div id="timer" className="working">
@@ -104,6 +110,72 @@ export default function RestTimer() {
       </div>
     </div>
   )
+  // The native Android notification is unaffected: this is ONLY an in-app presentation.
+  // A switch-sides pause stays compact because blocking a ten-second handover is disruptive.
+  const expandedEligible = pathname === '/workout' && timer.kind !== 'switch'
+  const restId = timer.startedAt || `legacy-${timer.forIdx ?? 'x'}-${timer.forSet ?? 'x'}-${timer.total}`
+  if (expandedEligible && minimizedRestId !== restId) {
+    const label = timer.ready ? 'Pause beendet' : timer.paused ? 'Pausiert' : timer.smartNote ? 'Empfohlene Pause' : 'Satzpause'
+    return (
+      <div id="rest-circle-overlay" role="dialog" aria-modal="true" aria-label="Satzpause">
+        <div className="rest-circle-card">
+          <div className="rest-circle-head">
+            <span className="rest-circle-eyebrow">TRAININGSPAUSE</span>
+            <button type="button" className="rest-circle-minimize" onClick={() => setMinimizedRestId(restId)}>
+              <Icon name="chevronDown" /> Training ansehen
+            </button>
+          </div>
+          <div className="rest-circle-status">{label}</div>
+          <button type="button" className="rest-circle-clock" onClick={adjustRestSheet}
+            aria-label={(timer.ready ? 'Bereit' : clock(timer.left)) + '. Verbleibende Pause bearbeiten'}>
+            <span className="rest-circle-track" style={{ '--rest-remaining': `${pct}%` }}>
+              <span className="rest-circle-inner">
+                <strong role={timer.ready ? 'status' : 'timer'}>{timer.ready ? 'Bereit' : clock(timer.left)}</strong>
+                <span>{timer.ready ? 'Nächster Satz' : timer.paused ? 'Angehalten' : 'verbleibend'}</span>
+              </span>
+            </span>
+          </button>
+          <p className="rest-circle-hint">{timer.ready ? 'Du kannst den nächsten Satz beginnen.' :
+            timer.smartNote ? timer.smartNote + ' · Zeit jederzeit anpassbar' :
+            'Tippe auf den Kreis, um die Zeit anzupassen.'}</p>
+          {timer.smartContext && !timer.ready && <div className="rest-circle-effort">
+            <div className="rest-circle-effort-title">Belastung nach dem Satz
+              <small>Optional · nur für diese Pause</small>
+            </div>
+            <div className="rest-circle-effort-options" role="group" aria-label="Wiederholungen in Reserve">
+              {[{ key: 'hard', label: '0–1 RIR' }, { key: 'normal', label: '2–3 RIR' },
+                { key: 'easy', label: '4+ RIR' }].map(option =>
+                <button key={option.key} type="button" aria-pressed={timer.smartEffortChoice === option.key}
+                  className={timer.smartEffortChoice === option.key ? 'selected' : ''}
+                  onClick={() => setSmartRestEffort(option.key)}>{option.label}</button>)}
+            </div>
+          </div>}
+          <div className="rest-circle-adjust">
+            <button type="button" onClick={() => addRest(-15)} disabled={!!timer.ready} aria-label="Pause um 15 Sekunden verkürzen">− 15 s</button>
+            <button type="button" onClick={() => addRest(15)} disabled={!timer.ready && timer.left >= REST_MAX} aria-label="Pause um 15 Sekunden verlängern">+ 15 s</button>
+          </div>
+          <div className="rest-circle-actions">
+            {!timer.ready && <button type="button" className="rest-circle-toggle"
+              onClick={timer.paused ? resumeRest : pauseRest}
+              aria-pressed={!!timer.paused}>{timer.paused ? 'Fortsetzen' : 'Pausieren'}</button>}
+            <button type="button" className="rest-circle-skip" onClick={stopRest}>
+              {timer.ready ? 'Schließen' : 'Überspringen'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (expandedEligible) return (
+    <button type="button" className="rest-circle-mini" onClick={() => setMinimizedRestId(null)}
+      aria-label={`Pausenkreis anzeigen. ${timer.ready ? 'Bereit' : clock(timer.left)}`}>
+      <span className="rest-circle-mini-track" style={{ '--rest-remaining': `${pct}%` }}>
+        <span className="rest-circle-mini-inner"><Icon name="timer" /></span>
+      </span>
+      <span className="rest-circle-mini-copy"><strong>{timer.ready ? 'Bereit' : clock(timer.left)}</strong><small>Pause anzeigen</small></span>
+      <Icon name="chevronUp" />
+    </button>
+  )
   // −15 and +15 sit together in number-line order; Skip is pushed to the far edge, away from the
   // button you tap to buy more time. Pause sits between them as an icon (#193): it holds the
   // time, it neither adds nor ends it. A rest that is over has nothing left to hold, so Ready
@@ -111,7 +183,7 @@ export default function RestTimer() {
   // (both labels share one cell, one of them hidden), and the clock keeps room for the other of
   // its two faces (data-alt, a hidden line in index.css): the row never reflows when the rest
   // turns Ready, so a thumb on +15 never lands on −15.
-  const label = timer.kind === 'switch' ? t('Switch sides') : timer.paused ? t('Paused') : t('Rest')
+  const label = timer.kind === 'switch' ? t('Switch sides') : timer.paused ? t('Paused') : timer.smartNote ? 'Empfohlene Pause' : t('Rest')
   return (
     <div id="timer" className={'rest' + (timer.paused ? ' paused' : '') + (timer.kind === 'switch' ? ' switch' : '') + (timer.ready ? ' ready' : '')}>
       <div className="bar" aria-hidden="true"><i style={{ width: pct + '%' }} /></div>

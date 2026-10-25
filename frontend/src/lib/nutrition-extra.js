@@ -54,7 +54,7 @@ export function logRecipe(recipe, portions, date = dateLocal()) {
 export function cleanSupplements(value) {
   return Array.isArray(value) ? value.filter(s => s && typeof s.id === 'string' && typeof s.name === 'string' && s.name.trim() && validNum(s.dose) && ['g','mg','ml','piece'].includes(s.unit))
     .map(s => ({ id: s.id, name: s.name.slice(0, 100), dose: Number(s.dose), unit: s.unit,
-      logs: Array.isArray(s.logs) ? [...new Set(s.logs.filter(x => /^\d{4}-\d\d-\d\d$/.test(x)))].slice(-800) : [] })).slice(0, 100) : []
+      nutrients: cleanMicros(s.nutrients), logs: Array.isArray(s.logs) ? [...new Set(s.logs.filter(x => /^\d{4}-\d\d-\d\d$/.test(x)))].slice(-800) : [] })).slice(0, 100) : []
 }
 export function weeklyNutrition(entries, anchor = dateLocal(), goals = { kcal: 2200, protein: 150 }) {
   const [y,m,d] = anchor.split('-').map(Number)

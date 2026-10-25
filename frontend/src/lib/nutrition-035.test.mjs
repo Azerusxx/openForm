@@ -17,7 +17,7 @@ test('bottom navigation remains routed correctly with German labels',()=>{
 })
 test('Android app ID preserved across updates',()=>{
  const src=read('../../android/app/build.gradle')
- for(const term of ['applicationId "app.openform.personal"','applicationIdSuffix ".test"','versionName "0.3.5"']) assert.ok(src.includes(term),term)
+ for(const term of ['applicationId "app.openform.personal"','applicationIdSuffix ".test"','versionName "0.3.7c"']) assert.ok(src.includes(term),term)
 })
 
 test('CI explicitly signs with the secret-backed stable keystore',()=>{

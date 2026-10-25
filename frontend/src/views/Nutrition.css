@@ -272,3 +272,44 @@
 .of-032 .of-meal-context strong{color:var(--label)}
 .of-032 .of-macro-tile>span{line-height:1.3}
 @media(max-width:360px){.of-032 .of-water-fast{gap:4px}.of-032 .of-water-fast button{padding:8px 5px;font-size:10px}}
+
+
+/* 0.3.6: respect the user-selected appearance accent throughout nutrition. */
+.of-032{--of-teal:var(--acc);--of-orange:var(--acc);--of-pink:var(--acc)}
+.of-032 .of-macro-tile.of-over-goal strong i,
+.of-032 .of-macro-tile.of-over-goal .of-mini-track>span{background:#ef4444}
+.of-032 .of-macro-tile.of-over-goal>span{color:#ef4444}
+
+/* Global appearance accent, including calorie ring, water and nutrient progress. */
+.of-032 .of-calorie-ring{background:conic-gradient(var(--acc) var(--of-ring-pct),var(--sep) var(--of-ring-pct))}
+.of-032 .of-calorie-ring[aria-valuenow]:not([aria-valuenow="0"]){transition:background .2s}
+.of-032 .of-nutrient-detail strong small{display:block;font-weight:400;font-size:11px;text-align:right}
+
+
+/* Supplement editor: single-column mobile form, no overflowing fourth column. */
+.of-032 .of-inline-supp-form{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.of-032 .of-supp-form-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.of-032 .of-supp-field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;color:var(--label-2)}
+.of-032 .of-inline-supp-form .of-supp-field input,
+.of-032 .of-inline-supp-form .of-supp-field select{min-height:42px;padding:10px;font-size:14px}
+.of-032 .of-inline-supp-form>button{min-height:42px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;color:var(--on-acc)}
+.of-032 .of-supp-optional{border:1px solid var(--sep);border-radius:10px;padding:10px}
+.of-032 .of-supp-optional summary{cursor:pointer;font-size:13px;font-weight:600}
+.of-032 .of-supp-optional p{margin:8px 0}
+.of-032 .of-micros-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:16px 0;margin-top:8px;border-top:1px solid var(--sep);color:var(--label);font-weight:700;text-align:left}
+.of-032 .of-micros-toggle>span:last-child{display:flex;align-items:center;gap:7px;color:var(--label-3);font-size:11px;white-space:nowrap;font-weight:400}
+.of-032 .of-micros-content{padding-bottom:10px}
+
+.of-032 .of-supp-open{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;margin:14px 0 8px;background:var(--acc);color:var(--on-acc);border-radius:10px;font-weight:650}
+.of-032 .of-inline-supp-form>.of-supp-cancel{background:transparent;color:var(--label-2);border:1px solid var(--sep)}
+
+/* Micronutrient daily totals from food and checked supplements. */
+.of-032 .of-micro-cards{display:flex;flex-direction:column;gap:15px;padding:10px 0}
+.of-032 .of-micro-card{display:flex;flex-direction:column;gap:7px;padding-bottom:12px;border-bottom:1px solid var(--sep)}
+.of-032 .of-micro-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px}
+.of-032 .of-micro-heading>span{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.of-032 .of-micro-track{height:7px;background:var(--sep);border-radius:10px;overflow:hidden}
+.of-032 .of-micro-track>span{display:block;height:100%;border-radius:10px;background:var(--acc);transition:width .2s}
+.of-032 .of-micro-track>.of-micro-over-fill{background:#ef4444}
+.of-032 .of-micro-heading .of-micro-over{color:#ef4444}
+.of-032 .of-micro-card>small{font-size:11px;line-height:1.5}

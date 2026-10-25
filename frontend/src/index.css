@@ -2145,3 +2145,64 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .exfix-link{display:inline-flex;align-items:center;gap:5px;margin:14px 0 4px;color:var(--label-3);text-decoration:none}
 .list .similar-label{margin:16px 2px 6px;grid-column:1/-1}
 
+
+
+/* openForm 0.3.7a – in-app circular pause overlay. Android's native notification is unchanged.
+   The entire overlay is above the workout but below modal sheets (z-index 100). */
+#rest-circle-overlay{position:fixed;inset:0;z-index:76;display:flex;align-items:center;justify-content:center;
+  padding:calc(22px + var(--sat)) 16px calc(24px + var(--sab));
+  background:rgba(3,4,7,.62);-webkit-backdrop-filter:blur(8px) saturate(.8);backdrop-filter:blur(8px) saturate(.8)}
+#rest-circle-overlay .rest-circle-card{box-sizing:border-box;max-width:380px;width:100%;max-height:100%;overflow-y:auto;
+  padding:19px 20px 22px;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--surface-3);
+  border-radius:28px;box-shadow:0 18px 55px rgba(0,0,0,.56);text-align:center}
+#rest-circle-overlay .rest-circle-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#rest-circle-overlay .rest-circle-eyebrow{font-size:11px;letter-spacing:.11em;font-weight:800;color:var(--acc)}
+#rest-circle-overlay .rest-circle-minimize{display:flex;align-items:center;gap:4px;border:0;border-radius:12px;padding:10px 7px;
+  color:var(--label-2);background:transparent;font-size:12px}
+#rest-circle-overlay .rest-circle-status{font-weight:700;font-size:19px;margin:10px 0 19px}
+#rest-circle-overlay .rest-circle-clock{display:block;width:min(59vw,236px);height:min(59vw,236px);max-width:236px;max-height:236px;
+  padding:0;margin:0 auto;border:0;background:transparent;border-radius:50%;cursor:pointer}
+#rest-circle-overlay .rest-circle-track{width:100%;height:100%;display:grid;place-items:center;border-radius:50%;
+  background:conic-gradient(from -90deg,var(--acc) var(--rest-remaining),var(--surface-3) 0);
+  transition:background 250ms linear}
+#rest-circle-overlay .rest-circle-inner{width:calc(100% - 22px);height:calc(100% - 22px);background:var(--surface);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;border-radius:50%;gap:5px}
+#rest-circle-overlay .rest-circle-inner strong{font-variant-numeric:tabular-nums;font-size:clamp(38px,11vw,59px);line-height:1.1;
+  font-weight:750;color:var(--label)}
+#rest-circle-overlay .rest-circle-inner span{font-size:13px;color:var(--label-2)}
+#rest-circle-overlay .rest-circle-hint{font-size:12px;line-height:1.5;color:var(--label-2);min-height:36px;
+  margin:17px auto 10px;max-width:285px}
+#rest-circle-overlay .rest-circle-adjust{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:13px 0}
+#rest-circle-overlay .rest-circle-adjust button,#rest-circle-overlay .rest-circle-toggle,
+#rest-circle-overlay .rest-circle-skip{min-height:46px;border-radius:14px;font-size:15px;font-weight:700}
+#rest-circle-overlay .rest-circle-adjust button,#rest-circle-overlay .rest-circle-toggle{border:1px solid var(--surface-3);
+  color:var(--label);background:var(--surface-2)}
+#rest-circle-overlay .rest-circle-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#rest-circle-overlay .rest-circle-actions .rest-circle-skip:only-child{grid-column:1/-1}
+#rest-circle-overlay .rest-circle-skip{border:0;background:var(--acc);color:var(--acc-ink,#111)}
+#rest-circle-overlay button:disabled{opacity:.35}
+.rest-circle-mini{position:fixed;bottom:calc(14px + var(--sab));right:14px;z-index:61;display:flex;align-items:center;
+  gap:12px;min-height:70px;max-width:calc(100vw - 24px);padding:10px 15px 10px 10px;
+  background:var(--surface);color:var(--label);border:1px solid var(--surface-3);border-radius:22px;
+  box-shadow:0 10px 35px rgba(0,0,0,.45)}
+.rest-circle-mini-track{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(from -90deg,var(--acc) var(--rest-remaining),var(--surface-3) 0)}
+.rest-circle-mini-inner{display:grid;place-items:center;width:36px;height:36px;background:var(--surface);border-radius:50%;color:var(--acc)}
+.rest-circle-mini-copy{display:flex;align-items:flex-start;flex-direction:column;gap:2px;min-width:105px}
+.rest-circle-mini-copy strong{font-variant-numeric:tabular-nums;font-size:20px;line-height:1}
+.rest-circle-mini-copy small{font-size:11px;color:var(--label-2)}
+@media(max-height:650px){#rest-circle-overlay .rest-circle-card{padding:12px 17px}
+ #rest-circle-overlay .rest-circle-status{margin:3px 0 8px}
+ #rest-circle-overlay .rest-circle-clock{width:min(40vh,185px);height:min(40vh,185px)}
+ #rest-circle-overlay .rest-circle-hint{margin:8px auto 6px;min-height:0}}
+@media(prefers-reduced-motion:reduce){#rest-circle-overlay .rest-circle-track{transition:none}}
+
+/* 0.3.7c: optional subjective effort inside the circular in-app rest timer */
+#rest-circle-overlay .rest-circle-effort{margin:4px 0 10px}
+#rest-circle-overlay .rest-circle-effort-title{font-size:12px;font-weight:650;text-align:start;margin:0 0 7px}
+#rest-circle-overlay .rest-circle-effort-title small{display:block;margin-top:2px;font-weight:400;color:var(--label-2);font-size:11px}
+#rest-circle-overlay .rest-circle-effort-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#rest-circle-overlay .rest-circle-effort-options button{border:1px solid var(--surface-3);background:var(--surface-2);color:var(--label);border-radius:11px;min-height:40px;font-size:12px;font-weight:700}
+#rest-circle-overlay .rest-circle-effort-options button.selected{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
+#rest-circle-overlay .rest-circle-effort-options button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media(max-height:700px){#rest-circle-overlay .rest-circle-effort{margin:0 0 6px}#rest-circle-overlay .rest-circle-effort-options button{min-height:33px}#rest-circle-overlay .rest-circle-hint{margin:3px auto}}

@@ -521,6 +521,10 @@ export default function Settings({ page = null, find = null, via = null }) {
     workout: () => <>
       <Section title={t('Rest')} footer={t('Each exercise can have its own rest too. Set it in the exercise settings of a routine.')}>
         {restRow}
+        <Row icon="timer" iconTint="var(--teal)" title="Intelligenter Pausentimer"
+          subtitle="Optional: Übung, Wiederholungen, RIR/RPE und Leistungsverlust bei gleichem Gewicht. Maximal 3:30 Min. Eigene Pausen bleiben erhalten.">
+          <Switch checked={S.smartRest === true} onChange={v => update(s => { s.smartRest = v })} />
+        </Row>
         {restPauseRow}
       </Section>
       <Section title={t('Logging')}>
