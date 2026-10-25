@@ -6,6 +6,7 @@ export const NUTRITION_VERSION = 1
 export const NEW_NUTRITION = () => ({
   schemaVersion: NUTRITION_VERSION,
   goals: { kcal: 2200, protein: 150, carbs: null, fat: null },
+  profile: { activity: 'moderate' },
   entries: [],
   favorites: [],
   recipes: [],
@@ -29,6 +30,7 @@ export const nutrients = e => ({
 export function normalizedNutrition(data) {
   const d = NEW_NUTRITION()
   if (!data || typeof data !== 'object' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) return d
+  d.profile = { activity: ['low', 'light', 'moderate', 'high'].includes(data.profile?.activity) ? data.profile.activity : 'moderate' }
   d.goals = {
     kcal: positive(data.goals?.kcal) ? n(data.goals.kcal) : 2200,
     protein: positive(data.goals?.protein) ? n(data.goals.protein) : 150,

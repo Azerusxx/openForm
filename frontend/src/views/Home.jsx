@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
@@ -15,6 +15,8 @@ import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
 import { dayNoteOf } from '../lib/day-notes.js'
+import { loadNutrition, dayTotals } from '../lib/nutrition.js'
+import './Nutrition.css'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -24,6 +26,21 @@ export default function Home() {
   // The banner switched off and the sync stuck: a dot on the gear (Settings → Show connection status).
   const trouble = useConnectionTrouble()
   const [weekOffset, setWeekOffset] = useState(0)
+  // Nutrition lives in separate local storage until the server sync supports both schemas.
+  // Updating a meal while Home is mounted refreshes these small read-only totals.
+  const [nutrition, setNutrition] = useState(loadNutrition)
+  useEffect(() => {
+    const refresh = () => setNutrition(loadNutrition())
+    window.addEventListener('openform-nutrition-changed', refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      window.removeEventListener('openform-nutrition-changed', refresh)
+      window.removeEventListener('storage', refresh)
+    }
+  }, [])
+  const consumed = dayTotals(nutrition.entries, todayISO())
+  const rounded = x => Math.round(Number(x) || 0)
+
 
   const today = new Date()
   // A weekday can hold several routines. `todayRoutines` is the whole day; `routine` is the
@@ -101,7 +118,6 @@ export default function Home() {
   const onQueueStart = id => { if (S.active) nav('/workout'); else startFlow([id]) }
 
   return <div className="narrow">
-    <div className="of-home-link"><button onClick={() => nav('/nutrition')}><Icon name="flame" /> Ernährung: Kalorien und Protein tracken <Icon name="chevronRight" /></button></div>
     <div className="hdr">
       <div><h1>{user ? t('Hi {0}', user.name) : 'openForm'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
       <button className="iconbtn" onClick={() => nav('/settings')} aria-label={trouble ? t('Settings') + ', ' + t('Connection problem') : t('Settings')}><Icon name="gear" />{trouble && <span className="tab-dot" aria-hidden="true" />}</button>
@@ -188,6 +204,18 @@ export default function Home() {
       </div>
     )}
 
+    {/* Quiet joint summary below the training controls, not the removed nutrition promo at the top. */}
+    <button type="button" className="card of-home-summary" onClick={() => nav('/nutrition')} aria-label="Ernährungstagebuch öffnen">
+      <div className="of-home-summary-title"><Icon name="flame" /> Essen heute <Icon name="chevronRight" /></div>
+      <div className="of-home-summary-grid">
+        <span><strong>{rounded(consumed.kcal)}</strong> / {rounded(nutrition.goals.kcal)} kcal</span>
+        <span><strong>{rounded(consumed.protein)}</strong> / {rounded(nutrition.goals.protein)} g Protein</span>
+      </div>
+      <div className="of-home-summary-bars" aria-hidden="true">
+        <span><i style={{ width: `${Math.min(100, 100 * consumed.kcal / Math.max(1,nutrition.goals.kcal))}%` }} /></span>
+        <span><i style={{ width: `${Math.min(100, 100 * consumed.protein / Math.max(1,nutrition.goals.protein))}%` }} /></span>
+      </div>
+    </button>
     {S.showWeightCard !== false && <div className="card">
       <div className="row between bw-head" style={{ marginBottom: 6 }}>
         <h2 style={{ margin: 0 }}>{t('Body weight')}</h2>

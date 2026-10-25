@@ -422,22 +422,31 @@ h4.sec{
   background:var(--orange);box-shadow:0 0 0 2px var(--bg-el);pointer-events:none;
 }
 .iconbtn .tab-dot{top:5px;right:5px;box-shadow:0 0 0 2px var(--bg)}
-#tabbar button.start{margin-top:-24px}
-#tabbar button.start .cir{
+#tabbar button.start,#tabbar button.food{margin-top:-24px}
+#tabbar button.start .cir,#tabbar button.food .cir{
   width:52px;height:52px;border-radius:50%;background:var(--acc);color:var(--on-acc);
   display:flex;align-items:center;justify-content:center;position:relative;
   box-shadow:0 6px 18px -4px color-mix(in srgb,var(--acc) 55%,transparent);
   transition:transform var(--fast) var(--ease);
 }
-#tabbar button.start:active .cir{transform:scale(.93)}
-#tabbar button.start .cir .icn{font-size:26px;--icon-stroke:2;color:inherit;opacity:1}
+#tabbar button.start:active .cir,#tabbar button.food:active .cir{transform:scale(.93)}
+#tabbar button.start .cir .icn,#tabbar button.food .cir .icn{font-size:26px;--icon-stroke:2;color:inherit;opacity:1}
 #tabbar button.start span{color:var(--acc);font-weight:600}
+#tabbar button.food span{color:var(--orange);font-weight:600}
 #tabbar button.start .tab-time{font-variant-numeric:tabular-nums}
 /* `.cir` is itself a <span>, so the label rules above and below reach it too and
    outrank the `.cir` block — which is how the running state ended up painting an
    orange play glyph onto an orange disc. Both states restate their own colour.
    The disc is orange in either theme, so its glyph is black, not `--on-acc`. */
 #tabbar button.start .cir{color:var(--on-acc)}
+/* Two equal-size floating actions. Food keeps the flame, with a warm orange disc;
+   Training keeps the green dumbbell disc. Same size and spacing on small screens. */
+#tabbar button.food .cir{
+  background:var(--orange);color:#000;
+  box-shadow:0 6px 18px -4px color-mix(in srgb,var(--orange) 55%,transparent)
+}
+#tabbar button.food.on .cir{outline:2px solid var(--orange);outline-offset:3px}
+#tabbar button.start.on .cir{outline:2px solid var(--acc);outline-offset:3px}
 #tabbar button.start.rec .cir{background:var(--orange);color:#000;box-shadow:0 6px 18px -4px color-mix(in srgb,var(--orange) 55%,transparent)}
 #tabbar button.start.rec span{color:var(--orange)}
 #tabbar button.start.rec .cir::after{
@@ -1928,7 +1937,7 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
     border:var(--hair) solid var(--sep-op);border-radius:var(--r-xl);
     padding:7px 10px 9px;box-shadow:0 12px 40px -10px rgba(0,0,0,.5);
   }
-  #tabbar button.start{margin-top:-26px}
+  #tabbar button.start,#tabbar button.food{margin-top:-26px}
   .sheet{left:50%;right:auto;margin-left:-320px;width:640px;border-radius:var(--r-xl) var(--r-xl) 0 0}
   .center{width:340px}
   #timer{left:50%;right:auto;margin-left:-260px;width:520px;bottom:112px}
@@ -2136,5 +2145,3 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .exfix-link{display:inline-flex;align-items:center;gap:5px;margin:14px 0 4px;color:var(--label-3);text-decoration:none}
 .list .similar-label{margin:16px 2px 6px;grid-column:1/-1}
 
-/* openForm: entry point to the new nutrition module */
-.of-home-link button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:13px 16px;border-radius:13px;margin:0 0 16px;background:var(--bg-el);color:var(--label);font-weight:600;text-align:left}.of-home-link button .icn:first-child{color:var(--acc)}

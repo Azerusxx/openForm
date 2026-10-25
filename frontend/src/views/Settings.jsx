@@ -37,6 +37,8 @@ import { REST_MAX, REST_PAUSE_MIN, REST_PAUSE_MAX, fmtRest, fmtDuration } from '
 import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, dumbbellInventorySheet, menuSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import NutritionGoalsSettings from './NutritionGoalsSettings.jsx'
+import { loadNutrition, saveNutrition, mergeNutrition } from '../lib/nutrition.js'
+import { createCompleteBackup, parseCompleteBackup } from '../lib/openform-backup.js'
 import { durationSheet } from '../components/DurationWheel.jsx'
 import { showsConnection, showsLocalLine } from '../components/SyncBanner.jsx'
 import BackupFolderRow, { useBackupFolder, autoBackupSubtitle } from '../components/BackupFolderRow.jsx'
@@ -99,6 +101,7 @@ export default function Settings({ page = null, find = null, via = null }) {
   const { update, importConflict, importBackup, setUnit, resetEverything: resetAll, setUser, pullState, pushState, resetDemo } = useStore()
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
+  const completeRef = useRef(null)
   const importRef = useRef(null)
   const body = useRef(null)
   const wakeOK = wakeLockSupported()
@@ -265,6 +268,53 @@ export default function Settings({ page = null, find = null, via = null }) {
     const blob = new Blob([json], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
     toast(t('Backup exported'))
+  }
+  // Portable JSON for both domains. Legacy gym backups and the media ZIP remain supported.
+  const doCompleteExport = async () => {
+    try {
+      const backup = createCompleteBackup(useStore.getState().S, loadNutrition())
+      const json = JSON.stringify(backup, null, 2)
+      const name = 'openform-komplett-' + todayISO() + '.json'
+      if (MOBILE) { await shareExport(json, name); toast('Komplettbackup exportiert'); return }
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+      const a = document.createElement('a'); a.href = url; a.download = name; a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      toast('Komplettbackup exportiert')
+    } catch (e) { toast(e?.message || 'Komplettbackup fehlgeschlagen') }
+  }
+  const doCompleteImport = async ev => {
+    const file = ev.target.files?.[0]
+    ev.target.value = ''
+    if (!file) return
+    let backup
+    try { backup = parseCompleteBackup(await file.text()) }
+    catch (e) { toast(e?.message || 'Importdatei ungültig'); return }
+    const restore = mergeWith => {
+      try {
+        // The nutrition merge preserves locally recorded meals and supplements.
+        // The gym import follows its established server-conflict handling.
+        const mergedFood = mergeNutrition(loadNutrition(), backup.nutrition)
+        saveNutrition(mergedFood)
+        importBackup(backup.training, { mergeWith })
+        toast('Training und Ernährung importiert. Bestehende Mahlzeiten bleiben erhalten.')
+      } catch (e) { toast(e?.message || 'Wiederherstellung fehlgeschlagen') }
+    }
+    let conflict
+    try { conflict = await importConflict(backup.training) }
+    catch (e) { toast('Serverprüfung fehlgeschlagen. Import nicht gestartet.'); return }
+    if (conflict) {
+      menuSheet({ title: 'openForm-Komplettbackup importieren?',
+        subtitle: `${conflict.workouts} neuere Trainings könnten beim Ersetzen verloren gehen. Ernährung wird mit den vorhandenen Einträgen zusammengeführt.`,
+        items: [
+          { icon: 'merge', label: 'Mit Server-Trainings zusammenführen', onClick: () => restore(conflict) },
+          { icon: 'trash', label: 'Training trotzdem ersetzen', danger: true, onClick: () => restore(null) },
+          { icon: 'xmark', label: 'Abbrechen', onClick: () => {} },
+        ] })
+      return
+    }
+    confirmSheet({ title: 'openForm-Komplettbackup importieren?',
+      message: 'Trainingsdaten werden durch den Backup-Stand ersetzt, laufende Mahlzeiten und Ernährungseinträge bleiben durch Zusammenführen erhalten. Bitte vorher ein aktuelles Komplettbackup erstellen.',
+      confirmText: 'Importieren', danger: true, onConfirm: () => restore(null) })
   }
   // "Export with photos & videos": the same JSON plus every file the state refers to, in a zip
   // (lib/backup-media.js). Signed in, a file this device never downloaded is fetched for it; one
@@ -776,7 +826,9 @@ export default function Settings({ page = null, find = null, via = null }) {
 
     data: () => <>
       <Section title={t('Back up')}>
-        <Row icon="share" iconTint="var(--blue)" title={t('Export backup (JSON)')} subtitle={hasMedia ? t('Without photos and videos') : undefined} accessory="chevron" onClick={doExport} />
+        <Row icon="share" iconTint="var(--green)" title="openForm Komplettbackup (JSON)" subtitle="Training + Ernährung, ohne Fotos/Videos" accessory="chevron" onClick={doCompleteExport} />
+        <Row icon="share" iconTint="var(--blue)" title="Nur Training exportieren (alt)" subtitle="Kompatibel mit alten openGym-Backups" accessory="chevron" onClick={doExport} />
+
         {hasMedia && <Row icon="share" iconTint="var(--blue)" title={t('Export with photos & videos (.zip)')} accessory="chevron" onClick={doExportZip} />}
         {/* 14 is AUTO_BACKUP_KEEP in lib/mobile.js, written out because the Settings tests mock
             that module wholesale; mobile.autobackup.test.js pins the two together. */}
@@ -788,6 +840,11 @@ export default function Settings({ page = null, find = null, via = null }) {
         {MOBILE && android && S.autoBackup && <BackupFolderRow />}
       </Section>
       {MOBILE && android && <HealthConnectCard S={S} toast={toast} />}
+      <Section title="openForm komplett wiederherstellen">
+        <Row icon="download" iconTint="var(--green)" title="Komplettbackup importieren" subtitle="Training + Ernährung aus einer JSON-Datei" accessory="chevron" onClick={() => completeRef.current?.click()} />
+        <div className="dim small" style={{ padding: '4px 16px 12px' }}>Automatische Geräte-Backups und Server-Sync enthalten derzeit nur Trainingsdaten. Für beides dieses Komplettbackup verwenden.</div>
+        <input ref={completeRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doCompleteImport} />
+      </Section>
       <Section title={t('Bring data in')}>
         <Row icon="download" iconTint="var(--teal)" title={t('Import backup')} accessory="chevron" onClick={() => fileRef.current.click()} />
         <Row icon="download" iconTint="var(--teal)" title={t('Import from another app')}
@@ -965,7 +1022,7 @@ function SettingsRoot({ ctx, preview, open, user, sync, home, go }) {
             value={preview[id]?.() || null} accessory="chevron" onClick={() => open(id)} className="sp-root-row" />)}
         </Section>
       ))}
-      <div className="dim small sp-version">openGym v{__APP_VERSION__}</div>
+      <div className="dim small sp-version">openForm v{__APP_VERSION__}</div>
     </>}
   </div>
 }

@@ -52,9 +52,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Ernaehrungsberechnungen testen
+      - name: Ernaehrung, Backup und Navigation testen
         working-directory: frontend
-        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs
+        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs
 
       - name: Mobile Web-App bauen
         working-directory: frontend
@@ -75,6 +75,36 @@ jobs:
             sed -i 's/OpenGymTest/openForm Test/g' android/app/src/debug/res/values/strings.xml
           fi
 
+      # A GitHub-hosted runner is new for every workflow run. Android would otherwise
+      # generate a new debug signing key each time, and refuse in-place APK upgrades.
+      # Generate ONE keystore on your own PC and store its BASE64 in the repository
+      # secret OPENFORM_DEBUG_KEYSTORE_B64 (never commit the keystore itself).
+      - name: Stabile Debug-Signatur laden
+        shell: bash
+        env:
+          OPENFORM_DEBUG_KEYSTORE_B64: ${{ secrets.OPENFORM_DEBUG_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OPENFORM_DEBUG_KEYSTORE_B64" ]; then
+            echo "::error::GitHub Secret OPENFORM_DEBUG_KEYSTORE_B64 fehlt. Anleitung: OPENFORM_UPDATE_SETUP.md"
+            exit 1
+          fi
+          mkdir -p "$HOME/.android"
+          chmod 700 "$HOME/.android"
+          printf '%s' "$OPENFORM_DEBUG_KEYSTORE_B64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+
+      # The package ID is unchanged. Android requires an identical signature and
+      # a versionCode that is not lower than the installed version.
+      - name: Android Build-Nummer aktualisieren
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$((1000 + GITHUB_RUN_NUMBER))
+          sed -i -E "s/versionCode [0-9]+/versionCode ${code}/" frontend/android/app/build.gradle
+          echo "Baue openForm Android versionCode=${code}"
+
       - name: Debug APK erstellen
         working-directory: frontend/android
         run: |
@@ -84,7 +114,7 @@ jobs:
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: openForm-0.2.0-debug
+          name: openForm-0.3.0-debug
           path: frontend/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
