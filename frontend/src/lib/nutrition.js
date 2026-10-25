@@ -4,6 +4,7 @@ import { cleanFavorites, cleanRecipes, cleanSupplements } from './nutrition-extr
 // Nutrients are optional. An absent value means UNKNOWN, not zero.
 // Stored units: fiber g; sodium/calcium/iron/magnesium/potassium/vitaminC mg; vitaminD µg.
 export const MICRO_NUTRIENTS = [
+  { key: 'creatine', label: 'Kreatin', unit: 'g', supplementOnly: true },
   { key: 'omega3', label: 'Omega-3 gesamt', unit: 'mg' },
   { key: 'epa', label: 'EPA (Omega-3)', unit: 'mg' },
   { key: 'dha', label: 'DHA (Omega-3)', unit: 'mg' },
