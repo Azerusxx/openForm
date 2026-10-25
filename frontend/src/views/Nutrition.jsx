@@ -337,18 +337,26 @@ export default function Nutrition() {
           </button>
           {showMicros && <div className="of-micros-content">
             <p className="of-micro-note">Nur erfasste Mengen. Fehlende Angaben bleiben unbekannt. Details antippen.</p>
-            <section className="of-fiber-report" aria-label="Ballaststoff Tagesübersicht">
-              <div className="of-fiber-heading"><strong>Ballaststoffe</strong><span>{fmt(fiberReport.recorded)} / {fmt(fiberReport.target)} g</span></div>
-              <div className="of-fiber-provenance">Erfasste Werte: {fmt(fiberReport.confirmed)} g · KI-geschätzt: {fmt(fiberReport.estimated)} g</div>
-              <div className="of-micro-track" role="progressbar" aria-label="Erfasste Ballaststoffe" aria-valuenow={fiberReport.recorded} aria-valuemin={0} aria-valuemax={fiberReport.target}><span style={{width:`${fiberReport.progress}%`}} /></div>
-              <p className="of-dim">{fiberReport.complete ? `Noch ${fmt(fiberReport.remaining)} g bis zum Orientierungswert.` : `${fmt(fiberReport.recorded)} g nachgewiesen. ${fiberReport.unknownCount} Lebensmittel ohne verwertbare Ballaststoffangabe, tatsächliche Tagesmenge unbekannt.`}</p>
-              <details className="of-fiber-sources"><summary>Lebensmittelquellen ({fiberReport.knownCount}) und Datenlücken ({fiberReport.unknownCount})</summary>
-                {fiberReport.sources.length ? <div className="of-fiber-source-list">{fiberReport.sources.map((food,i) => <div key={food.id || i}><span>{food.name} <small>{fmt(food.quantity)} {food.unit}{food.estimated ? ' · KI-Schätzung' : ' · erfasster Wert'}</small></span><strong>{fmt(food.fiber)} g</strong></div>)}</div> : <p className="of-dim">Noch keine Lebensmittel mit verlässlichen Ballaststoffangaben erfasst.</p>}
-                {fiberReport.missing.length > 0 && <div className="of-fiber-missing"><strong>Angaben fehlen</strong>{fiberReport.missing.map((food,i) => <div key={food.id || i}>{food.name} ({fmt(food.quantity)} {food.unit})</div>)}<p>Lebensmittel bearbeiten: verfügbare Nährstoffwerte ergänzen oder fehlende Werte als KI-Schätzung vorschlagen lassen.</p></div>}
+            <div className="of-micro-cards">
+              <details className="of-micro-card of-micro-compact" key="fiber">
+                <summary className="of-micro-summary">
+                  <span className="of-micro-name">Ballaststoffe</span>
+                  <span className="of-micro-value">{fmt(fiberReport.recorded)} g<small> / {fmt(fiberReport.target)} g</small></span>
+                  <Icon name="chevronDown" />
+                </summary>
+                <div className="of-micro-details">
+                  <div className="of-micro-track" role="progressbar" aria-label="Ballaststoffe" aria-valuenow={fiberReport.recorded} aria-valuemin={0} aria-valuemax={fiberReport.target}><span style={{width:`${fiberReport.progress}%`}} /></div>
+                  <div>Erfasste Werte: {fmt(fiberReport.confirmed)} g · KI-geschätzt: {fmt(fiberReport.estimated)} g</div>
+                  <div>{fiberReport.complete ? `Noch ${fmt(fiberReport.remaining)} g bis zum Orientierungswert.` : `${fiberReport.unknownCount} Lebensmittel ohne verwertbare Ballaststoffangabe. Die tatsächliche Tagesmenge ist unbekannt.`}</div>
+                  <details className="of-fiber-sources">
+                    <summary>Lebensmittelquellen ({fiberReport.knownCount}) und Datenlücken ({fiberReport.unknownCount})</summary>
+                    {fiberReport.sources.length ? <div className="of-fiber-source-list">{fiberReport.sources.map((food,i) => <div key={food.id || i}><span>{food.name} <small>{fmt(food.quantity)} {food.unit}{food.estimated ? ' · KI-Schätzung' : ' · erfasster Wert'}</small></span><strong>{fmt(food.fiber)} g</strong></div>)}</div> : <p className="of-dim">Noch keine Lebensmittel mit Ballaststoffangaben erfasst.</p>}
+                    {fiberReport.missing.length > 0 && <div className="of-fiber-missing"><strong>Angaben fehlen</strong>{fiberReport.missing.map((food,i) => <div key={food.id || i}>{food.name} ({fmt(food.quantity)} {food.unit})</div>)}<p>Lebensmittel bearbeiten und fehlende Nährstoffe per KI schätzen oder einen Etikettwert nachtragen.</p></div>}
+                  </details>
+                </div>
               </details>
-            </section>
-            {nutrientRows.some(n => n.known && n.key !== 'fiber')
-              ? <div className="of-micro-cards">{nutrientRows.filter(n => n.known && n.key !== 'fiber').map(n => {
+              {nutrientRows.filter(n => n.known && n.key !== 'fiber').map(n => {
+
                 const limitText = n.upper ? `Obergrenze: ${fmt(n.upper.max)} ${n.unit} (${n.upper.scope === 'supplement' ? 'nur aus Ergänzungen' : 'Gesamtaufnahme'})` : null
                 return <details className={'of-micro-card of-micro-compact' + (n.limitExceeded ? ' of-micro-warning' : '')} key={n.key}>
                   <summary className="of-micro-summary">
@@ -370,8 +378,8 @@ export default function Nutrition() {
                     {n.key === 'creatine' && <p>Kreatin ist kein Vitamin oder Mineralstoff. Hier wird nur die dokumentierte Einnahme angezeigt.</p>}
                   </div>
                 </details>
-              })}</div>
-              : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
+              })}
+            </div>
           </div>}
           <button type="button" className="of-micros-toggle of-supplements-toggle" aria-expanded={showSupplements} onClick={() => { setShowSupplements(v => !v); setSuppFormOpen(false); setEditingSupplement(null) }}>
             <span>Supplements heute</span>
