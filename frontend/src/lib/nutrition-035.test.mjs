@@ -22,7 +22,7 @@ test('Android app ID preserved across updates',()=>{
 
 test('CI explicitly signs with the secret-backed stable keystore',()=>{
  const gradle=read('../../android/app/build.gradle')
- const workflow=read('../../.github/workflows/android-apk.yml')
+ const workflow=read('../../../.github/workflows/android-apk.yml')
  assert.match(gradle,/signingConfig signingConfigs\.openformDebug/)
  assert.match(gradle,/OPENFORM_DEBUG_KEYSTORE_PATH/)
  assert.match(workflow,/OPENFORM_DEBUG_KEYSTORE_PATH=\$HOME\/.android\/debug.keystore/)
