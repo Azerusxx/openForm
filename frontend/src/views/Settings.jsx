@@ -1611,8 +1611,8 @@ function HealthConnectCard({ S, toast }) {
       const result = await healthStepsForDay(new Date().toLocaleDateString('sv-SE'), {ask:true})
       await refreshRead()
       if(result.ok){setLastSync({time:Date.now(),steps:result.steps}); toast('Health Connect: Schritte gelesen')}
-      else toast(result.reason==='permission'?'Berechtigung nicht erteilt':'Health Connect nicht verfügbar')
-    } catch(e){toast('Schritte konnten nicht gelesen werden')}
+      else toast(describeHealthFailure(result))
+    } catch(e){toast(describeHealthFailure(e))}
     setReadBusy(false)
   }
   const readWalking = async () => {
@@ -1621,10 +1621,10 @@ function HealthConnectCard({ S, toast }) {
       const permission=await requestHealthExercisePermission()
       await refreshRead()
       if(!permission.ok){toast('Aktivitätszugriff: '+permission.reason);setReadBusy(false);return}
-      const result=await healthWalkingSessionsForDay(new Date().toLocaleDateString('sv-SE'))
+      const result=await healthWalkingSessionsForDay(new Date().toLocaleDateString('sv-SE'),{ask:true})
       if(result.ok){setLastSync(x=>({...x,time:Date.now(),walking:result.sessions.length}));toast(result.sessions.length+' Spaziergänge gefunden (nur Vorschau)')}
-      else toast('Berechtigung für Aktivitäten fehlt oder Health Connect nicht verfügbar')
-    } catch(e){toast('Aktivitäten konnten nicht gelesen werden')}
+      else toast(describeHealthFailure(result))
+    } catch(e){toast(describeHealthFailure(e))}
     setReadBusy(false)
   }
   return (
@@ -1652,6 +1652,7 @@ function HealthConnectCard({ S, toast }) {
           catch(e){setDiagnostic({error:e?.message||'Unbekannter Fehler'});toast('Diagnose fehlgeschlagen')}
           finally{setReadBusy(false)}
         }} />
+      <Row icon="info" iconTint="var(--blue)" title="Verbindungsdiagnose" subtitle={readStatus ? `Status: ${readStatus.status} · Schritte: ${readStatus.granted ? 'frei' : 'gesperrt'} · Aktivitäten: ${readStatus.exerciseGranted ? 'frei' : 'gesperrt'}` : 'Status wird geprüft'} accessory="chevron" onClick={async()=>{try{await refreshRead();toast('Health Connect Status aktualisiert')}catch(e){toast(describeHealthFailure(e))}}} />
       <Row icon="list" iconTint="var(--blue)" title="Berechtigungen verwalten"
         subtitle="Zugriff jederzeit in Health Connect ändern"
         accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />
