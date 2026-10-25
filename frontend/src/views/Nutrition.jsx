@@ -12,7 +12,7 @@ import { trainingEnergyForDay } from '../lib/training-energy.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
-const MICRO_GUIDES = { fiber:30, sodium:2000, calcium:1000, iron:10, magnesium:350, potassium:4000, vitaminC:110, vitaminD:20, vitaminA:850, vitaminE:14, vitaminB1:1.2, vitaminB2:1.4, vitaminB6:1.6, vitaminB12:4, folate:300, zinc:11, iodine:200, selenium:70 }
+const MICRO_GUIDES = { omega3:null, epa:null, dha:null, fiber:30, sodium:2000, calcium:1000, iron:10, magnesium:350, potassium:4000, vitaminC:110, vitaminD:20, vitaminA:850, vitaminE:14, vitaminB1:1.2, vitaminB2:1.4, vitaminB6:1.6, vitaminB12:4, folate:300, zinc:11, iodine:200, selenium:70 }
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(), mealType: 'breakfast',
   per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, barcode: null, source: 'manual' })
@@ -267,7 +267,7 @@ export default function Nutrition() {
           {showMicros && <div className="of-micros-content">
             <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
             {MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).length
-              ? <div className="of-nutrient-detail">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{fmt(micros[key])} {unit}<small className="of-dim">/ Richtwert {fmt(MICRO_GUIDES[key])} {unit}</small></strong></div>)}</div>
+              ? <div className="of-nutrient-detail">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{fmt(micros[key])} {unit}{MICRO_GUIDES[key] != null && <small className="of-dim">/ Richtwert {fmt(MICRO_GUIDES[key])} {unit}</small>}</strong></div>)}</div>
               : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
           </div>}
           <h3>Supplements heute</h3>
