@@ -4,6 +4,7 @@ import SwipeRow from '../components/SwipeRow.jsx'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
+import { smartRestForSet } from '../lib/smart-rest.js'
 import { useUI } from '../store/useUI.js'
 import { exOr, betterWeight } from '../lib/exercises.js'
 import { usesBar } from '../lib/bar.js'
@@ -1685,7 +1686,24 @@ function ActiveWorkout() {
       const restSec = restSecFor(fresh.entries, freshUnit || [idx], S.restSec, setRest)
       // A warm-up ramp set may rest shorter than a work set (the exercise's warmupRestSec); the
       // last ramp set, into the first work set, still gets the working rest.
-      const restAfter = warmupRestSecFor(fresh.entries[idx], i, restSec)
+      const activeEntry = fresh.entries[idx]
+      const presetRest = warmupRestSecFor(activeEntry, i, restSec)
+      const recommendation = smartRestForSet({
+        enabled: S.smartRest === true,
+        seconds: presetRest,
+        defaultSeconds: S.restSec,
+        exercise: exerciseNameFor(exOr(activeEntry.id)),
+        reps: activeEntry.sets[i]?.r ?? null,
+        mode: m,
+        superset: (freshUnit?.length || 0) > 1,
+        warmup: isWarmupRow(activeEntry.sets[i]),
+        customRest: Number(activeEntry.target?.restSec) > 0,
+        specializedRest: Number(setRest.sec) > 0,
+      })
+      const restAfter = recommendation.seconds
+      const normalRestMeta = recommendation.source === 'suggested'
+        ? { forSet: i, smartNote: recommendation.reason }
+        : { forSet: i }
 
       // A re-check of finished work must not navigate or reopen a sheet, but it may still owe
       // you a rest — see restOnRecheck, and the other half of issue #3. A rest that already ran
@@ -1693,7 +1711,7 @@ function ActiveWorkout() {
       // still the rest you are in, held on purpose, and a re-check leaves it as it is.
       if (!progress.isNew) {
         const rest = useUI.getState().timer
-        if (!restBeforeWarmup && restOnRecheck({ timerRunning: !!(rest && !rest.ready), unitDone: freshUnitDone, lastUnit: freshWorkoutDone })) startRest(restAfter, idx, { forSet: i })
+        if (!restBeforeWarmup && restOnRecheck({ timerRunning: !!(rest && !rest.ready), unitDone: freshUnitDone, lastUnit: freshWorkoutDone })) startRest(restAfter, idx, normalRestMeta)
         return
       }
 
@@ -1724,7 +1742,7 @@ function ActiveWorkout() {
       // stopRest() first so a rest that belongs after this set replaces the one that was running.
       if (freshUnitDone) stopRest()
       if (!freshUnit || freshUnit.length <= 1) {
-        if (!restBeforeWarmup && restAfterSet({ unitDone: freshUnitDone, lastUnit: freshWorkoutDone })) startRest(restAfter, idx, { forSet: i })
+        if (!restBeforeWarmup && restAfterSet({ unitDone: freshUnitDone, lastUnit: freshWorkoutDone })) startRest(restAfter, idx, normalRestMeta)
         onFocusProgress?.({ unitDone: freshUnitDone })
         return
       }
@@ -1732,10 +1750,10 @@ function ActiveWorkout() {
       const step = supersetFlowStep(fresh.entries, freshUnit, idx)
       if (!step) { onFocusProgress?.({ unitDone: freshUnitDone }); return }
       if (step.unitDone) {
-        if (nextUnit?.length && !restBeforeWarmup) startRest(restAfter, idx, { forSet: i })
+        if (nextUnit?.length && !restBeforeWarmup) startRest(restAfter, idx, normalRestMeta)
       } else {
         if (step.nextIdx != null) update(s => { if (s.active) s.active.cur = step.nextIdx })
-        if (step.roundDone) startRest(restAfter, idx, { forSet: i })
+        if (step.roundDone) startRest(restAfter, idx, normalRestMeta)
       }
       onFocusProgress?.({ unitDone: freshUnitDone })
     }

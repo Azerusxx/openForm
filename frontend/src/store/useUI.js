@@ -272,7 +272,7 @@ export const useUI = create((set, get) => ({
     if (get().toastMsg) runToast(set)
   },
 
-  startRest(sec, forIdx, { kind, forSet } = {}) {
+  startRest(sec, forIdx, { kind, forSet, smartNote } = {}) {
     get().stopRest()
     // Rest timer set to Off. Stopping and returning rather than starting a zero-length timer
     // keeps every caller honest: the four places that start a rest do not each need to know.
@@ -292,7 +292,7 @@ export const useUI = create((set, get) => ({
     // with no beep, no vibration and no flash. Each timer starts from where the page is now.
     pageHiddenAt = document.hidden ? Date.now() : null
     const endsAt = Date.now() + sec * 1000
-    set({ timer: { left: sec, total: sec, endsAt, forIdx, ...(forSet != null ? { forSet } : {}), ...(kind === 'switch' ? { kind } : {}) } })
+    set({ timer: { left: sec, total: sec, endsAt, forIdx, ...(forSet != null ? { forSet } : {}), ...(kind === 'switch' ? { kind } : {}), ...(smartNote && kind !== 'switch' ? { smartNote } : {}) } })
     bookRestEnd(endsAt, sec, kind)
     runRest(set, get)
   },

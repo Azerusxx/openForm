@@ -1,18 +1,20 @@
-// Optional smart rest recommendations for openForm 0.3.7a.
-// Pure logic: never mutates workouts, exercise targets, or an active timer.
-const clamp = (n, min, max) => Math.min(max, Math.max(min, n))
-export function suggestRestSeconds({ exercise = '', previousSeconds = 90, intensity = null, compound = false, reps = null, userSeconds = null } = {}) {
-  const explicit = Number(userSeconds)
-  if (userSeconds != null && Number.isFinite(explicit) && explicit > 0) return { seconds: explicit, reason: 'Eigene Pausenzeit', source: 'manual' }
-  const name = String(exercise).toLocaleLowerCase('de')
-  const heavy = compound || /kniebeuge|beinpresse|kreuzheben|bankdrücken|bankdruecken|rudern|latzug|schulterdrücken|schulterdruecken|squat|deadlift|bench press|leg press/.test(name)
-  let seconds = heavy ? 150 : 90
-  if (Number.isFinite(Number(reps)) && reps !== null && Number(reps) <= 5) seconds += 30
-  if (Number.isFinite(Number(intensity)) && intensity !== null && Number(intensity) >= 9) seconds += 30
-  seconds = clamp(seconds, 45, 240)
-  const fallback = Number(previousSeconds)
-  if (!name && !compound && reps == null && intensity == null && Number.isFinite(fallback) && fallback > 0) {
-    return { seconds: fallback, reason: 'Bisherige Standardpause', source: 'default' }
-  }
-  return { seconds, reason: heavy ? 'Mehrgelenkige Übung / hohe Belastung' : 'Übung mit moderater Belastung', source: 'suggested' }
+// Rule-based optional recommendations, not recovery measurements. Never rewrite workout data.
+const compound = /kniebeuge|beinpresse|kreuzheben|bankdrücken|bankdruecken|rudern|latzug|schulterdrücken|schulterdruecken|squat|deadlift|bench press|leg press|chest press|row|pulldown|shoulder press|hack squat/i
+export function suggestRestSeconds({exercise='', previousSeconds=90, reps=null, intensity=null, userSeconds=null}={}){
+ const manual=Number(userSeconds)
+ if(userSeconds!=null&&Number.isFinite(manual)&&manual>0)return {seconds:manual,reason:'Eigene Pausenzeit',source:'manual'}
+ const fallback=Number(previousSeconds)
+ if(!(Number.isFinite(fallback)&&fallback>0))return {seconds:0,reason:'Timer ausgeschaltet',source:'off'}
+ const name=String(exercise||'').trim()
+ if(!name)return {seconds:fallback,reason:'Bisherige Standardpause',source:'default'}
+ const heavy=compound.test(name)
+ let sec=heavy?150:90
+ if(reps!=null&&Number.isFinite(Number(reps))&&Number(reps)>0&&Number(reps)<=5)sec+=30
+ if(intensity!=null&&Number.isFinite(Number(intensity))&&Number(intensity)>=9)sec+=30
+ return {seconds:Math.max(45,Math.min(240,sec)),reason:heavy?'Mehrgelenkige Übung':'Moderate Belastung',source:'suggested'}
+}
+export function smartRestForSet({enabled=false,seconds=0,defaultSeconds=90,exercise='',reps=null,mode='reps',superset=false,warmup=false,customRest=false,specializedRest=false}={}){
+ const unchanged={seconds,reason:'',source:'unchanged'}
+ if(!enabled||!(seconds>0)||!(defaultSeconds>0)||mode!=='reps'||superset||warmup||customRest||specializedRest)return unchanged
+ return suggestRestSeconds({exercise,reps,previousSeconds:seconds})
 }

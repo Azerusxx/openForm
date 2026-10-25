@@ -61,7 +61,7 @@ jobs:
 
       - name: Ernaehrung, Backup und Navigation testen
         working-directory: frontend
-        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs src/lib/nutrition-micros.test.mjs src/lib/coach-nutrition.test.mjs src/lib/training-energy.test.mjs src/lib/openform-recovery.test.mjs src/lib/nutrition-035.test.mjs
+        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs src/lib/nutrition-micros.test.mjs src/lib/coach-nutrition.test.mjs src/lib/training-energy.test.mjs src/lib/openform-recovery.test.mjs src/lib/nutrition-035.test.mjs src/lib/smart-rest.test.mjs
 
       - name: Hybrid-Ernährungssuche testen
         working-directory: frontend
@@ -141,13 +141,13 @@ jobs:
           pkg=$("$aapt" dump badging "$apk" | grep '^package:' | head -1)
           echo "$pkg"
           echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
-          echo "$pkg" | grep -F "versionName='0.3.6'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
+          echo "$pkg" | grep -F "versionName='0.3.7a'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
           echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: openForm-0.3.6-debug
+          name: openForm-0.3.7a-debug
           path: frontend/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
