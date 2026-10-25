@@ -9,6 +9,7 @@ import { MOBILE } from '../lib/mobile.js'
 import { armRestAlert, bindNativeRest, disarmRestAlert, holdRestAlert, toneNative } from '../lib/rest-alert.js'
 import { useStore } from './useStore.js'
 import { REST_MAX } from '../lib/duration.js'
+import { suggestedRestForBand } from '../lib/smart-rest.js'
 import { accentValue } from '../lib/accent.js'
 
 // Fire-and-forget: lets the server push a "rest over" alert if this tab gets suspended
@@ -272,7 +273,7 @@ export const useUI = create((set, get) => ({
     if (get().toastMsg) runToast(set)
   },
 
-  startRest(sec, forIdx, { kind, forSet, smartNote } = {}) {
+  startRest(sec, forIdx, { kind, forSet, smartNote, smartContext, smartRecommendedSeconds, smartEffortChoice } = {}) {
     get().stopRest()
     // Rest timer set to Off. Stopping and returning rather than starting a zero-length timer
     // keeps every caller honest: the four places that start a rest do not each need to know.
@@ -293,7 +294,15 @@ export const useUI = create((set, get) => ({
     pageHiddenAt = document.hidden ? Date.now() : null
     const startedAt = Date.now()
     const endsAt = startedAt + sec * 1000
-    set({ timer: { left: sec, total: sec, endsAt, startedAt, forIdx, ...(forSet != null ? { forSet } : {}), ...(kind === 'switch' ? { kind } : {}), ...(smartNote && kind !== 'switch' ? { smartNote } : {}) } })
+    set({ timer: { left: sec, total: sec, endsAt, startedAt, forIdx,
+      ...(forSet != null ? { forSet } : {}),
+      ...(kind === 'switch' ? { kind } : {}),
+      ...(smartNote && kind !== 'switch' ? { smartNote } : {}),
+      ...(smartContext && kind !== 'switch' ? {
+        smartContext, smartRecommendedSeconds: smartRecommendedSeconds ?? sec,
+        smartEffortChoice: smartEffortChoice ?? null,
+      } : {}),
+    } })
     bookRestEnd(endsAt, sec, kind)
     runRest(set, get)
   },
@@ -324,6 +333,21 @@ export const useUI = create((set, get) => ({
     set({ timer: { ...rest, endsAt } })
     bookRestEnd(endsAt, tm.total, tm.kind)
     runRest(set, get)
+  },
+  setSmartRestEffort(band) {
+    const tm = get().timer
+    if (!tm || tm.ready || !tm.smartContext || !['hard','normal','easy'].includes(band)) return
+    const proposal = suggestedRestForBand(tm.smartContext, band)
+    if (!proposal || tm.smartEffortChoice === band) return
+    const delta = proposal.seconds - (tm.smartRecommendedSeconds ?? tm.total)
+    // Preserve manually modified seconds. Do not skip the timer if a lower estimate
+    // arrives close to the end of the countdown.
+    const safeDelta = delta < 0 ? Math.max(delta, 1 - tm.left) : delta
+    if (safeDelta) get().addRest(safeDelta)
+    const latest = get().timer
+    if (!latest || latest.startedAt !== tm.startedAt || latest.ready) return
+    set({ timer: { ...latest, smartEffortChoice: band,
+      smartRecommendedSeconds: proposal.seconds, smartNote: proposal.reason } })
   },
   addRest(sec) {
     const tm = get().timer
@@ -464,7 +488,7 @@ const saveRest = tm => {
   if (!ss) return
   try {
     if (!tm || tm.ready) ss.removeItem(REST_KEY)
-    else ss.setItem(REST_KEY, JSON.stringify({ endsAt: tm.endsAt, total: tm.total, forIdx: tm.forIdx ?? null, forSet: tm.forSet ?? null, kind: tm.kind || null, startedAt: tm.startedAt || null, paused: !!tm.paused, left: tm.left }))
+    else ss.setItem(REST_KEY, JSON.stringify({ endsAt: tm.endsAt, total: tm.total, forIdx: tm.forIdx ?? null, forSet: tm.forSet ?? null, kind: tm.kind || null, startedAt: tm.startedAt || null, paused: !!tm.paused, left: tm.left, smartContext: tm.smartContext || null, smartNote: tm.smartNote || null, smartRecommendedSeconds: tm.smartRecommendedSeconds ?? null, smartEffortChoice: tm.smartEffortChoice || null }))
   } catch { /* the rest just does not outlive a reload */ }
 }
 export function restoreRest(now = Date.now()) {
@@ -475,7 +499,15 @@ export function restoreRest(now = Date.now()) {
   const total = Math.round(Number(saved.total))
   const ok = useStore.getState().S?.active && total > 0 && (saved.paused ? saved.left > 0 : saved.endsAt > now)
   if (!ok) { try { ss.removeItem(REST_KEY) } catch { /* nothing to drop */ } return false }
-  const base = { total, startedAt: saved.startedAt || now, forIdx: saved.forIdx ?? undefined, ...(saved.forSet != null ? { forSet: saved.forSet } : {}), ...(saved.kind === 'switch' ? { kind: 'switch' } : {}) }
+  const base = { total, startedAt: saved.startedAt || now, forIdx: saved.forIdx ?? undefined,
+    ...(saved.forSet != null ? { forSet: saved.forSet } : {}),
+    ...(saved.kind === 'switch' ? { kind: 'switch' } : {}),
+    ...(saved.smartContext && saved.kind !== 'switch' ? {
+      smartContext: saved.smartContext, smartNote: saved.smartNote || null,
+      smartRecommendedSeconds: saved.smartRecommendedSeconds ?? total,
+      smartEffortChoice: saved.smartEffortChoice || null,
+    } : {}),
+  }
   if (saved.paused) {
     useUI.setState({ timer: { ...base, left: Math.round(saved.left), endsAt: saved.endsAt, paused: true } })
     if (MOBILE) holdRestAlert(Math.round(saved.left), total)

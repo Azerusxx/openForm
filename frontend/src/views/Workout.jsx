@@ -4,7 +4,7 @@ import SwipeRow from '../components/SwipeRow.jsx'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
-import { smartRestForSet } from '../lib/smart-rest.js'
+import { smartRestForSet, repDropAtSameWeight } from '../lib/smart-rest.js'
 import { useUI } from '../store/useUI.js'
 import { exOr, betterWeight } from '../lib/exercises.js'
 import { usesBar } from '../lib/bar.js'
@@ -1688,21 +1688,35 @@ function ActiveWorkout() {
       // last ramp set, into the first work set, still gets the working rest.
       const activeEntry = fresh.entries[idx]
       const presetRest = warmupRestSecFor(activeEntry, i, restSec)
+      const completedSet = activeEntry.sets[i]
+      const exercise = exerciseNameFor(exOr(activeEntry.id))
+      const rir = completedSet?.rir ?? null
+      const rpe = completedSet?.rpe ?? null
+      const failure = isFailureSet(completedSet)
+      const smartContext = {
+        exercise, reps: completedSet?.r ?? null,
+        performanceDrop: repDropAtSameWeight(activeEntry.sets, i),
+        rir, rpe, failure, previousSeconds: presetRest,
+      }
       const recommendation = smartRestForSet({
         enabled: S.smartRest === true,
-        seconds: presetRest,
-        defaultSeconds: S.restSec,
-        exercise: exerciseNameFor(exOr(activeEntry.id)),
-        reps: activeEntry.sets[i]?.r ?? null,
+        seconds: presetRest, defaultSeconds: S.restSec,
+        ...smartContext,
         mode: m,
         superset: (freshUnit?.length || 0) > 1,
-        warmup: isWarmupRow(activeEntry.sets[i]),
+        warmup: isWarmupRow(completedSet),
         customRest: Number(activeEntry.target?.restSec) > 0,
         specializedRest: Number(setRest.sec) > 0,
       })
       const restAfter = recommendation.seconds
       const normalRestMeta = recommendation.source === 'suggested'
-        ? { forSet: i, smartNote: recommendation.reason }
+        ? {
+            forSet: i, smartNote: recommendation.reason, smartContext: smartContext,
+            smartRecommendedSeconds: restAfter,
+            smartEffortChoice: (failure || (rir != null && Number(rir) <= 1) ||
+              (rir == null && rpe != null && Number(rpe) >= 9)) ? 'hard'
+              : ((rir != null || rpe != null) ? 'normal' : null),
+          }
         : { forSet: i }
 
       // A re-check of finished work must not navigate or reopen a sheet, but it may still owe
