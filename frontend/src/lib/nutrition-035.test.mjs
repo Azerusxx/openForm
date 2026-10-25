@@ -19,3 +19,11 @@ test('Android app ID preserved across updates',()=>{
  const src=read('../../android/app/build.gradle')
  for(const term of ['applicationId "app.openform.personal"','applicationIdSuffix ".test"','versionName "0.3.5"']) assert.ok(src.includes(term),term)
 })
+
+test('CI explicitly signs with the secret-backed stable keystore',()=>{
+ const gradle=read('../../android/app/build.gradle')
+ const workflow=read('../../.github/workflows/android-apk.yml')
+ assert.match(gradle,/signingConfig signingConfigs\.openformDebug/)
+ assert.match(gradle,/OPENFORM_DEBUG_KEYSTORE_PATH/)
+ assert.match(workflow,/OPENFORM_DEBUG_KEYSTORE_PATH=\$HOME\/.android\/debug.keystore/)
+})

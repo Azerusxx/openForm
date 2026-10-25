@@ -94,6 +94,7 @@ jobs:
           printf '%s' "$OPENFORM_DEBUG_KEYSTORE_B64" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
           keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+          echo "OPENFORM_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
 
       # The package ID is unchanged. Android requires an identical signature and
       # a versionCode that is not lower than the installed version.
@@ -123,6 +124,8 @@ jobs:
           "$apksigner" verify --verbose --print-certs "$apk"
           actual=$("$apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
           expected=$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | sed -n 's/^.*SHA256: //p' | head -1 | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          echo "APK Zertifikat SHA-256: ${actual:-nicht gefunden}"
+          echo "Keystore Zertifikat SHA-256: ${expected:-nicht gefunden}"
           test -n "$actual" && test -n "$expected" && test "$actual" = "$expected" || { echo "::error::APK ist nicht mit dem hinterlegten Debug-Keystore signiert"; exit 1; }
           pkg=$("$aapt" dump badging "$apk" | grep '^package:' | head -1)
           echo "$pkg"
