@@ -281,21 +281,17 @@ export default function Nutrition() {
           {suppFormOpen && <form className="of-inline-supp-form" onSubmit={addSupplement}>
             <label className="of-supp-field">Supplement<input aria-label="Supplementname" placeholder="z. B. Magnesium" value={suppName} onChange={e => setSuppName(e.target.value)} required /></label>
             <div className="of-supp-form-row">
-              <label className="of-supp-field">Tägliche Menge<input aria-label="Tägliche Menge" type="number" min="0.01" step="any" placeholder="1" value={suppDose} onChange={e => setSuppDose(e.target.value)} required /></label>
+              <label className="of-supp-field">Anzahl / Menge<input aria-label="Tägliche Menge" type="number" min="0.01" step="any" placeholder="1" value={suppDose} onChange={e => setSuppDose(e.target.value)} required /></label>
               <label className="of-supp-field">Einheit<select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="piece">Stk.</option><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option></select></label>
             </div>
-            <details className="of-supp-optional" open={suppAmount !== '' || undefined}>
-              <summary>Nährstoffgehalt angeben (optional)</summary>
-              <p className="of-dim">Wert laut Verpackung pro {suppUnit === 'piece' ? 'Stück' : suppUnit}. Bei Magnesium die Menge an elementarem Magnesium eintragen.</p>
-              <div className="of-supp-form-row">
-                <label className="of-supp-field">Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
-                <label className="of-supp-field">Gehalt pro Einheit<input aria-label="Nährstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
-              </div>
-            </details>
+            <div className="of-supp-form-row">
+              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
+              <label className="of-supp-field">Wirkstoffgehalt pro {suppUnit === 'piece' ? 'Stück' : suppUnit}<input aria-label="Wirkstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
+            </div>
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
           </form>}
-          <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Nährstoffmengen werden ohne Produktangaben nicht automatisch berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
+          <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Wirkstoffmengen werden nur mit hinterlegtem Gehalt berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
         </div>}
       </section>
       <div className="of-plus-zone"><button className="of-big-plus" aria-label="Lebensmittel hinzufügen" aria-expanded={addMenu} onClick={() => setAddMenu(x => !x)}><Icon name={addMenu ? 'xmark' : 'plus'} /></button><p>{meals.length ? 'Mahlzeit hinzufügen' : 'Tippe auf +, um deine erste Mahlzeit zu erfassen'}</p>
