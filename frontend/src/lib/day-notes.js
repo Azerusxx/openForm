@@ -16,6 +16,7 @@
 // skip it, and the issue asked for nothing that nudges towards procrastination.
 import { NOTE_MAX } from './history.js'
 import { todayISO } from './format.js'
+import { illnessOnDay } from './illness.js'
 
 /** The quick picks, in the order the sheet shows them. Labels are English source strings. */
 export const DAY_NOTE_TAGS = ['sick', 'travel', 'rest', 'injured']
@@ -38,7 +39,7 @@ export function readDayNote(entry) {
 export const dayNoteOf = (S, iso) => readDayNote(isMap(S?.dayNotes) ? S.dayNotes[iso] : null)
 
 /** Whether `iso` is excused: it carries a note. The nudge and the reminder skip such a day. */
-export const excusedOn = (S, iso) => dayNoteOf(S, iso) != null
+export const excusedOn = (S, iso) => dayNoteOf(S, iso) != null || illnessOnDay(S, iso, todayISO()) != null
 
 /** Whether `iso` can take a note at all: a real date, today or earlier. */
 export const canNoteDay = (iso, today = todayISO()) => ISO.test(String(iso || '')) && iso <= today

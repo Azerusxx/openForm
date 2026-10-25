@@ -18,7 +18,7 @@ export function cleanIllness(raw) {
  const end=validDay(raw.end)?raw.end:null
  if(end&&end<raw.start)return null
  const plannedReturn=validDay(raw.plannedReturn)?raw.plannedReturn:null
- if(plannedReturn&&plannedReturn<=(end||raw.start))return null
+ if(plannedReturn&&(!end||plannedReturn<=end))return null
  return {
   start:raw.start,end,plannedReturn,
   note:typeof raw.note==='string'?raw.note.trim().slice(0,300):'',
@@ -44,6 +44,7 @@ export function latestIllness(state,today) {
 export function recoveryStatus(record,today) {
  const r=cleanIllness(record)
  if(!r||!validDay(today))return {state:'unknown',label:'Keine Angaben'}
+ if(today<r.start)return {state:'upcoming',label:'Krankheitszeitraum geplant'}
  if(today>=r.start&&(!r.end||today<=r.end))return {state:'ill',label:'Krankheitszeitraum'}
  if(!r.end)return {state:'ill',label:'Krankheitszeitraum offen'}
  const checks=[r.feverFree,r.improving,r.noWarning,r.dailyEnergy].every(Boolean)
