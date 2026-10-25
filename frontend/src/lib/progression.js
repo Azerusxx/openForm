@@ -337,6 +337,24 @@ export function sessionsFor(S, exId, fallback, rid) {
   return sessionsIn(S, exId, fallback, null)
 }
 
+// 0.3.8: exercise-level progression across compatible routines. A heavy/light variant
+// with a different prescription remains separate; old un-stamped records are only
+// borrowed if this routine has no own history (legacy behavior in sessionsFor).
+// No workout is rewritten. A pause between sessions has no artificial miss count.
+export function exerciseSessionsFor(S, exId, cfg, rid) {
+  const all = sessionsIn(S, exId, cfg, null)
+  if (!rid) return all
+  const own = all.filter(s => s.rid === rid)
+  const compatible = all.filter(s => s.rid !== rid && s.planned &&
+    !planChanged(s.planned, cfg) &&
+    (s.planned.weight == null || cfg?.weight == null ||
+      Number(s.planned.weight) === Number(cfg.weight)))
+  // No stamped cross-routine match: preserve the established routine-specific
+  // progress (including historic sessions with no planned snapshot).
+  if (!compatible.length) return own.length ? own : sessionsFor(S, exId, cfg, rid)
+  return all.filter(s => s.rid === rid || compatible.includes(s))
+}
+
 function sessionsIn(S, exId, fallback, rid) {
   const out = []
   ;(S.workouts || []).forEach(w => {
@@ -470,7 +488,9 @@ export function nextPrescription(S, cfg, routine) {
 
   // The routine's own sessions of this exercise, or the exercise's whole history when the
   // routine has none yet (issue #216) — see sessionsFor.
-  const sessions = sessionsFor(S, cfg.id, cfg, routine?.id).filter(s => s.mode === mode)
+  const sessions = (S.progressionScope === 'exercise'
+    ? exerciseSessionsFor(S, cfg.id, cfg, routine?.id)
+    : sessionsFor(S, cfg.id, cfg, routine?.id)).filter(s => s.mode === mode)
   const last = sessions[sessions.length - 1]
   // Triple progression starts a cycle at the base sets and the bottom of the range, so its first
   // session does too; the weight is still the plan's.
