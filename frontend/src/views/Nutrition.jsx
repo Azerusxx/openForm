@@ -370,8 +370,7 @@ export default function Nutrition() {
           <span className="of-accordion-summary">{data.supplements.filter(x => x.logs.includes(date)).length}/{data.supplements.length} eingenommen <Icon name={showNutritionExtras ? 'chevronUp' : 'chevronDown'} /></span>
         </button>
         {showNutritionExtras && <div id="of-nutrition-details" className="of-accordion-body">
-          <details className="of-macro-details"><summary>Makronährstoffe im Detail</summary><h3>Makronährstoffe</h3>
-          <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {macroGoals[key] == null ? '' : `von ${fmt(macroGoals[key])} g`}</strong></div>)}</div>
+          <p className="of-micro-note">Makronährstoffe stehen bereits in der Tagesübersicht. Hier findest du nur Mikronährstoffe und Supplements.</p>
           <button type="button" className="of-micros-toggle" aria-expanded={showMicros} onClick={() => setShowMicros(v => !v)}>
             <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{nutrientRows.filter(n => n.known).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
@@ -636,13 +635,11 @@ export default function Nutrition() {
         {suggestedMeals.length ? <div className="of-analysis-frequent">{suggestedMeals.map(item=><div key={item.name+item.latest.unit}><span><strong>{item.name}</strong><small>{item.count}× · {fmt(item.energy)} kcal{item.related.length?' · Ähnlich: '+item.related.join(', '):''}</small></span><button type="button" onClick={()=>log(item.latest,item.latest.mealType||selectedMeal)}>+ Eintragen</button></div>)}</div> : <p>Erfasse zuerst Mahlzeiten, um sie hier wiederholen zu können.</p>}
       </section>
     </>}
-    {tab === 'backup' && <>
-      <div className="card of-backup"><h2>Datensicherung zentral verwalten</h2><p>Vollständige Sicherungen mit Training, Ernährung, Gewicht und Supplements findest du unter Einstellungen → Daten & Backup. Die spezialisierten Ernährungsimporte bleiben hier verfügbar.</p>
-        <button type="button" onClick={()=>window.location.assign('/settings/data')}>Zu Daten & Backup</button>
-        <div className="of-actions"><button onClick={exportBackup}><Icon name="share" /> Nur Ernährung exportieren</button><button onClick={() => backupInput.current?.click()}><Icon name="download" /> Nur Ernährung importieren</button>
-          <input hidden type="file" ref={backupInput} accept=".json,application/json" onChange={async e => { await importBackup(e.target.files?.[0]); e.target.value = '' }} /></div>
-      </div>
-    </>}
+    {tab === 'backup' && <div className="card of-backup">
+      <h2>Datensicherung</h2>
+      <p>Vollständige Backups sowie Spezialimporte für Ernährung und Training werden zentral unter Einstellungen → Daten & Backup verwaltet.</p>
+      <button type="button" onClick={()=>window.location.assign('/settings/data')}>Daten & Backup öffnen</button>
+    </div>}
   </div>
 }
 function Progress({ value, max }) { return <div className="of-bar" role="progressbar" aria-valuenow={value} aria-valuemin="0" aria-valuemax={max || 0}><span style={{ width: `${Math.min(100, max > 0 ? 100 * value / max : 0)}%` }} /></div> }
