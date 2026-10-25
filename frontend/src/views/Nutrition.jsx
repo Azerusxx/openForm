@@ -480,15 +480,11 @@ export default function Nutrition() {
         <div className="of-2-col">{[['kcal','Kalorien'],['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([k,label]) =>
           <label key={k}>{label} ({k === 'kcal' ? 'kcal' : 'g'})<input required type="number" min="0" step="any" value={form.per100[k]} onChange={e => setForm(f => ({ ...f, per100: { ...f.per100, [k]: e.target.value } }))} /></label>)}</div>
         <section className="of-fiber-input">
-          <label>Ballaststoffe pro 100 {form.basis} (g)
-            <input type="number" min="0" step="any" placeholder="Unbekannt"
-              value={form.per100Micros?.fiber ?? ''}
-              onChange={e => setForm(old => ({...old,per100Micros:{...old.per100Micros,fiber:e.target.value},
-                microsSources:{...old.microsSources, fiber:e.target.value === '' ? null : 'manual'},
-                fiberSource:e.target.value === '' ? null : 'manual'}))} />
-          </label>
-          <div className="of-dim">Quelle: {(form.microsSources?.fiber || form.fiberSource) === 'ai_estimate' ? 'KI-Schätzung, nicht verifiziert' : (form.microsSources?.fiber || form.fiberSource) === 'database' ? 'Lebensmitteldatenbank' : form.per100Micros?.fiber !== undefined && form.per100Micros?.fiber !== '' ? 'Manuelle Angabe' : 'Unbekannt'}</div>
-          <button type="button" disabled={fiberBusy || !form.name.trim() || form.basis !== 'g'} onClick={estimateFormMicros}>{fiberBusy ? 'KI analysiert…' : 'Fehlende Mikronährstoffe mit KI schätzen'}</button>
+          <button type="button" disabled={fiberBusy || !form.name.trim() || form.basis !== 'g'}
+            onClick={estimateFormMicros}>{fiberBusy ? 'KI analysiert…' : 'Fehlende Mikronährstoffe mit KI schätzen'}</button>
+          <div className="of-dim">Die KI ergänzt nur fehlende Angaben. Vorhandene Datenbankwerte und deine Korrekturen bleiben erhalten.</div>
+          {Object.values(form.microsSources || {}).some(v => v === 'ai_estimate') &&
+            <div className="of-dim">KI-Schätzwerte vorhanden. Unter „Weitere Mikronährstoffe“ prüfen und bei Bedarf korrigieren.</div>}
         </section>
         <details className="of-optional-micros"><summary>Weitere Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.filter(n => n.key !== 'fiber' && !n.supplementOnly && !['omega3','epa','dha'].includes(n.key)).map(({key,label,unit}) => <label key={key}>{label} ({unit}){form.microsSources?.[key] === 'ai_estimate' ? ' · KI' : form.microsSources?.[key] === 'database' ? ' · DB' : ''}<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value}, microsSources: {...f.microsSources, [key]: e.target.value === '' ? null : 'manual'} }))} /></label>)}</div></details>
         <div className="of-macro-sub">Portion: {fmt(entryTotals(form).kcal)} kcal · {fmt(entryTotals(form).protein)} g Protein</div>
