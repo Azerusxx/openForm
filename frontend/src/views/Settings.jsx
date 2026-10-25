@@ -39,7 +39,7 @@ import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmen
 import Icon from '../components/Icon.jsx'
 import NutritionGoalsSettings from './NutritionGoalsSettings.jsx'
 import { loadNutrition, saveNutrition, mergeNutrition } from '../lib/nutrition.js'
-import { createCompleteBackup, parseCompleteBackup } from '../lib/openform-backup.js'
+import { createCompleteBackup, parseCompleteBackup, backupManifest, verifyCompleteSnapshot } from '../lib/openform-backup.js'
 import { backupCounts, backupHasEntries, backupCountLabel, verifyRestoredBackup, verifyPersistedBackup } from '../lib/backup-review.js'
 import { durationSheet } from '../components/DurationWheel.jsx'
 import { showsConnection, showsLocalLine } from '../components/SyncBanner.jsx'
@@ -275,13 +275,15 @@ export default function Settings({ page = null, find = null, via = null }) {
   const doCompleteExport = async () => {
     try {
       const backup = createCompleteBackup(useStore.getState().S, loadNutrition())
+      const verified=verifyCompleteSnapshot(backup,{...backup,nutrition:backup.nutrition})
+      if(!verified.ok)throw new Error('Backup-Vollständigkeitsprüfung fehlgeschlagen: '+verified.missing.join(', '))
       const json = JSON.stringify(backup, null, 2)
       const name = 'openform-komplett-' + todayISO() + '.json'
       if (MOBILE) { await shareExport(json, name); toast('Komplettbackup exportiert'); return }
       const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
       const a = document.createElement('a'); a.href = url; a.download = name; a.click()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-      toast('Komplettbackup exportiert')
+      toast('Komplettbackup exportiert: '+JSON.stringify(backupManifest(backup)))
     } catch (e) { toast(e?.message || 'Komplettbackup fehlgeschlagen') }
   }
   const doCompleteImport = async ev => {
@@ -291,6 +293,7 @@ export default function Settings({ page = null, find = null, via = null }) {
     let backup
     try { backup = parseCompleteBackup(await file.text()) }
     catch (e) { toast(e?.message || 'Importdatei ungültig'); return }
+    const preview=backupManifest({kind:'openform-complete',training:backup.training,nutrition:backup.nutrition})
     const restore = mergeWith => {
       try {
         // Import training first and verify the visible store BEFORE changing nutrition.
@@ -300,6 +303,9 @@ export default function Settings({ page = null, find = null, via = null }) {
         if (!proof.ok || !durable.ok) throw new Error('Training nicht zuverlässig gespeichert. Bitte App nicht deinstallieren und das Backup behalten.')
         const mergedFood = mergeNutrition(loadNutrition(), backup.nutrition)
         saveNutrition(mergedFood)
+        const checked=loadNutrition()
+        const lost=['entries','water','activities','favorites','recipes','supplements'].filter(key=>!backup.nutrition[key]?.every(item=>checked[key]?.some(x=>x.id===item.id)))
+        if(lost.length)throw new Error('Ernährungsimport nicht vollständig: '+lost.join(', '))
         toast(`Importiert: ${backupCountLabel(useStore.getState().S)} · ${mergedFood.entries.length} Mahlzeiten.`)
       } catch (e) { toast(e?.message || 'Wiederherstellung fehlgeschlagen') }
     }
@@ -308,7 +314,7 @@ export default function Settings({ page = null, find = null, via = null }) {
     catch (e) { toast('Serverprüfung fehlgeschlagen. Import nicht gestartet.'); return }
     if (conflict) {
       menuSheet({ title: 'openForm-Komplettbackup importieren?',
-        subtitle: `${conflict.workouts} neuere Trainings könnten beim Ersetzen verloren gehen. Ernährung wird mit den vorhandenen Einträgen zusammengeführt.`,
+        subtitle: `${conflict.workouts} neuere Trainings könnten beim Ersetzen verloren gehen. Enthalten: ${preview.workouts} Trainings, ${preview.bodyweight} Wägungen, ${preview.entries} Mahlzeiten, ${preview.supplements} Supplements. Ernährung wird zusammengeführt.`,
         items: [
           { icon: 'merge', label: 'Mit Server-Trainings zusammenführen', onClick: () => restore(conflict) },
           { icon: 'trash', label: 'Training trotzdem ersetzen', danger: true, onClick: () => restore(null) },
@@ -317,7 +323,7 @@ export default function Settings({ page = null, find = null, via = null }) {
       return
     }
     confirmSheet({ title: 'openForm-Komplettbackup importieren?',
-      message: 'Trainingsdaten werden durch den Backup-Stand ersetzt, laufende Mahlzeiten und Ernährungseinträge bleiben durch Zusammenführen erhalten. Bitte vorher ein aktuelles Komplettbackup erstellen.',
+      message: `Enthalten: ${preview.workouts} Trainings, ${preview.bodyweight} Wägungen, ${preview.entries} Mahlzeiten, ${preview.supplements} Supplements. Training wird ersetzt, Ernährung zusammengeführt. Bitte vorab ein aktuelles Backup erstellen.`,
       confirmText: 'Importieren', danger: true, onConfirm: () => restore(null) })
   }
   // "Export with photos & videos": the same JSON plus every file the state refers to, in a zip
