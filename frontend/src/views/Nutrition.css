@@ -358,3 +358,11 @@
 .of-032 .of-fiber-source-list strong{white-space:nowrap}
 .of-032 .of-fiber-missing{border-top:1px solid var(--sep);padding-top:10px;display:grid;gap:5px;color:var(--label-2)}
 .of-032 .of-fiber-missing>strong{color:var(--label)}
+
+/* 0.4.0g AI-estimated fibre remains visibly distinct from declared values. */
+.of-032 .of-fiber-provenance{font-size:11px;color:var(--label-2);margin:7px 0}
+.of-032 .of-fiber-input{border:1px solid var(--sep);border-radius:12px;padding:12px;margin:12px 0;display:grid;gap:8px}
+.of-032 .of-fiber-input label{display:grid;gap:6px;font-size:13px}
+.of-032 .of-fiber-input input{width:100%;min-height:42px;color:var(--label);background:var(--bg);border:1px solid var(--sep);border-radius:8px;padding:10px}
+.of-032 .of-fiber-input button{min-height:42px;border:1px solid var(--acc);color:var(--acc);border-radius:9px;padding:9px 12px}
+.of-032 .of-fiber-input button:disabled{opacity:.45}
