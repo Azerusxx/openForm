@@ -29,6 +29,8 @@ import {
   changeTitle, changeValues, exName, canRevert, revertLast
 } from '../lib/coach.js'
 import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
+import { loadNutrition } from '../lib/nutrition.js'
+import { nutritionQuestion, coachNutritionReport } from '../lib/coach-nutrition.js'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited, JOB_ERRORS } from '../lib/coach-api.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -100,9 +102,19 @@ export default function CoachChat() {
   const coach = S.coach || emptyCoach()
   const community = !!config?.coach?.community && !DEMO && !(MOBILE && coachMode === 'byok')
 
+  const reviewNutrition = (question = 'Wie läuft meine Ernährung?') => {
+    // Nutrition currently lives only on-device and must not be silently sent to a remote provider.
+    const report = coachNutritionReport(loadNutrition(), S)
+    update(s => {
+      appendChat(s, { role: 'user', kind: 'text', text: question })
+      appendChat(s, { role: 'coach', kind: 'text', text: report })
+    })
+    return true
+  }
   const send = async () => {
     const msg = text.trim()
     if (!msg || busy) return
+    if (nutritionQuestion(msg)) { reviewNutrition(msg); setText(''); return }
     setBusy(true)
     try {
       // A message about a proposed plan refines it. With no plan at all — the first attempt
@@ -156,6 +168,7 @@ export default function CoachChat() {
   const menu = () => openSheet(close => <div className="chat-menu">
     <h3>{t('Coach')}</h3>
     <div className="sect-b">
+      {idle && <Row icon="flame" iconTint="var(--orange)" title="Ernährung auswerten" subtitle="Lokal, ohne API-Kosten · Kalorien, Protein, Supplements" accessory="chevron" onClick={() => { close(); reviewNutrition() }} />}
       {idle && <Row icon="sparkles" iconTint="var(--acc)" title={t('Ask for a review')} subtitle={t('What would the Coach change after your last sessions?')} accessory="chevron" onClick={() => { close(); askReview() }} />}
       {idle && !!lastWorkout && <Row icon="checkCircle" iconTint="var(--green)" title={t('Review my last workout')} subtitle={t('What went well, what to watch, what to do next time')} accessory="chevron" onClick={() => { close(); askDebrief() }} />}
       {idle && !!(S.routines || []).length && <Row icon="wrench" iconTint="var(--orange)" title={t('Improve a routine')} subtitle={t('Pick one; the Coach works on just that')} accessory="chevron" onClick={() => { close(); pickRoutine() }} />}
@@ -197,7 +210,7 @@ export default function CoachChat() {
     </div>
 
     <div className="msgs">
-      <Bubble role="coach">{t('Hi, I’m your Coach. I build your plan from your answers and adjust it from what you actually log. Nothing changes until you say so.')}</Bubble>
+      <Bubble role="coach">Training und Ernährung an einem Ort. Ernährungsberichte analysiere ich direkt aus deinen lokalen Einträgen, auch ohne KI-Guthaben. Trainingspläne und Trainingsanpassungen benötigen weiterhin einen erreichbaren KI-Anbieter. Nichts wird ohne deine Zustimmung geändert.</Bubble>
 
       {(coach.chat || []).map(m => <Message key={m.id} m={m} S={S} profile={coach.profile} openSheet={openSheet} />)}
 
@@ -214,6 +227,7 @@ export default function CoachChat() {
 
     <div className="composer">
       {idle && !busy && <div className="chips-row">
+        <button className="qchip" onClick={() => reviewNutrition()}><Icon name="flame" />Ernährung prüfen</button>
         <button className="qchip" onClick={askReview}><Icon name="sparkles" />{t('Review my training')}</button>
         {!!lastWorkout && <button className="qchip" onClick={askDebrief}><Icon name="checkCircle" />{t('Last workout')}</button>}
         {!!(S.routines || []).length && <button className="qchip" onClick={pickRoutine}><Icon name="wrench" />{t('Improve a routine')}</button>}

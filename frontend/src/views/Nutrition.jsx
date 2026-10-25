@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
 import { bwSheet } from '../sheets.jsx'
 import { MOBILE } from '../lib/mobile.js'
 import { scanCode, importCodeFromImage } from '../lib/scan.js'
 import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
-  dayTotals, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
+  dayTotals, dayMicros, MICRO_NUTRIENTS, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
 import './Nutrition.css'
 
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(), mealType: 'breakfast',
-  per100: { kcal: '', protein: '', carbs: '', fat: '' }, barcode: null, source: 'manual' })
+  per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, barcode: null, source: 'manual' })
 const MEAL_GROUPS = [
   { id: 'breakfast', title: 'Frühstück', icon: 'coffee' },
   { id: 'lunch', title: 'Mittagessen', icon: 'plate' },
@@ -20,10 +19,9 @@ const MEAL_GROUPS = [
   { id: 'snack', title: 'Snacks', icon: 'sparkles' },
   { id: 'other', title: 'Weitere Einträge', icon: 'book' }
 ]
-const SECTIONS = [['today','Heute','house'],['diary','Tagebuch','calendar'],['analysis','Trends','chart'],['recipes','Rezepte','plate'],['favorites','Favoriten','star'],['supplements','Supplements','checkCircle'],['backup','Export / Import','download']]
+const SECTIONS = [['today','Heute','house'],['diary','Tagebuch','calendar'],['analysis','Trends','chart'],['recipes','Rezepte','plate'],['favorites','Favoriten','star'],['backup','Export / Import','download']]
 
 export default function Nutrition() {
-  const nav = useNavigate()
   const gym = useStore(s => s.S)
   const weight = gym.bodyweight?.at(-1)?.w
   const [data, setData] = useState(loadNutrition)
@@ -31,6 +29,7 @@ export default function Nutrition() {
   const [drawer, setDrawer] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
   const [showWater, setShowWater] = useState(false)
+  const [showNutritionExtras, setShowNutritionExtras] = useState(false)
   const [selectedMeal, setSelectedMeal] = useState('breakfast')
   const [activityName, setActivityName] = useState('')
   const [activityKcal, setActivityKcal] = useState('')
@@ -60,6 +59,7 @@ export default function Nutrition() {
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = weeklyNutrition(data.entries, date, data.goals)
+  const micros = dayMicros(data.entries, date)
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -74,7 +74,7 @@ export default function Nutrition() {
   const update = fn => commit(fn(loadNutrition()))
   const startNew = (type = selectedMeal) => { setSelectedMeal(type); setForm({ ...EMPTY(), date, mealType: type }); setEditing(null); setShowForm(true); setTab('food'); setAddMenu(false); setNotice('') }
   const edit = e => {
-    setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 } })
+    setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 }, per100Micros: { ...e.per100Micros } })
     setSelectedMeal(e.mealType || 'other'); setEditing(e.id); setShowForm(true); setTab('food'); setNotice('')
   }
   const log = (food, type = selectedMeal) => {
@@ -98,7 +98,7 @@ export default function Nutrition() {
   }
   const setProduct = p => {
     setForm({ ...EMPTY(), name: p.name, quantity: '100', basis: p.basis, unit: p.basis,
-      source: p.source, barcode: p.barcode, per100: p.per100, date, mealType: selectedMeal })
+      source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, date, mealType: selectedMeal })
     setEditing(null); setShowForm(true); setTab('food'); setNotice('Produkt gefunden. Nährwerte und Portion vor dem Speichern prüfen.')
   }
   const lookup = async candidate => {
@@ -191,19 +191,18 @@ export default function Nutrition() {
   }, [drawer, addMenu])
   return <div className="narrow of-nutrition of-032">
     <header className="of-appbar">
-      <div className="of-appbar-brand"><span className="of-brand-symbol"><Icon name="flame" /></span><div><h1>Essen</h1><small>openForm · Ernährung</small></div></div>
+      <div className="of-appbar-brand"><div><h1>Essen</h1></div></div>
       <button className="of-menu-trigger" type="button" aria-label="Ernährungsmenü öffnen" aria-expanded={drawer} onClick={() => setDrawer(true)}><span aria-hidden="true">☰</span></button>
     </header>
     {drawer && <div className="of-drawer-overlay" onClick={() => setDrawer(false)}>
       <aside className="of-drawer" role="dialog" aria-modal="true" aria-label="Ernährungsmenü" onClick={e => e.stopPropagation()}>
         <div className="of-drawer-head"><strong>Ernährung</strong><button aria-label="Menü schließen" onClick={() => setDrawer(false)}><Icon name="xmark" /></button></div>
         {SECTIONS.map(([id,label,icon]) => <button key={id} className={tab === id ? 'current' : ''} onClick={() => goSection(id)}><Icon name={icon} /> {label}</button>)}
-        <div className="of-drawer-divider" />
-        <button onClick={() => { setDrawer(false); nav('/settings/nutrition-profile') }}><Icon name="gear" /> Profil &amp; Ziele <Icon name="chevronRight" /></button>
+
       </aside>
     </div>}
     {tab !== 'today' && <div className="of-subview-head"><button type="button" onClick={() => goSection('today')} aria-label="Zurück zur Ernährung"><Icon name="chevronLeft" /></button><h2>{tab === 'food' ? (showForm ? 'Mahlzeit erfassen' : 'Lebensmittel') : SECTIONS.find(([id]) => id === tab)?.[1]}</h2></div>}
-    {(tab === 'today' || tab === 'diary' || tab === 'supplements') && <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
+    {(tab === 'today' || tab === 'diary') && <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
       <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
       <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
     {notice && <div className="of-notice" role="status">{notice}</div>}
@@ -228,6 +227,31 @@ export default function Nutrition() {
           <span>{fmt(totals[key])} / {data.goals[key] == null ? '–' : fmt(data.goals[key])} g</span>
         </div>)}
       </div>
+      <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
+        <button className="of-accordion-toggle" type="button" aria-expanded={showNutritionExtras} aria-controls="of-nutrition-details" onClick={() => setShowNutritionExtras(v => !v)}>
+          <span><Icon name="clipboard" /> Nährstoffe &amp; Supplements</span>
+          <span className="of-accordion-summary">{data.supplements.filter(x => x.logs.includes(date)).length}/{data.supplements.length} eingenommen <Icon name={showNutritionExtras ? 'chevronUp' : 'chevronDown'} /></span>
+        </button>
+        {showNutritionExtras && <div id="of-nutrition-details" className="of-accordion-body">
+          <h3>Makronährstoffe</h3>
+          <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {data.goals[key] == null ? '' : `von ${fmt(data.goals[key])} g`}</strong></div>)}</div>
+          <h3>Mikronährstoffe &amp; Ballaststoffe</h3>
+          {Object.keys(micros).length ? <div className="of-nutrient-detail">{MICRO_NUTRIENTS.filter(({key}) => micros[key] != null).map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{fmt(micros[key])} {unit}</strong></div>)}</div> : <p className="of-dim">Noch keine Mikronährstoffdaten erfasst. Fehlende Angaben werden nicht als null Gramm gewertet. Du kannst sie beim Lebensmittel ergänzen.</p>}
+          <h3>Supplements heute</h3>
+          {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
+            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}</small></span></label>
+            <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
+          </div>)}
+          {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
+          <form className="of-inline-supp-form" onSubmit={addSupplement}>
+            <input aria-label="Supplementname" placeholder="z. B. Kreatin" value={suppName} onChange={e => setSuppName(e.target.value)} required />
+            <input aria-label="Dosis" type="number" min="0.01" step="any" placeholder="Dosis" value={suppDose} onChange={e => setSuppDose(e.target.value)} required />
+            <select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option><option value="piece">Stk.</option></select>
+            <button type="submit" aria-label="Supplement hinzufügen"><Icon name="plus" /></button>
+          </form>
+          <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Nährstoffmengen werden ohne Produktangaben nicht automatisch berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
+        </div>}
+      </section>
       <div className="of-plus-zone"><button className="of-big-plus" aria-label="Lebensmittel hinzufügen" aria-expanded={addMenu} onClick={() => setAddMenu(x => !x)}><Icon name={addMenu ? 'xmark' : 'plus'} /></button><p>{meals.length ? 'Mahlzeit hinzufügen' : 'Tippe auf +, um deine erste Mahlzeit zu erfassen'}</p>
         {addMenu && <div className="of-add-popover"><button onClick={() => openFood()}><Icon name="magnifier" /> Lebensmittel suchen</button><button onClick={() => { openFood(); scan() }}><Icon name="qr" /> Barcode scannen</button><button onClick={() => startNew()}><Icon name="pencil" /> Manuell eintragen</button><button onClick={() => { setAddMenu(false); fileInput.current?.click() }}><Icon name="image" /> Barcode aus Foto</button><button onClick={() => goSection('recipes')}><Icon name="plate" /> Rezept eintragen</button></div>}
       </div>
@@ -284,6 +308,7 @@ export default function Nutrition() {
         <div className="of-form-caption">Nährwerte pro 100 {form.basis}, nicht pro Portion</div>
         <div className="of-2-col">{[['kcal','Kalorien'],['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([k,label]) =>
           <label key={k}>{label} ({k === 'kcal' ? 'kcal' : 'g'})<input required type="number" min="0" step="any" value={form.per100[k]} onChange={e => setForm(f => ({ ...f, per100: { ...f.per100, [k]: e.target.value } }))} /></label>)}</div>
+        <details className="of-optional-micros"><summary>Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.map(({key,label,unit}) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value} }))} /></label>)}</div></details>
         <div className="of-macro-sub">Portion: {fmt(entryTotals(form).kcal)} kcal · {fmt(entryTotals(form).protein)} g Protein</div>
         <div className="of-form-buttons"><button type="button" onClick={() => setShowForm(false)}>Abbrechen</button><button type="submit">{editing ? 'Aktualisieren' : 'Eintragen'}</button></div>
       </form>}
@@ -321,19 +346,6 @@ export default function Nutrition() {
         <div className="of-actions"><button onClick={exportBackup}><Icon name="share" /> Export</button><button onClick={() => backupInput.current?.click()}><Icon name="download" /> Import</button>
           <input hidden type="file" ref={backupInput} accept=".json,application/json" onChange={async e => { await importBackup(e.target.files?.[0]); e.target.value = '' }} /></div>
       </div>
-    </>}
-    {tab === 'supplements' && <>
-      <div className="card of-form"><h2>Supplements</h2><p className="of-dim">Hier erfasst du die Einnahme. Kalorienhaltige Supplements wie Proteinshakes zusätzlich im Ernährungstagebuch eintragen.</p>
-        <form className="of-supp-form" onSubmit={addSupplement}>
-          <label>Name<input required value={suppName} onChange={e => setSuppName(e.target.value)} placeholder="z. B. Kreatin" /></label>
-          <div className="of-2-col"><label>Dosis<input required type="number" min="0.01" step="any" value={suppDose} onChange={e => setSuppDose(e.target.value)} /></label>
-            <label>Einheit<select value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option><option value="piece">Stück</option></select></label></div>
-          <button className="of-primary" type="submit">Supplement hinzufügen</button>
-        </form></div>
-      {data.supplements.length ? data.supplements.map(s => <div className="card of-supp-item" key={s.id}>
-        <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /> <span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit} · {s.logs.includes(date) ? 'heute erfasst' : 'nicht erfasst'}</small></span></label>
-        <button title="Entfernen" aria-label={`${s.name} löschen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
-      </div>) : <div className="of-empty">Noch keine Supplements eingerichtet.</div>}
     </>}
   </div>
 }

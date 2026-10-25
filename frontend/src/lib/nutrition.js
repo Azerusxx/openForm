@@ -1,6 +1,40 @@
 import { cleanFavorites, cleanRecipes, cleanSupplements } from './nutrition-extra.js'
 // openForm nutrition v0.1: intentionally separate from gym_state_v1 until sync/merge
 // and complete-backup support have been implemented and tested.
+// Nutrients are optional. An absent value means UNKNOWN, not zero.
+// Stored units: fiber g; sodium/calcium/iron/magnesium/potassium/vitaminC mg; vitaminD µg.
+export const MICRO_NUTRIENTS = [
+  { key: 'fiber', label: 'Ballaststoffe', unit: 'g', off: 'fiber_100g', factor: 1 },
+  { key: 'sodium', label: 'Natrium', unit: 'mg', off: 'sodium_100g', factor: 1000 },
+  { key: 'calcium', label: 'Calcium', unit: 'mg', off: 'calcium_100g', factor: 1000 },
+  { key: 'iron', label: 'Eisen', unit: 'mg', off: 'iron_100g', factor: 1000 },
+  { key: 'magnesium', label: 'Magnesium', unit: 'mg', off: 'magnesium_100g', factor: 1000 },
+  { key: 'potassium', label: 'Kalium', unit: 'mg', off: 'potassium_100g', factor: 1000 },
+  { key: 'vitaminC', label: 'Vitamin C', unit: 'mg', off: 'vitamin-c_100g', factor: 1000 },
+  { key: 'vitaminD', label: 'Vitamin D', unit: 'µg', off: 'vitamin-d_100g', factor: 1e6 },
+]
+export function cleanMicros(source) {
+  if (!source || typeof source !== 'object') return {}
+  return Object.fromEntries(MICRO_NUTRIENTS.flatMap(({key}) => {
+    const v = source[key]
+    return v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) || Number(v) < 0 ? [] : [[key, Number(v)]]
+  }))
+}
+export function entryMicros(entry) {
+  const size = entry.unit === 'piece' ? Number(entry.pieceSize) : 1
+  const qty = Number(entry.quantity)
+  if (!(size > 0 && qty > 0)) return {}
+  const factor = qty * size / Number(entry.unitPer100 || 100)
+  return Object.fromEntries(Object.entries(cleanMicros(entry.per100Micros)).map(([key,value]) => [key, Math.round(value * factor * 100) / 100]))
+}
+export function dayMicros(entries, date) {
+  const sum = {}
+  for (const entry of entries || []) {
+    if (entry.date !== date) continue
+    for (const [key,value] of Object.entries(entryMicros(entry))) sum[key] = Math.round(((sum[key] ?? 0) + value) * 100) / 100
+  }
+  return sum
+}
 export const NUTRITION_KEY = 'openform_nutrition_v1'
 export const NUTRITION_VERSION = 1
 export const NEW_NUTRITION = () => ({
@@ -45,7 +79,7 @@ export function normalizedNutrition(data) {
   d.entries = data.entries.filter(e => e && typeof e.id === 'string' && validDate(e.date) && typeof e.name === 'string' && positive(e.quantity) && (e.unit === 'g' || e.unit === 'ml' || e.unit === 'piece') && positive(e.unitPer100 || 100)).map(e => ({
     ...e, name: e.name.slice(0, 160), date: e.date, quantity: n(e.quantity),
     mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(e.mealType) ? e.mealType : 'other',
-    unitPer100: n(e.unitPer100 || 100), per100: nutrients(e.per100),
+    unitPer100: n(e.unitPer100 || 100), per100: nutrients(e.per100), per100Micros: cleanMicros(e.per100Micros),
     pieceSize: positive(e.pieceSize) ? n(e.pieceSize) : null,
     source: typeof e.source === 'string' ? e.source : 'manual'
   })).filter(e => e.unit !== 'piece' || positive(e.pieceSize))
@@ -87,14 +121,14 @@ export function dayTotals(entries, date) {
     return sum
   }, nutrients({}))
 }
-export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other' }) {
+export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other', per100Micros = {} }) {
   const cleanName = String(name || '').trim()
   if (!cleanName || !positive(quantity) || !validDate(date) || !['g', 'ml', 'piece'].includes(unit)) throw new Error('Bitte Name und gültige Portion eingeben.')
   if (!['g', 'ml'].includes(basis) || (unit !== 'piece' && basis !== unit) || (unit === 'piece' && !positive(pieceSize))) throw new Error('Einheit und Nährwertbasis passen nicht zusammen.')
   const uid = id || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
   return { id: uid, date, name: cleanName.slice(0, 160), quantity: n(quantity), unit, basis,
     unitPer100: 100, pieceSize: unit === 'piece' ? n(pieceSize) : null,
-    per100: nutrients(per100), source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
+    per100: nutrients(per100), per100Micros: cleanMicros(per100Micros), source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
 }
 export function mergeNutrition(existing, imported) {
   const old = normalizedNutrition(existing), incoming = normalizedNutrition(imported)
@@ -136,6 +170,7 @@ export function parseOpenFoodFacts(payload, barcode) {
       kcal: has('energy-kcal_100g') ? n(q['energy-kcal_100g']) : Math.round(n(q['energy-kj_100g']) / 4.184),
       protein: n(q.proteins_100g), carbs: n(q.carbohydrates_100g), fat: n(q.fat_100g)
     },
+    per100Micros: Object.fromEntries(MICRO_NUTRIENTS.flatMap(({key,off,factor}) => has(off) && Number(q[off]) >= 0 ? [[key, Math.round(Number(q[off]) * factor * 100) / 100]] : [])),
     source: 'openfoodfacts'
   }
 }
