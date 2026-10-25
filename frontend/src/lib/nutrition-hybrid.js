@@ -23,7 +23,14 @@ function validateEstimate(obj, query) {
   if (!Number.isFinite(amount) || amount < 10 || amount > 5000 || values.some(x => !Number.isFinite(x) || x < 0)) throw new Error('Die KI-Schätzung enthält ungültige Mengen oder Nährwerte.')
   if (values[0] > 12000 || values.slice(1).some(x => x > 1000)) throw new Error('Die KI-Schätzung ist unplausibel.')
   const per100 = Object.fromEntries(['kcal','protein','carbs','fat'].map((key,i) => [key, Math.round(values[i] * 10000 / amount) / 100]))
-  return { name: obj.name.trim().slice(0,160) || query, basis:'g', barcode:null, per100, per100Micros:{}, source:'ai_estimate', estimatedGrams:amount, note:'KI-Schätzung für die gesamte genannte Portion; Werte pro 100 g umgerechnet. Bitte prüfen.' }
+  // Fibre is optional. A missing or implausible value stays UNKNOWN, never 0.
+  const totalFiber = obj.fiber == null || obj.fiber === '' ? null : Number(obj.fiber)
+  const validFiber = totalFiber !== null && Number.isFinite(totalFiber) && totalFiber >= 0 &&
+    totalFiber <= amount && totalFiber <= 250
+  const per100Micros = validFiber ? { fiber: Math.round(totalFiber * 10000 / amount) / 100 } : {}
+  return { name: obj.name.trim().slice(0,160) || query, basis:'g', barcode:null, per100,
+    per100Micros, fiberSource: validFiber ? 'ai_estimate' : null, source:'ai_estimate',
+    estimatedGrams:amount, note:'KI-Schätzung für die gesamte genannte Portion; Werte pro 100 g umgerechnet. Bitte prüfen.' }
 }
 export async function hybridFoodSearch(query, { search = searchFoodByName, estimate = estimateFood } = {}) {
   const term = String(query || '').trim()
@@ -56,7 +63,7 @@ export async function estimateFood(query) {
   const env = key ? { [meta.apiKeyEnv]:key } : {}
   const result = await adapter.invoke({
     cfg,env,model:device.model,fetch:nativeFetch,timeoutMs:60000,maxTokens:650,
-    system:'Du schätzt Lebensmittel-Nährwerte. Antworte ausschließlich mit einem JSON-Objekt. Erfinde keine Recherche, Herstellerangaben oder Quellen. Verwende realistische typische Portionsgrößen. Werte gelten für die gesamte genannte Portion. Keys: name (string), grams (number), kcal (number), protein (number), carbs (number), fat (number). Bei Unsicherheit konservativ schätzen.',
+    system:'Du schätzt Lebensmittel-Nährwerte. Antworte ausschließlich mit einem JSON-Objekt. Erfinde keine Recherche, Herstellerangaben oder Quellen. Verwende realistische typische Portionsgrößen. Werte gelten für die gesamte genannte Portion. Keys: name (string), grams (number), kcal (number), protein (number), carbs (number), fat (number), fiber (number oder null). Ballaststoffe für die ganze Portion anhand plausibler Zutaten schätzen; falls nicht sinnvoll schätzbar, null ausgeben. Bei Unsicherheit konservativ schätzen.',
     prompt:'Schätze die gesamte verzehrte Menge und Makronährwerte für: '+query
   })
   if (result.code !== 0) throw new Error('KI-Anfrage fehlgeschlagen: '+String(result.stderr || 'Keine Antwort').slice(0,160))
