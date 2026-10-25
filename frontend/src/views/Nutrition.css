@@ -313,3 +313,113 @@
 .of-032 .of-micro-track>.of-micro-over-fill{background:#ef4444}
 .of-032 .of-micro-heading .of-micro-over{color:#ef4444}
 .of-032 .of-micro-card>small{font-size:11px;line-height:1.5}
+
+/* 0.4.0c: one compact disclosure row per known nutrient. */
+.of-032 .of-micro-cards{gap:0;padding:2px 0}
+.of-032 details.of-micro-compact{display:block;padding:0;border-bottom:1px solid var(--sep)}
+.of-032 .of-micro-compact .of-micro-summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:54px;cursor:pointer;padding:10px 0;font-size:13px}
+.of-032 .of-micro-compact .of-micro-summary::-webkit-details-marker{display:none}
+.of-032 .of-micro-name{min-width:0;flex:1;font-weight:650}
+.of-032 .of-micro-value{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:650}
+.of-032 .of-micro-value small{display:block;color:var(--label-3);font-weight:400}
+.of-032 .of-micro-summary>svg{flex:0 0 auto;color:var(--label-3);width:15px;height:15px}
+.of-032 details[open]>.of-micro-summary>svg{transform:rotate(180deg)}
+.of-032 .of-micro-alert{display:block;color:#ef4444;font-size:11px;font-weight:600;margin-top:3px}
+.of-032 .of-micro-warning .of-micro-value{color:#ef4444}
+.of-032 .of-micro-compact .of-micro-track{margin:0 0 8px;height:5px}
+.of-032 .of-micro-compact .of-micro-track>.of-micro-over-fill{background:#ef4444}
+.of-032 .of-micro-details{display:grid;gap:6px;padding:4px 0 14px;color:var(--label-2);font-size:12px;line-height:1.5}
+.of-032 .of-micro-details p{margin:4px 0 0}
+.of-032 .of-micro-details .of-micro-over{color:#ef4444}
+.of-032 .of-micro-note{font-size:12px;color:var(--label-3);margin:8px 0 10px}
+.of-032 .of-inline-supp-form .of-inline-supp input[type=number]{width:100%;height:auto;min-height:40px;font-size:14px}
+
+/* Explicit repair action only for the known, unambiguous creatine/Mg typo. */
+.of-032 .of-inline-supp .of-creatine-repair{width:auto;flex-shrink:0;border:1px solid var(--acc);border-radius:8px;color:var(--acc);font-size:11px;font-weight:650;padding:7px 9px;white-space:nowrap}
+
+/* 0.4.0e: conservative EPA + DHA supplement consolidation. */
+.of-032 .of-omega3-merge{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;margin:8px 0;border:1px solid var(--sep);border-radius:10px}
+.of-032 .of-omega3-merge>div{flex:1;min-width:0;font-size:13px}
+.of-032 .of-omega3-merge small{display:block;font-size:11px;color:var(--label-3);margin-top:3px}
+.of-032 .of-omega3-merge button{flex-shrink:0;padding:9px;border-radius:8px;background:var(--acc);color:var(--on-acc);font-size:12px;font-weight:650}
+.of-032 .of-omega3-merge button:disabled{opacity:.45;cursor:not-allowed}
+
+/* 0.4.0f: readable daily fibre total and source-specific data completeness. */
+.of-032 .of-fiber-report{border:1px solid var(--sep);border-radius:12px;padding:13px 12px;margin:10px 0 16px}
+.of-032 .of-fiber-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:14px}
+.of-032 .of-fiber-heading span{font-variant-numeric:tabular-nums;font-weight:700}
+.of-032 .of-fiber-report>.of-micro-track{margin:10px 0 8px}
+.of-032 .of-fiber-report p{font-size:12px;line-height:1.5;margin:6px 0}
+.of-032 .of-fiber-sources{border-top:1px solid var(--sep);margin-top:10px;padding-top:10px;font-size:12px}
+.of-032 .of-fiber-sources summary{cursor:pointer;font-weight:650}
+.of-032 .of-fiber-source-list{display:grid;gap:7px;margin:12px 0}
+.of-032 .of-fiber-source-list>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.of-032 .of-fiber-source-list small{font-size:11px;color:var(--label-3);display:block}
+.of-032 .of-fiber-source-list strong{white-space:nowrap}
+.of-032 .of-fiber-missing{border-top:1px solid var(--sep);padding-top:10px;display:grid;gap:5px;color:var(--label-2)}
+.of-032 .of-fiber-missing>strong{color:var(--label)}
+
+/* 0.4.0g AI-estimated fibre remains visibly distinct from declared values. */
+.of-032 .of-fiber-provenance{font-size:11px;color:var(--label-2);margin:7px 0}
+.of-032 .of-fiber-input{border:1px solid var(--sep);border-radius:12px;padding:12px;margin:12px 0;display:grid;gap:8px}
+.of-032 .of-fiber-input label{display:grid;gap:6px;font-size:13px}
+.of-032 .of-fiber-input input{width:100%;min-height:42px;color:var(--label);background:var(--bg);border:1px solid var(--sep);border-radius:8px;padding:10px}
+.of-032 .of-fiber-input button{min-height:42px;border:1px solid var(--acc);color:var(--acc);border-radius:9px;padding:9px 12px}
+.of-032 .of-fiber-input button:disabled{opacity:.45}
+
+/* 0.4.1 weekly nutrition analysis; compact and readable on phones. */
+.of-032 .of-analysis{display:grid;gap:13px;margin-bottom:14px}
+.of-032 .of-analysis h2{margin:0;font-size:19px}
+.of-032 .of-analysis h3{margin:6px 0 0;font-size:14px}
+.of-032 .of-analysis p{margin:0;line-height:1.5}
+.of-032 .of-analysis-coverage{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.of-032 .of-analysis-coverage span{color:var(--label-3)}
+.of-032 .of-analysis-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.of-032 .of-analysis-kpis>div{padding:13px 11px;background:var(--bg-el);border:1px solid var(--sep);border-radius:12px;display:grid;gap:5px}
+.of-032 .of-analysis-kpis span{font-size:12px;color:var(--label-2)}
+.of-032 .of-analysis-kpis strong{font-size:20px;font-variant-numeric:tabular-nums}
+.of-032 .of-analysis-kpis small{font-size:12px;font-weight:400}
+.of-032 .of-analysis-days{display:grid;gap:9px}
+.of-032 .of-analysis-day{display:grid;grid-template-columns:42px minmax(0,1fr) 85px;gap:3px 9px;align-items:center;font-size:12px}
+.of-032 .of-analysis-day strong{grid-row:1/3;font-size:12px}
+.of-032 .of-analysis-day>span{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.of-032 .of-analysis-day>small{grid-column:2/4;color:var(--label-3);font-size:11px}
+.of-032 .of-analysis-empty{opacity:.55}
+.of-032 .of-analysis-meter{height:7px;border-radius:10px;background:var(--sep);overflow:hidden}
+.of-032 .of-analysis-meter span{display:block;background:var(--of-teal);height:100%;border-radius:10px}
+.of-032 .of-analysis-targets,.of-032 .of-analysis-weights{display:grid;gap:8px}
+.of-032 .of-analysis-targets>div,.of-032 .of-analysis-weights>div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--sep);padding:7px 0;font-size:13px}
+.of-032 .of-analysis-frequent{display:grid;gap:9px}
+.of-032 .of-analysis-frequent>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--sep)}
+.of-032 .of-analysis-frequent span{min-width:0;overflow-wrap:anywhere}
+.of-032 .of-analysis-frequent small{display:block;font-size:11px;color:var(--label-3);margin-top:4px}
+.of-032 .of-analysis-frequent button{flex-shrink:0;color:var(--on-acc);background:var(--of-teal);padding:10px;border-radius:10px;font-size:12px}
+
+/* 0.4.1a: selectable weight intervals and explicit data quality. */
+.of-032 .of-analysis-range{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.of-032 .of-analysis-range button{border:1px solid var(--sep);background:var(--bg-el);border-radius:9px;padding:10px 4px;font-size:12px;color:var(--label)}
+.of-032 .of-analysis-range button.active{border-color:var(--of-teal);color:var(--of-teal);font-weight:700}
+.of-032 .of-analysis-quality{border-left:3px solid var(--of-teal);padding:8px 10px;font-size:12px;color:var(--label-2);background:var(--bg-el)}
+.of-032 .of-analysis-weighins{padding-top:10px;border-top:1px solid var(--sep);font-size:13px}
+.of-032 .of-analysis-weighins summary{cursor:pointer;font-weight:650}
+.of-032 .of-analysis-weighins .of-analysis-weights{margin-top:12px;max-height:260px;overflow:auto}
+
+/* 0.4.2: MET activity editor, privacy-first HC steps, time-aligned charts. */
+.of-032 .of-activity-smart{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.of-032 .of-activity-smart label{display:grid;gap:5px;font-size:12px;color:var(--label-2);min-width:0}
+.of-032 .of-activity-smart label:first-child,.of-032 .of-activity-smart label:nth-child(2){grid-column:1/-1}
+.of-032 .of-activity-smart input,.of-032 .of-activity-smart select{width:100%;height:44px;min-width:0;padding:9px;border:1px solid var(--sep);border-radius:10px;color:var(--label);background:var(--bg-el);font-size:14px}
+.of-032 .of-activity-smart button{grid-column:1/-1}
+.of-032 .of-activity-smart button:disabled{opacity:.5}
+.of-032 .of-activity-result{grid-column:1/-1;display:grid;gap:3px;padding:13px;border-radius:11px;border:1px solid var(--sep);background:var(--bg-el)}
+.of-032 .of-activity-result strong{font-size:18px}
+.of-032 .of-activity-result small{color:var(--label-3);font-size:11px}
+.of-032 .of-step-info{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;padding:10px;border:1px solid var(--sep);border-radius:12px;font-size:13px}
+.of-032 .of-step-info button{color:var(--of-teal);border:1px solid var(--sep);border-radius:9px;padding:8px 12px}
+.of-032 .of-step-info small{width:100%;color:var(--label-3);font-size:11px;line-height:1.5}
+.of-032 .of-budget-toggle{display:flex;gap:10px;align-items:flex-start;font-size:12px;margin:8px 0;color:var(--label-2)}
+.of-032 .of-budget-toggle input{width:18px;height:18px;flex-shrink:0;accent-color:var(--of-teal)}
+.of-032 .of-chart-wrap{border:1px solid var(--sep);background:var(--bg-el);border-radius:14px;padding:12px;margin:8px 0;display:grid;gap:4px;overflow:hidden}
+.of-032 .of-chart-wrap>strong{font-size:13px}
+.of-032 .of-chart-wrap>small{color:var(--label-3);font-size:11px;line-height:1.4}
+.of-032 .of-chart-wrap svg{display:block;max-width:100%;color:var(--label-2)}
