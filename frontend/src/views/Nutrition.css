@@ -91,7 +91,7 @@
 .of-profile-weight button{color:var(--acc);text-align:left;font-size:13px;font-weight:600;padding:5px 0}
 .of-home-summary{display:block;text-align:left;width:100%;padding:14px 16px;margin:12px 0;cursor:pointer;color:var(--label)}
 .of-home-summary-title{display:flex;align-items:center;gap:8px;color:var(--label-2);font-size:13px;font-weight:600;margin-bottom:12px}
-.of-home-summary-title .icn:first-child{color:var(--orange)}
+.of-home-summary-title .icn:first-child{color:var(--food-accent)}
 .of-home-summary-title .icn:last-child{margin-left:auto;color:var(--label-3)}
 .of-home-summary-grid,.of-home-summary-bars{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .of-home-summary-grid span{font-size:12px;color:var(--label-2)}
@@ -99,7 +99,7 @@
 .of-home-summary-bars{margin-top:10px}
 .of-home-summary-bars span{background:var(--sep);height:5px;overflow:hidden;border-radius:100px}
 .of-home-summary-bars i{display:block;height:100%;border-radius:100px;background:var(--acc)}
-.of-home-summary-bars span:first-child i{background:var(--orange)}
+.of-home-summary-bars span:first-child i{background:var(--food-accent)}
 
 .of-profile-measures{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:var(--label-2);padding:11px 0 16px}
 .of-profile-measures button{color:var(--acc);font-weight:600;text-align:right}
@@ -119,20 +119,20 @@
 .of-nutrition .of-date{margin:2px 0 13px}
 .of-nutrition .of-summary{border-radius:18px;padding:20px 18px;gap:13px}
 .of-nutrition .of-summary .of-macro-main strong{font-size:27px;letter-spacing:-.03em}
-.of-nutrition .of-summary .of-macro-main>div:first-child strong{color:var(--orange)}
+.of-nutrition .of-summary .of-macro-main>div:first-child strong{color:var(--food-accent)}
 .of-nutrition .of-summary .of-macro-main>div:nth-child(2) strong{color:var(--acc)}
 .of-quick-heading{display:flex;justify-content:space-between;align-items:center;margin:21px 0 11px;font-weight:700;font-size:17px}
 .of-quick-heading span{font-size:12px;color:var(--label-3);font-weight:400}
 .of-quick-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .of-quick-actions button{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:15px 2px 11px;background:var(--bg-el);border:1px solid var(--sep);border-radius:14px;color:var(--label);font-size:12px;font-weight:650}
-.of-quick-actions button:first-child{border-color:var(--orange);color:var(--orange)}
+.of-quick-actions button:first-child{border-color:var(--food-accent);color:var(--food-accent)}
 .of-quick-actions button .icn{font-size:22px}
 .of-nutrition .of-list-head{margin-top:24px}
 @media(max-width:350px){.of-quick-actions{gap:5px}.of-quick-actions button{font-size:11px}}
 
 /* openForm 0.3.2 – original OpenNutriTracker-inspired nutrition dashboard.
    Scoped strictly to the nutrition route; main app navigation stays unchanged. */
-.of-032{--of-teal:#15b9ad;--of-orange:#f2a955;--of-pink:#f1837d;--of-card:#242421;--of-stroke:rgba(255,255,255,.09);padding-bottom:64px}
+.of-032{--of-teal:var(--food-accent);--of-orange:var(--food-accent);--of-pink:var(--food-accent);--of-card:#242421;--of-stroke:rgba(255,255,255,.09);padding-bottom:64px}
 .of-032 .of-appbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0 20px}
 .of-032 .of-appbar-brand{display:flex;align-items:center;gap:10px}
 .of-032 .of-appbar h1{font-size:25px;line-height:1.1;font-weight:750;letter-spacing:-.035em;margin:0}
@@ -178,7 +178,7 @@
 .of-032 .of-fat .of-mini-track>span{background:var(--of-pink)}
 .of-032 .of-protein .of-mini-track>span{background:var(--of-teal)}
 .of-032 .of-plus-zone{position:relative;text-align:center;margin:0 0 56px;display:flex;flex-direction:column;align-items:center;gap:16px}
-.of-032 .of-big-plus{width:74px;height:74px;display:grid;place-items:center;color:white;background:var(--of-teal);border-radius:50%;font-size:32px;box-shadow:0 8px 26px #00bfa83a}
+.of-032 .of-big-plus{width:74px;height:74px;display:grid;place-items:center;color:var(--food-on-accent);background:var(--of-teal);border-radius:50%;font-size:32px;box-shadow:0 8px 26px #00bfa83a}
 .of-032 .of-plus-zone>p{color:var(--label-2);font-size:14px;line-height:1.5;margin:0;max-width:300px}
 .of-032 .of-add-popover{display:grid;gap:3px;position:absolute;z-index:10;top:84px;left:50%;transform:translateX(-50%);width:min(320px,96vw);padding:8px;border:1px solid var(--sep);border-radius:17px;background:var(--bg-el);box-shadow:0 10px 28px #0008;text-align:left}
 .of-032 .of-add-popover button{display:flex;align-items:center;gap:13px;width:100%;padding:13px 14px;color:var(--label);font-size:14px;border-radius:11px}
@@ -198,7 +198,7 @@
 .of-032 .of-item-btn button{padding:5px;font-size:15px;color:var(--label-2)}
 .of-032 .of-activity-form{display:grid;grid-template-columns:1fr 95px;gap:8px;margin-bottom:10px}
 .of-032 .of-activity-form input{min-width:0;border:1px solid var(--sep);background:var(--bg-el);color:var(--label);border-radius:9px;padding:10px}
-.of-032 .of-activity-form button{grid-column:1/-1;background:var(--of-teal);color:white;padding:11px;border-radius:10px}
+.of-032 .of-activity-form button{grid-column:1/-1;background:var(--of-teal);color:var(--food-on-accent);padding:11px;border-radius:10px}
 .of-032 .of-subview-head{display:flex;align-items:center;gap:12px;margin:7px 0 18px}
 .of-032 .of-subview-head button{padding:8px;color:var(--label-2)}
 .of-032 .of-subview-head h2{margin:0;font-size:22px}
@@ -238,7 +238,7 @@
 .of-032 .of-inline-supp button{padding:8px;color:var(--label-2)}
 .of-032 .of-inline-supp-form{display:grid;grid-template-columns:minmax(0,1fr) 73px 67px 34px;gap:5px;margin:12px 0}
 .of-032 .of-inline-supp-form input,.of-032 .of-inline-supp-form select{min-width:0;width:100%;color:var(--label);background:var(--bg);border:1px solid var(--sep);border-radius:8px;padding:8px 5px;font-size:12px}
-.of-032 .of-inline-supp-form button{background:var(--of-teal);color:#001c19;border-radius:8px;display:grid;place-items:center}
+.of-032 .of-inline-supp-form button{background:var(--of-teal);color:var(--food-on-accent);border-radius:8px;display:grid;place-items:center}
 .of-032 .of-plus-zone{margin-bottom:27px}
 .of-032 .of-optional-micros{border:1px solid var(--sep);border-radius:11px;padding:12px;margin-top:10px}
 .of-032 .of-optional-micros summary{color:var(--of-teal);font-weight:650;cursor:pointer}
@@ -275,13 +275,13 @@
 
 
 /* 0.3.6: respect the user-selected appearance accent throughout nutrition. */
-.of-032{--of-teal:var(--acc);--of-orange:var(--acc);--of-pink:var(--acc)}
+.of-032{--of-teal:var(--food-accent);--of-orange:var(--food-accent);--of-pink:var(--food-accent)}
 .of-032 .of-macro-tile.of-over-goal strong i,
 .of-032 .of-macro-tile.of-over-goal .of-mini-track>span{background:#ef4444}
 .of-032 .of-macro-tile.of-over-goal>span{color:#ef4444}
 
 /* Global appearance accent, including calorie ring, water and nutrient progress. */
-.of-032 .of-calorie-ring{background:conic-gradient(var(--acc) var(--of-ring-pct),var(--sep) var(--of-ring-pct))}
+.of-032 .of-calorie-ring{background:conic-gradient(var(--food-accent) var(--of-ring-pct),var(--sep) var(--of-ring-pct))}
 .of-032 .of-calorie-ring[aria-valuenow]:not([aria-valuenow="0"]){transition:background .2s}
 .of-032 .of-nutrient-detail strong small{display:block;font-weight:400;font-size:11px;text-align:right}
 

@@ -198,6 +198,21 @@ export function accentPair(v) {
   return { accent: ACCENTS[k], ink: ACCENT_INK[k] }
 }
 
+/**
+ * The complementary hue to the user's selected accent. Follows preset colours and
+ * arbitrary custom hex colours in dark and light themes, with contrast against the
+ * page/card backgrounds. Greys have no complementary hue, so use a distinct cyan.
+ * This is a display colour only: it is never stored in the user's profile.
+ */
+export function complementaryAccent(value, theme = 'dark') {
+  const chosen = cleanHex(value) ||
+    (typeof value === 'string' && Object.hasOwn(ACCENTS, value) ? ACCENTS[value] : ACCENTS[DEFAULT_ACCENT])
+  if (isGrey(chosen)) return readableIn('#34c5d8', theme)
+  const [h, s, l] = toHsl(chosen)
+  const opposite = fromHsl([((h + 180) % 360 + 360) % 360,
+    Math.max(0.68, s), Math.max(0.38, Math.min(0.65, l))])
+  return readableIn(opposite, theme)
+}
 const CUSTOM_VARS = ['--acc', '--acc-2', '--on-acc', '--knob-ring']
 
 /**
@@ -205,6 +220,8 @@ const CUSTOM_VARS = ['--acc', '--acc-2', '--on-acc', '--knob-ring']
  * user's colour as inline custom properties for the resolved `theme`. `value` is accentValue's.
  */
 export function applyAccent(el, value, theme) {
+  // Recompute every time Settings changes the accent OR dark/light appearance.
+  el.style.setProperty('--illness-color', complementaryAccent(value, theme))
   const vars = customAccentVars(value, theme)
   if (vars) {
     el.dataset.accent = CUSTOM
