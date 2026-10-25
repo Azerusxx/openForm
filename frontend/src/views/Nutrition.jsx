@@ -9,10 +9,10 @@ import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
   dayTotals, dayMicros, MICRO_NUTRIENTS, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
 import { trainingEnergyForDay } from '../lib/training-energy.js'
+import { nutrientOverview } from '../lib/nutrient-overview.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
-const MICRO_GUIDES = { omega3:null, epa:null, dha:null, fiber:30, sodium:2000, calcium:1000, iron:10, magnesium:350, potassium:4000, vitaminC:110, vitaminD:20, vitaminA:850, vitaminE:14, vitaminB1:1.2, vitaminB2:1.4, vitaminB6:1.6, vitaminB12:4, folate:300, zinc:11, iodine:200, selenium:70 }
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(), mealType: 'breakfast',
   per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, barcode: null, source: 'manual' })
@@ -58,6 +58,7 @@ export default function Nutrition() {
   const [suppUnit, setSuppUnit] = useState('piece')
   const [suppNutrient, setSuppNutrient] = useState('magnesium')
   const [suppAmount, setSuppAmount] = useState('')
+  const [suppNutrients, setSuppNutrients] = useState({})
   const [editingSupplement, setEditingSupplement] = useState(null)
   const [suppFormOpen, setSuppFormOpen] = useState(false)
   const fileInput = useRef(null)
@@ -73,13 +74,8 @@ export default function Nutrition() {
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = weeklyNutrition(data.entries, date, macroGoals)
-  const foodMicros = dayMicros(data.entries, date)
-  const supplementMicros = {}
-  for (const s of data.supplements) if (s.logs.includes(date)) for (const [key, amount] of Object.entries(s.nutrients || {})) {
-    const value = Number(amount) * Number(s.dose)
-    if (Number.isFinite(value) && value > 0) supplementMicros[key] = (supplementMicros[key] || 0) + value
-  }
-  const micros = Object.fromEntries(MICRO_NUTRIENTS.map(({key}) => [key, Math.round(((foodMicros[key] || 0) + (supplementMicros[key] || 0)) * 100) / 100]))
+  const nutrientRows = nutrientOverview(data, date)
+  const micros = Object.fromEntries(nutrientRows.filter(n => n.known).map(n => [n.key, n.total]))
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -189,11 +185,24 @@ export default function Nutrition() {
     if (!suppName.trim() || !(Number(suppDose) > 0)) { setNotice('Name und Dosis prüfen.'); return }
     const previous = data.supplements.find(s => s.id === editingSupplement)
     const amount = suppAmount === '' ? null : Number(suppAmount)
-    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Nährstoffmenge prüfen.'); return }
+    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Wirkstoffmenge prüfen.'); return }
+    if (Object.values(suppNutrients).some(v => !Number.isFinite(Number(v)) || Number(v) < 0)) { setNotice('Wirkstoffe prüfen.'); return }
     const sameName = data.supplements.find(s => s.id !== editingSupplement && s.name.trim().toLocaleLowerCase('de') === suppName.trim().toLocaleLowerCase('de'))
     if (sameName && !window.confirm(`„${sameName.name}“ ist bereits vorhanden. Wirklich einen weiteren Eintrag anlegen?`)) return
-    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: amount === null ? {} : { [suppNutrient]: amount }, logs: previous?.logs || [] }
-    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setEditingSupplement(null); setSuppFormOpen(false) }
+    const nutrients = { ...suppNutrients }
+    if (amount !== null) nutrients[suppNutrient] = amount
+    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: Object.fromEntries(Object.entries(nutrients).map(([k,v]) => [k, Number(v)])), logs: previous?.logs || [] }
+    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) resetSupplementForm()
+  }
+  const selectSupplementForEdit = s => {
+    setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose))
+    setSuppUnit(s.unit); setSuppNutrients({ ...(s.nutrients || {}) })
+    setSuppNutrient('magnesium'); setSuppAmount(''); setSuppFormOpen(true)
+  }
+  const resetSupplementForm = () => {
+    setEditingSupplement(null); setSuppName(''); setSuppDose('')
+    setSuppUnit('piece'); setSuppNutrient('magnesium')
+    setSuppAmount(''); setSuppNutrients({}); setSuppFormOpen(false)
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
@@ -268,18 +277,23 @@ export default function Nutrition() {
           <h3>Makronährstoffe</h3>
           <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {macroGoals[key] == null ? '' : `von ${fmt(macroGoals[key])} g`}</strong></div>)}</div>
           <button type="button" className="of-micros-toggle" aria-expanded={showMicros} onClick={() => setShowMicros(v => !v)}>
-            <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{Object.values(micros).filter(v => Number(v) > 0).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
+            <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{nutrientRows.filter(n => n.known).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
           {showMicros && <div className="of-micros-content">
             <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
-            {MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).length
-              ? <div className="of-micro-cards">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => {
-                  const guide = MICRO_GUIDES[key]
-                  const exceededUpperLimit = key === 'sodium' && guide != null && micros[key] > guide
-                  return <div className="of-micro-card" key={key}>
-                    <div className="of-micro-heading"><strong>{label}</strong><span className={exceededUpperLimit ? 'of-micro-over' : ''}>{fmt(micros[key])}{guide != null ? ` / ${fmt(guide)}` : ''} {unit}</span></div>
-                    {guide != null && <div className="of-micro-track" role="progressbar" aria-label={label} aria-valuenow={micros[key]} aria-valuemin={0} aria-valuemax={guide}><span className={exceededUpperLimit ? 'of-micro-over-fill' : ''} style={{width:`${Math.min(100, 100 * micros[key] / Math.max(1,guide))}%`}} /></div>}
-                    <small className="of-dim">Nahrung: {fmt(foodMicros[key] || 0)} {unit} · Supplements: {fmt(supplementMicros[key] || 0)} {unit}{guide == null ? ' · Kein pauschaler Tagesrichtwert' : key === 'sodium' ? ' · Obergrenze' : ' · Orientierungswert'}</small>
+            {nutrientRows.some(n => n.known)
+              ? <div className="of-micro-cards">{nutrientRows.filter(n => n.known).map(n => {
+                  const limitText = n.upper ? `Obergrenze: ${fmt(n.upper.max)} ${n.unit} (${n.upper.scope === 'supplement' ? 'nur aus Ergänzungen' : 'Gesamtaufnahme'})` : null
+                  return <div className="of-micro-card" key={n.key}>
+                    <div className="of-micro-heading"><strong>{n.label}</strong><span className={n.limitExceeded ? 'of-micro-over' : ''}>{fmt(n.total)}{n.guide != null ? ` / ${fmt(n.guide)}` : ''} {n.unit}</span></div>
+                    {n.guide != null && <div className="of-micro-track" role="progressbar" aria-label={n.label} aria-valuenow={n.total} aria-valuemin={0} aria-valuemax={n.guide}><span style={{width:`${Math.min(100,100*n.total / Math.max(1,n.guide))}%`}} /></div>}
+                    <small className="of-dim">Nahrung: {n.food == null ? 'unbekannt' : fmt(n.food)} {n.unit} · Supplements: {n.supplement == null ? 'nicht erfasst' : fmt(n.supplement)} {n.unit}</small>
+                    {n.incomplete && <small className="of-dim">Lebensmitteldaten unvollständig. Gesamtmenge ist ein Mindestwert der erfassten Angaben.</small>}
+                    {n.limitExceeded && <small className="of-micro-over">⚠ Erfasste Menge überschreitet die EFSA-Obergrenze. {limitText}. Bitte Dosierung prüfen.</small>}
+                    {!n.limitExceeded && limitText && <small className="of-dim">{limitText}</small>}
+                    {n.key === 'sodium' && <small className="of-dim">2.000 mg Natrium: Orientierung zur Begrenzung, kein Mindestziel.</small>}
+                    {n.key === 'magnesium' && <small className="of-dim">350 mg = täglicher Orientierungswert. 250 mg = ergänzungsbezogener EFSA-Grenzwert für bestimmte Magnesiumverbindungen, kein Zielwert.</small>}
+                    {n.key === 'creatine' && <small className="of-dim">Kreatin ist kein Vitamin oder Mineralstoff. Die Anzeige dokumentiert nur die erfasste Einnahme, ohne pauschale Tagesbedarf-Aussage.</small>}
                   </div>
                 })}</div>
               : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
@@ -292,11 +306,11 @@ export default function Nutrition() {
           {showSupplements && <>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
-            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
+            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => selectSupplementForEdit(s)}><Icon name="pencil" /></button>
             <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
           </div>)}
           {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
-          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { setEditingSupplement(null); setSuppName(""); setSuppDose(""); setSuppUnit("piece"); setSuppAmount(""); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
+          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { resetSupplementForm(); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
           {suppFormOpen && <form className="of-inline-supp-form" onSubmit={addSupplement}>
             <label className="of-supp-field">Supplement<input aria-label="Supplementname" placeholder="z. B. Magnesium" value={suppName} onChange={e => setSuppName(e.target.value)} required /></label>
             <div className="of-supp-form-row">
@@ -304,13 +318,19 @@ export default function Nutrition() {
               <label className="of-supp-field">Einheit<select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="piece">Stk.</option><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option></select></label>
             </div>
             <div className="of-supp-form-row">
-              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
+              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.filter(n => n.key !== 'creatine' || suppName.toLocaleLowerCase('de').includes('kreatin')).map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
               <label className="of-supp-field">Wirkstoffgehalt pro {suppUnit === 'piece' ? 'Stück' : suppUnit}<input aria-label="Wirkstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
             </div>
+            <button type="button" className="of-supp-open" onClick={() => {
+              if (suppAmount === '' || !Number.isFinite(Number(suppAmount)) || Number(suppAmount) < 0) { setNotice('Wirkstoffgehalt prüfen.'); return }
+              setSuppNutrients(old => ({ ...old, [suppNutrient]: Number(suppAmount) }))
+              setSuppAmount('')
+            }}>Wirkstoff zur Liste hinzufügen</button>
+            {Object.entries(suppNutrients).map(([key, val]) => <div key={key} className="of-inline-supp"><label style={{flex:1}}>{MICRO_NUTRIENTS.find(n => n.key === key)?.label || key} ({MICRO_NUTRIENTS.find(n => n.key === key)?.unit}) pro Einheit<input type="number" step="any" min="0" aria-label={key + ' Wirkstoffgehalt'} value={val} onChange={e => setSuppNutrients(old => ({ ...old, [key]: e.target.value }))} /></label><button type="button" aria-label={key + ' entfernen'} onClick={() => setSuppNutrients(old => Object.fromEntries(Object.entries(old).filter(([k]) => k !== key)))}><Icon name="trash" /></button></div>)}
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
           </form>}
-          <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Wirkstoffmengen werden nur mit hinterlegtem Gehalt berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
+          <p className="of-dim">Für Kreatin bitte „Kreatin“ als Wirkstoff mit Gramm pro Portion eintragen, nicht als Magnesium. Frühere falsche Angaben bitte manuell berichtigen; die App verändert sie nicht automatisch. Ein Produkt kann mehrere Wirkstoffe haben. EPA und DHA sind Bestandteile von Omega-3 und dürfen nicht zusätzlich zur Gesamtmenge addiert werden. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
           </>}
         </div>}
       </section>
