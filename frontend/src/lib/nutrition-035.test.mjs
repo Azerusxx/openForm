@@ -2,9 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const read=rel=>readFileSync(new URL(rel,import.meta.url),'utf8')
-test('calorie deficit target never includes exercise calories',()=>{
+test('calorie deficit uses activity net only after explicit opt in',()=>{
  const src=read('../views/Nutrition.jsx')
- assert.match(src,/const remaining = Math\.round\(\(data\.goals\.kcal \|\| 0\) - totals\.kcal\)/)
+ assert.match(src,/const remaining = Math\.round\(\(data\.goals\.kcal \|\| 0\) \+ activeBonus - totals\.kcal\)/)
+ assert.match(src,/data\.profile\?\.includeActivityCalories/)
+ assert.match(src,/a\.source==='met_estimate'/)
  assert.doesNotMatch(src,/const remaining = .*\+ burned/)
 })
 test('water and favorites have one-touch shortcuts and unknown macro goals are explicit',()=>{
