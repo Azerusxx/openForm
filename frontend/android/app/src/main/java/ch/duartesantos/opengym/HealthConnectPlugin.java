@@ -6,6 +6,13 @@ import android.os.Build;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.health.connect.client.HealthConnectClient;
+import androidx.health.connect.client.request.AggregateRequest;
+import androidx.health.connect.client.records.StepsRecord;
+import androidx.health.connect.client.time.TimeRangeFilter;
+import androidx.health.connect.client.aggregate.AggregationResult;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import androidx.health.connect.client.PermissionController;
 import androidx.health.connect.client.records.ExerciseSessionRecord;
 import androidx.health.connect.client.records.Record;
@@ -67,6 +74,7 @@ public class HealthConnectPlugin extends Plugin {
     // The literal permission names, as declared in AndroidManifest.xml.
     private static final String WRITE_EXERCISE = "android.permission.health.WRITE_EXERCISE";
     private static final String WRITE_WEIGHT = "android.permission.health.WRITE_WEIGHT";
+    private static final String READ_STEPS = "android.permission.health.READ_STEPS";
     // Health Connect takes at most this many records in one insert.
     private static final int CHUNK = 500;
 
@@ -152,6 +160,70 @@ public class HealthConnectPlugin extends Plugin {
             } catch (Exception e) {
                 call.reject(e.getMessage(), "failed");
             }
+        });
+    }
+
+    // Reading steps is deliberately a separate, opt-in permission from writing
+    // the existing openForm workout data.
+    @PluginMethod
+    public void stepPermission(PluginCall call) {
+        if (!"available".equals(sdkStatus())) { call.reject("Health Connect unavailable", "unavailable"); return; }
+        worker.execute(() -> {
+            try {
+                JSObject out=new JSObject();
+                out.put("granted",granted().contains(READ_STEPS));
+                call.resolve(out);
+            } catch(Exception e) {call.reject(e.getMessage(),"failed");}
+        });
+    }
+
+    @PluginMethod
+    public void requestStepPermission(PluginCall call) {
+        if (!"available".equals(sdkStatus())) { call.reject("Health Connect unavailable", "unavailable"); return; }
+        Set<String> requested=Collections.singleton(READ_STEPS);
+        ActivityResultContract<Set<String>, Set<String>> contract = PermissionController.createRequestPermissionResultContract(PROVIDER);
+        startActivityForResult(call, contract.createIntent(getContext(),requested), "stepPermissionResult");
+    }
+
+    @ActivityCallback
+    private void stepPermissionResult(PluginCall call, ActivityResult result) {
+        if(call==null)return;
+        worker.execute(()->{
+            try{
+                JSObject out=new JSObject();
+                out.put("granted",granted().contains(READ_STEPS));
+                call.resolve(out);
+            }catch(Exception e){call.reject(e.getMessage(),"failed");}
+        });
+    }
+
+    // Health Connect handles deduplication across sources in aggregate(). We
+    // never add estimated calories from steps to already logged workouts.
+    @PluginMethod
+    public void readSteps(PluginCall call) {
+        if (!"available".equals(sdkStatus())) {call.reject("Health Connect unavailable", "unavailable");return;}
+        String date=call.getString("date","");
+        final LocalDate day;
+        try{ day=LocalDate.parse(date); }
+        catch(DateTimeParseException e){call.reject("Invalid ISO date","invalid");return;}
+        worker.execute(()->{
+            try{
+                if(!granted().contains(READ_STEPS)) {call.reject("Read steps not granted","permission");return;}
+                Instant start=day.atStartOfDay(ZoneId.systemDefault()).toInstant();
+                Instant end=day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+                AggregateRequest req=new AggregateRequest(
+                    Collections.singleton(StepsRecord.COUNT_TOTAL),
+                    TimeRangeFilter.between(start,end),Collections.emptySet());
+                AggregationResult response=(AggregationResult)BuildersKt.runBlocking(
+                    EmptyCoroutineContext.INSTANCE,(scope,cont)->client().aggregate(req,cont));
+                Long steps=response.get(StepsRecord.COUNT_TOTAL);
+                JSObject out=new JSObject();
+                out.put("date",date);
+                out.put("steps",steps==null?0:steps);
+                out.put("source","health_connect_aggregated");
+                call.resolve(out);
+            }catch(SecurityException e){call.reject(e.getMessage(),"permission");}
+            catch(Exception e){call.reject(e.getMessage(),"failed");}
         });
     }
 
