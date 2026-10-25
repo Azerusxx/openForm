@@ -67,6 +67,10 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js
 
+      - name: Mikronaehrstoffe und Kreatin-Korrektur testen
+        working-directory: frontend
+        run: npx vitest run src/lib/nutrient-overview.test.js src/lib/supplement-editor.test.js src/lib/creatine-repair.test.js
+
       - name: Mobile Web-App bauen
         working-directory: frontend
         env:
