@@ -299,3 +299,6 @@
 .of-032 .of-micros-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:16px 0;margin-top:8px;border-top:1px solid var(--sep);color:var(--label);font-weight:700;text-align:left}
 .of-032 .of-micros-toggle>span:last-child{display:flex;align-items:center;gap:7px;color:var(--label-3);font-size:11px;white-space:nowrap;font-weight:400}
 .of-032 .of-micros-content{padding-bottom:10px}
+
+.of-032 .of-supp-open{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;margin:14px 0 8px;background:var(--acc);color:var(--on-acc);border-radius:10px;font-weight:650}
+.of-032 .of-inline-supp-form>.of-supp-cancel{background:transparent;color:var(--label-2);border:1px solid var(--sep)}
