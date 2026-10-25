@@ -61,7 +61,7 @@ jobs:
 
       - name: Ernaehrung, Backup und Navigation testen
         working-directory: frontend
-        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs src/lib/nutrition-micros.test.mjs src/lib/coach-nutrition.test.mjs src/lib/training-energy.test.mjs src/lib/openform-recovery.test.mjs src/lib/nutrition-035.test.mjs src/lib/smart-rest.test.mjs
+        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs src/lib/nutrition-micros.test.mjs src/lib/coach-nutrition.test.mjs src/lib/training-energy.test.mjs src/lib/openform-recovery.test.mjs src/lib/nutrition-035.test.mjs src/lib/smart-rest.test.mjs src/lib/rest-circle.test.mjs
 
       - name: Hybrid-Ernährungssuche testen
         working-directory: frontend
