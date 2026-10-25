@@ -1,4 +1,4 @@
-import { hybridFoodSearch } from '../lib/nutrition-hybrid.js'
+import { hybridFoodSearch, estimateFood } from '../lib/nutrition-hybrid.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
@@ -9,13 +9,17 @@ import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
   dayTotals, dayMicros, MICRO_NUTRIENTS, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
 import { trainingEnergyForDay } from '../lib/training-energy.js'
+import { nutrientOverview } from '../lib/nutrient-overview.js'
+import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/creatine-repair.js'
+import { omega3Pairs, mergeOmega3Pair } from '../lib/omega3-merge.js'
+import { dailyFiberReport } from '../lib/fiber-report.js'
+import { nutritionWeekAnalysis, frequentMeals } from '../lib/nutrition-analysis.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
-const MICRO_GUIDES = { omega3:null, epa:null, dha:null, fiber:30, sodium:2000, calcium:1000, iron:10, magnesium:350, potassium:4000, vitaminC:110, vitaminD:20, vitaminA:850, vitaminE:14, vitaminB1:1.2, vitaminB2:1.4, vitaminB6:1.6, vitaminB12:4, folate:300, zinc:11, iodine:200, selenium:70 }
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(), mealType: 'breakfast',
-  per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, barcode: null, source: 'manual' })
+  per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, microsSources: {}, fiberSource: null, barcode: null, source: 'manual' })
 const MEAL_GROUPS = [
   { id: 'breakfast', title: 'Frühstück', icon: 'coffee' },
   { id: 'lunch', title: 'Mittagessen', icon: 'plate' },
@@ -48,6 +52,7 @@ export default function Nutrition() {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState([])
   const [busy, setBusy] = useState(false)
+  const [fiberBusy, setFiberBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [camera, setCamera] = useState(false)
   const [recipeName, setRecipeName] = useState('')
@@ -56,8 +61,9 @@ export default function Nutrition() {
   const [suppName, setSuppName] = useState('')
   const [suppDose, setSuppDose] = useState('')
   const [suppUnit, setSuppUnit] = useState('piece')
-  const [suppNutrient, setSuppNutrient] = useState('magnesium')
+  const [suppNutrient, setSuppNutrient] = useState('')
   const [suppAmount, setSuppAmount] = useState('')
+  const [suppNutrients, setSuppNutrients] = useState({})
   const [editingSupplement, setEditingSupplement] = useState(null)
   const [suppFormOpen, setSuppFormOpen] = useState(false)
   const fileInput = useRef(null)
@@ -72,14 +78,11 @@ export default function Nutrition() {
   const remaining = Math.round((data.goals.kcal || 0) - totals.kcal)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
-  const week = weeklyNutrition(data.entries, date, macroGoals)
-  const foodMicros = dayMicros(data.entries, date)
-  const supplementMicros = {}
-  for (const s of data.supplements) if (s.logs.includes(date)) for (const [key, amount] of Object.entries(s.nutrients || {})) {
-    const value = Number(amount) * Number(s.dose)
-    if (Number.isFinite(value) && value > 0) supplementMicros[key] = (supplementMicros[key] || 0) + value
-  }
-  const micros = Object.fromEntries(MICRO_NUTRIENTS.map(({key}) => [key, Math.round(((foodMicros[key] || 0) + (supplementMicros[key] || 0)) * 100) / 100]))
+  const week = nutritionWeekAnalysis(data.entries, date, macroGoals, gym.bodyweight, gym.unit)
+  const frequent = frequentMeals(data.entries)
+  const nutrientRows = nutrientOverview(data, date)
+  const fiberReport = dailyFiberReport(data.entries, date)
+  const micros = Object.fromEntries(nutrientRows.filter(n => n.known).map(n => [n.key, n.total]))
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -94,7 +97,7 @@ export default function Nutrition() {
   const update = fn => commit(fn(loadNutrition()))
   const startNew = (type = selectedMeal) => { setSelectedMeal(type); setForm({ ...EMPTY(), date, mealType: type }); setEditing(null); setShowForm(true); setTab('food'); setAddMenu(false); setNotice('') }
   const edit = e => {
-    setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 }, per100Micros: { ...e.per100Micros } })
+    setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 }, per100Micros: { ...e.per100Micros }, microsSources: { ...(e.microsSources || {}) } })
     setSelectedMeal(e.mealType || 'other'); setEditing(e.id); setShowForm(true); setTab('food'); setNotice('')
   }
   const log = (food, type = selectedMeal) => {
@@ -116,9 +119,39 @@ export default function Nutrition() {
       }
     } catch (err) { setNotice(err.message) }
   }
+  const estimateFormMicros = async () => {
+    if (form.basis !== 'g') { setNotice('KI-Schätzung nur für Lebensmittel auf Gramm-Basis.'); return }
+    if (!form.name.trim()) { setNotice('Bitte einen Lebensmittelnamen angeben.'); return }
+    setFiberBusy(true)
+    try {
+      const estimated = await estimateFood(form.name + ' (' + form.quantity + ' ' + form.unit + ')')
+      const suggestions = Object.entries(estimated.per100Micros || {})
+        .filter(([key,value]) => Number.isFinite(value) && value >= 0 &&
+          MICRO_NUTRIENTS.some(n => n.key === key && !n.supplementOnly))
+      if (!suggestions.length) throw new Error('KI konnte keine ausreichend plausiblen Mikronährstoffe schätzen.')
+      const missing = suggestions.filter(([key]) => form.per100Micros?.[key] == null ||
+        form.per100Micros?.[key] === '')
+      if (!missing.length) { setNotice('Für alle geschätzten Nährstoffe liegen bereits Werte vor. Keine vorhandenen Daten überschrieben.'); return }
+      setForm(old => {
+        const micros = { ...old.per100Micros }
+        const sources = { ...old.microsSources }
+        let count = 0
+        for (const [key,value] of missing) {
+          if (micros[key] != null && micros[key] !== '') continue
+          micros[key] = value
+          sources[key] = 'ai_estimate'
+          count++
+        }
+        return { ...old, per100Micros:micros, microsSources:sources,
+          fiberSource:sources.fiber || old.fiberSource }
+      })
+      setNotice(missing.length + ' fehlende Nährstoffwerte durch KI geschätzt. Werte vor dem Speichern prüfen.')
+    } catch(err) { setNotice(err?.message || 'KI-Schätzung fehlgeschlagen.') }
+    finally { setFiberBusy(false) }
+  }
   const setProduct = p => {
     setForm({ ...EMPTY(), name: p.name, quantity: String(p.estimatedGrams || 100), basis: p.basis, unit: p.basis,
-      source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, date, mealType: selectedMeal })
+      source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, microsSources: p.microsSources || {}, fiberSource: p.fiberSource || (p.per100Micros?.fiber != null ? 'database' : null), date, mealType: selectedMeal })
     setEditing(null); setShowForm(true); setTab('food'); setNotice('Produkt gefunden. Nährwerte und Portion vor dem Speichern prüfen.')
   }
   const lookup = async candidate => {
@@ -189,11 +222,45 @@ export default function Nutrition() {
     if (!suppName.trim() || !(Number(suppDose) > 0)) { setNotice('Name und Dosis prüfen.'); return }
     const previous = data.supplements.find(s => s.id === editingSupplement)
     const amount = suppAmount === '' ? null : Number(suppAmount)
-    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Nährstoffmenge prüfen.'); return }
+    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Wirkstoffmenge prüfen.'); return }
+    if (Object.values(suppNutrients).some(v => !Number.isFinite(Number(v)) || Number(v) < 0)) { setNotice('Wirkstoffe prüfen.'); return }
     const sameName = data.supplements.find(s => s.id !== editingSupplement && s.name.trim().toLocaleLowerCase('de') === suppName.trim().toLocaleLowerCase('de'))
     if (sameName && !window.confirm(`„${sameName.name}“ ist bereits vorhanden. Wirklich einen weiteren Eintrag anlegen?`)) return
-    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: amount === null ? {} : { [suppNutrient]: amount }, logs: previous?.logs || [] }
-    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setEditingSupplement(null); setSuppFormOpen(false) }
+    const nutrients = { ...suppNutrients }
+    if (amount !== null && suppNutrient) nutrients[suppNutrient] = amount
+    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: Object.fromEntries(Object.entries(nutrients).map(([k,v]) => [k, Number(v)])), logs: previous?.logs || [] }
+    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) resetSupplementForm()
+  }
+  const selectSupplementForEdit = s => {
+    setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose))
+    setSuppUnit(s.unit); setSuppNutrients({ ...(s.nutrients || {}) })
+    setSuppNutrient(''); setSuppAmount(''); setSuppFormOpen(true)
+  }
+  const resetSupplementForm = () => {
+    setEditingSupplement(null); setSuppName(''); setSuppDose('')
+    setSuppUnit('piece'); setSuppNutrient('')
+    setSuppAmount(''); setSuppNutrients({}); setSuppFormOpen(false)
+  }
+  const repairCreatine = supplement => {
+    if (!isMisattributedCreatine(supplement)) return
+    if (!window.confirm('Dieser Kreatin-Eintrag enthält offenbar eine falsche Magnesium-Zuordnung. Soll Magnesium entfernt und Kreatin mit 1 g pro Gramm Produkt erfasst werden? Die gespeicherten Einnahmetage und deine Tagesmenge bleiben erhalten.')) return
+    if (update(d => ({ ...d, supplements: d.supplements.map(s =>
+      s.id === supplement.id ? (repairMisattributedCreatine(s) || s) : s
+    ) }))) setNotice('Kreatin-Eintrag korrigiert. Magnesium wird dafür nicht mehr mitgerechnet.')
+  }
+  const mergeOmega3 = (left, right) => {
+    const result = mergeOmega3Pair(data.supplements, left.id, right.id)
+    if (!result.changed) {
+      setNotice(result.reason === 'different-history'
+        ? 'EPA und DHA haben unterschiedliche Einnahmetage. Zusammenführen ist gesperrt, damit keine Einnahmen erfunden werden. Bitte Historien prüfen.'
+        : 'Diese beiden Einträge sind nicht sicher zusammenführbar.')
+      return
+    }
+    if (!window.confirm('EPA und DHA in EIN Omega-3-Produkt zusammenführen? Die gleichen Einnahmetage bleiben erhalten. Der zweite Eintrag wird entfernt.')) return
+    if (update(d => {
+      const next = mergeOmega3Pair(d.supplements, left.id, right.id)
+      return next.changed ? { ...d, supplements: next.supplements } : d
+    })) setNotice('Omega-3 zusammengeführt. EPA und DHA bleiben getrennte Wirkstoffe in einem Produkt.')
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
@@ -268,21 +335,53 @@ export default function Nutrition() {
           <h3>Makronährstoffe</h3>
           <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {macroGoals[key] == null ? '' : `von ${fmt(macroGoals[key])} g`}</strong></div>)}</div>
           <button type="button" className="of-micros-toggle" aria-expanded={showMicros} onClick={() => setShowMicros(v => !v)}>
-            <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{Object.values(micros).filter(v => Number(v) > 0).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
+            <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{nutrientRows.filter(n => n.known).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
           {showMicros && <div className="of-micros-content">
-            <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
-            {MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).length
-              ? <div className="of-micro-cards">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => {
-                  const guide = MICRO_GUIDES[key]
-                  const exceededUpperLimit = key === 'sodium' && guide != null && micros[key] > guide
-                  return <div className="of-micro-card" key={key}>
-                    <div className="of-micro-heading"><strong>{label}</strong><span className={exceededUpperLimit ? 'of-micro-over' : ''}>{fmt(micros[key])}{guide != null ? ` / ${fmt(guide)}` : ''} {unit}</span></div>
-                    {guide != null && <div className="of-micro-track" role="progressbar" aria-label={label} aria-valuenow={micros[key]} aria-valuemin={0} aria-valuemax={guide}><span className={exceededUpperLimit ? 'of-micro-over-fill' : ''} style={{width:`${Math.min(100, 100 * micros[key] / Math.max(1,guide))}%`}} /></div>}
-                    <small className="of-dim">Nahrung: {fmt(foodMicros[key] || 0)} {unit} · Supplements: {fmt(supplementMicros[key] || 0)} {unit}{guide == null ? ' · Kein pauschaler Tagesrichtwert' : key === 'sodium' ? ' · Obergrenze' : ' · Orientierungswert'}</small>
+            <p className="of-micro-note">Nur erfasste Mengen. Fehlende Angaben bleiben unbekannt. Details antippen.</p>
+            <div className="of-micro-cards">
+              <details className="of-micro-card of-micro-compact" key="fiber">
+                <summary className="of-micro-summary">
+                  <span className="of-micro-name">Ballaststoffe</span>
+                  <span className="of-micro-value">{fmt(fiberReport.recorded)} g<small> / {fmt(fiberReport.target)} g</small></span>
+                  <Icon name="chevronDown" />
+                </summary>
+                <div className="of-micro-details">
+                  <div className="of-micro-track" role="progressbar" aria-label="Ballaststoffe" aria-valuenow={fiberReport.recorded} aria-valuemin={0} aria-valuemax={fiberReport.target}><span style={{width:`${fiberReport.progress}%`}} /></div>
+                  <div>Erfasste Werte: {fmt(fiberReport.confirmed)} g · KI-geschätzt: {fmt(fiberReport.estimated)} g</div>
+                  <div>{fiberReport.complete ? `Noch ${fmt(fiberReport.remaining)} g bis zum Orientierungswert.` : `${fiberReport.unknownCount} Lebensmittel ohne verwertbare Ballaststoffangabe. Die tatsächliche Tagesmenge ist unbekannt.`}</div>
+                  <details className="of-fiber-sources">
+                    <summary>Lebensmittelquellen ({fiberReport.knownCount}) und Datenlücken ({fiberReport.unknownCount})</summary>
+                    {fiberReport.sources.length ? <div className="of-fiber-source-list">{fiberReport.sources.map((food,i) => <div key={food.id || i}><span>{food.name} <small>{fmt(food.quantity)} {food.unit}{food.estimated ? ' · KI-Schätzung' : ' · erfasster Wert'}</small></span><strong>{fmt(food.fiber)} g</strong></div>)}</div> : <p className="of-dim">Noch keine Lebensmittel mit Ballaststoffangaben erfasst.</p>}
+                    {fiberReport.missing.length > 0 && <div className="of-fiber-missing"><strong>Angaben fehlen</strong>{fiberReport.missing.map((food,i) => <div key={food.id || i}>{food.name} ({fmt(food.quantity)} {food.unit})</div>)}<p>Lebensmittel bearbeiten und fehlende Nährstoffe per KI schätzen oder einen Etikettwert nachtragen.</p></div>}
+                  </details>
+                </div>
+              </details>
+              {nutrientRows.filter(n => n.known && n.key !== 'fiber').map(n => {
+
+                const limitText = n.upper ? `Obergrenze: ${fmt(n.upper.max)} ${n.unit} (${n.upper.scope === 'supplement' ? 'nur aus Ergänzungen' : 'Gesamtaufnahme'})` : null
+                return <details className={'of-micro-card of-micro-compact' + (n.limitExceeded ? ' of-micro-warning' : '')} key={n.key}>
+                  <summary className="of-micro-summary">
+                    <span className="of-micro-name">{n.label}{n.limitExceeded && <span className="of-micro-alert">⚠ Grenzwert prüfen</span>}</span>
+                    <span className="of-micro-value">{fmt(n.total)} {n.unit}{n.guide != null && <small> / {fmt(n.guide)} {n.unit}</small>}</span>
+                    <Icon name="chevronDown" />
+                  </summary>
+                  {n.guide != null && <div className="of-micro-track" role="progressbar" aria-label={n.label} aria-valuenow={n.total} aria-valuemin={0} aria-valuemax={n.guide}><span className={n.limitExceeded ? 'of-micro-over-fill' : ''} style={{width:`${Math.min(100,100*n.total / Math.max(1,n.guide))}%`}} /></div>}
+                  <div className="of-micro-details">
+                    <div>Nahrung: {n.food == null ? 'unbekannt' : `${fmt(n.food)} ${n.unit}`}</div>
+                    <div>Supplements: {n.supplement == null ? 'nicht erfasst' : `${fmt(n.supplement)} ${n.unit}`}</div>
+                    <div>Lebensmittelwerte: {fmt(n.confirmedFood)} {n.unit} erfasst · {fmt(n.estimatedFood)} {n.unit} KI-geschätzt</div>
+                    {n.estimatedFood > 0 && <p>KI-Werte sind Näherungen und keine gemessenen Produktangaben.</p>}
+                    {n.estimatedExceedance && <p>⚠ Geschätzte Gesamtaufnahme liegt über einer Obergrenze. Das ist keine bestätigte Überschreitung.</p>}
+                    {n.incomplete && <p>Lebensmitteldaten unvollständig. Der tatsächliche Wert kann höher sein.</p>}
+                    {n.guide != null && <p>{n.key === 'sodium' ? 'Orientierung zur Begrenzung, kein Mindestziel.' : 'Der Vergleichswert ist ein Orientierungswert, keine sichere Obergrenze.'}</p>}
+                    {limitText && <p className={n.limitExceeded ? 'of-micro-over' : ''}>{n.limitExceeded ? '⚠ Erfasste Menge überschreitet den angegebenen Grenzwert. ' : ''}{limitText}. Bitte Dosierung und Produktform prüfen.</p>}
+                    {n.key === 'magnesium' && <p>350 mg = täglicher Orientierungswert. 250 mg gilt nur für bestimmte ergänzte Magnesiumverbindungen und ist kein Zielwert.</p>}
+                    {n.key === 'creatine' && <p>Kreatin ist kein Vitamin oder Mineralstoff. Hier wird nur die dokumentierte Einnahme angezeigt.</p>}
                   </div>
-                })}</div>
-              : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
+                </details>
+              })}
+            </div>
           </div>}
           <button type="button" className="of-micros-toggle of-supplements-toggle" aria-expanded={showSupplements} onClick={() => { setShowSupplements(v => !v); setSuppFormOpen(false); setEditingSupplement(null) }}>
             <span>Supplements heute</span>
@@ -290,13 +389,21 @@ export default function Nutrition() {
           </button>
           {!showSupplements && <p className="of-dim of-supp-hint">{data.supplements.length ? 'Hier kannst du deine täglichen Einnahmen abhaken und die hinterlegten Dosierungen bearbeiten.' : 'Hier einmal deine Supplements und Tagesdosen hinterlegen, danach täglich abhaken.'}</p>}
           {showSupplements && <>
+          {omega3Pairs(data.supplements).map(({left, right, review}) => <div className="of-omega3-merge" key={left.id + ':' + right.id}>
+            <div><strong>Omega-3: EPA + DHA</strong><small>{review.allowed
+              ? 'Gleiche Einnahmetage und Dosierung. Als ein Produkt speichern.'
+              : 'Unterschiedliche Einnahmehistorie. Nicht automatisch zusammenführen.'}</small></div>
+            <button type="button" onClick={() => mergeOmega3(left, right)} disabled={!review.allowed}
+              aria-label="Omega-3-Einträge zusammenführen">Zusammenführen</button>
+          </div>)}
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
-            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
+            {isMisattributedCreatine(s) && <button type="button" className="of-creatine-repair" onClick={() => repairCreatine(s)} aria-label="Kreatin-Zuordnung korrigieren">Kreatin korrigieren</button>}
+            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => selectSupplementForEdit(s)}><Icon name="pencil" /></button>
             <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
           </div>)}
           {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
-          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { setEditingSupplement(null); setSuppName(""); setSuppDose(""); setSuppUnit("piece"); setSuppAmount(""); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
+          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { resetSupplementForm(); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
           {suppFormOpen && <form className="of-inline-supp-form" onSubmit={addSupplement}>
             <label className="of-supp-field">Supplement<input aria-label="Supplementname" placeholder="z. B. Magnesium" value={suppName} onChange={e => setSuppName(e.target.value)} required /></label>
             <div className="of-supp-form-row">
@@ -304,13 +411,19 @@ export default function Nutrition() {
               <label className="of-supp-field">Einheit<select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="piece">Stk.</option><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option></select></label>
             </div>
             <div className="of-supp-form-row">
-              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
+              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}><option value="">Wirkstoff auswählen</option>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
               <label className="of-supp-field">Wirkstoffgehalt pro {suppUnit === 'piece' ? 'Stück' : suppUnit}<input aria-label="Wirkstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
             </div>
+            <button type="button" className="of-supp-open" onClick={() => {
+              if (!suppNutrient || suppAmount === '' || !Number.isFinite(Number(suppAmount)) || Number(suppAmount) < 0) { setNotice('Wirkstoff und Gehalt prüfen.'); return }
+              setSuppNutrients(old => ({ ...old, [suppNutrient]: Number(suppAmount) }))
+              setSuppAmount('')
+            }}>Wirkstoff zur Liste hinzufügen</button>
+            {Object.entries(suppNutrients).map(([key, val]) => <div key={key} className="of-inline-supp"><label style={{flex:1}}>{MICRO_NUTRIENTS.find(n => n.key === key)?.label || key} ({MICRO_NUTRIENTS.find(n => n.key === key)?.unit}) pro Einheit<input type="number" step="any" min="0" aria-label={key + ' Wirkstoffgehalt'} value={val} onChange={e => setSuppNutrients(old => ({ ...old, [key]: e.target.value }))} /></label><button type="button" aria-label={key + ' entfernen'} onClick={() => setSuppNutrients(old => Object.fromEntries(Object.entries(old).filter(([k]) => k !== key)))}><Icon name="trash" /></button></div>)}
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
           </form>}
-          <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Wirkstoffmengen werden nur mit hinterlegtem Gehalt berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
+          <p className="of-dim">Wirkstoffe und Mengen laut Etikett eintragen. Frühere Fehlzuordnungen werden nicht automatisch verändert. EPA und DHA sind Bestandteile von Omega-3.</p>
           </>}
         </div>}
       </section>
@@ -344,7 +457,8 @@ export default function Nutrition() {
     {tab === 'favorites' && <div className="card of-reusable"><h2>Favoriten</h2>{data.favorites.length ? data.favorites.map(f => <div className="of-reuse-row" key={f.id}><span>{f.food.name}</span><button onClick={() => { log(f.food, selectedMeal); goSection('today') }}>Eintragen</button></div>) : <p>Markiere Lebensmittel im Tagebuch mit dem Stern, um sie hier schnell wiederzufinden.</p>}</div>}
     {tab === 'food' && <>
       <div className="of-meal-context">Eintragen für <strong>{MEAL_GROUPS.find(g => g.id === selectedMeal)?.title || 'Snacks'}</strong></div>
-      {!showForm && (data.favorites.length > 0 || unique.length > 0) && <section className="of-food-shortcuts" aria-label="Schnell eintragen">
+      {!showForm && (data.favorites.length > 0 || unique.length > 0 || frequent.length > 0) && <section className="of-food-shortcuts" aria-label="Schnell eintragen">
+        {!!frequent.length && <><h3><Icon name="repeat" /> Häufig gegessen</h3><div className="of-quick-food-list">{frequent.map(item => <button type="button" key={item.name + item.latest.unit} onClick={() => log(item.latest, item.latest.mealType || selectedMeal)}><strong>{item.name}</strong><small>{item.count}× bisher · {fmt(item.energy)} kcal · letzte Portion {fmt(item.latest.quantity)} {item.latest.unit}</small><span>+</span></button>)}</div></>}
         {!!data.favorites.length && <><h3><Icon name="star" /> Favoriten</h3><div className="of-quick-food-list">{data.favorites.slice(0,6).map(f => <button type="button" key={f.id} onClick={() => log(f.food)}><strong>{f.food.name}</strong><small>{fmt(entryTotals(f.food).kcal)} kcal · {fmt(entryTotals(f.food).protein)} g Protein</small><span>+</span></button>)}</div></>}
         {!!unique.length && <><h3><Icon name="repeat" /> Zuletzt gegessen</h3><div className="of-quick-food-list">{unique.filter(e => !isFavorite(data,e)).slice(0,5).map(e => <button type="button" key={e.id} onClick={() => log(e)}><strong>{e.name}</strong><small>{fmt(entryTotals(e).kcal)} kcal</small><span>+</span></button>)}</div></>}
       </section>}
@@ -376,7 +490,14 @@ export default function Nutrition() {
         <div className="of-form-caption">Nährwerte pro 100 {form.basis}, nicht pro Portion</div>
         <div className="of-2-col">{[['kcal','Kalorien'],['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([k,label]) =>
           <label key={k}>{label} ({k === 'kcal' ? 'kcal' : 'g'})<input required type="number" min="0" step="any" value={form.per100[k]} onChange={e => setForm(f => ({ ...f, per100: { ...f.per100, [k]: e.target.value } }))} /></label>)}</div>
-        <details className="of-optional-micros"><summary>Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.map(({key,label,unit}) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value} }))} /></label>)}</div></details>
+        <section className="of-fiber-input">
+          <button type="button" disabled={fiberBusy || !form.name.trim() || form.basis !== 'g'}
+            onClick={estimateFormMicros}>{fiberBusy ? 'KI analysiert…' : 'Fehlende Mikronährstoffe mit KI schätzen'}</button>
+          <div className="of-dim">Die KI ergänzt nur fehlende Angaben. Vorhandene Datenbankwerte und deine Korrekturen bleiben erhalten.</div>
+          {Object.values(form.microsSources || {}).some(v => v === 'ai_estimate') &&
+            <div className="of-dim">KI-Schätzwerte vorhanden. Unter „Weitere Mikronährstoffe“ prüfen und bei Bedarf korrigieren.</div>}
+        </section>
+        <details className="of-optional-micros"><summary>Weitere Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.filter(n => n.key !== 'fiber' && !n.supplementOnly && !['omega3','epa','dha'].includes(n.key)).map(({key,label,unit}) => <label key={key}>{label} ({unit}){form.microsSources?.[key] === 'ai_estimate' ? ' · KI' : form.microsSources?.[key] === 'database' ? ' · DB' : ''}<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value}, microsSources: {...f.microsSources, [key]: e.target.value === '' ? null : 'manual'} }))} /></label>)}</div></details>
         <div className="of-macro-sub">Portion: {fmt(entryTotals(form).kcal)} kcal · {fmt(entryTotals(form).protein)} g Protein</div>
         <div className="of-form-buttons"><button type="button" onClick={() => setShowForm(false)}>Abbrechen</button><button type="submit">{editing ? 'Aktualisieren' : 'Eintragen'}</button></div>
       </form>}
@@ -399,15 +520,35 @@ export default function Nutrition() {
       </div> }) : <div className="of-empty">Noch keine Rezepte gespeichert.</div>}
     </>}
     {tab === 'analysis' && <>
-      <div className="card of-week"><h2>Letzte 7 Tage</h2><p className="of-dim">Nur Tage mit Ernährungseinträgen zählen zum Durchschnitt. Leere Tage gelten nicht als Fastentage.</p>
-        <div className="of-macro-main"><div><span>Ø Kalorien / erfasster Tag</span><strong>{week.average.kcal} <small>kcal</small></strong></div>
-          <div><span>Ø Protein / erfasster Tag</span><strong>{week.average.protein} <small>g</small></strong></div></div>
-        <div className="of-dim">{week.daysLogged} von 7 Tagen erfasst · Protein-Ziel an {week.goalsReached} Tagen erreicht</div>
-        <div className="of-week-bars">{week.days.map(d => <div className="of-week-day" key={d.date} title={`${d.date}: ${d.kcal} kcal`}>
-          <div className="of-week-bar"><span style={{ height: `${Math.min(100, data.goals.kcal ? d.kcal / data.goals.kcal * 100 : 0)}%` }} /></div>
-          <small>{d.date.slice(8)}</small></div>)}</div>
-        <div className="of-macro-sub"><span>Ø Kohlenhydrate <b>{week.average.carbs} g</b></span><span>Ø Fett <b>{week.average.fat} g</b></span></div>
-      </div>
+      <section className="card of-week of-analysis">
+        <h2>Ernährungsanalyse · 7 Tage</h2>
+        <p className="of-dim">Durchschnitte nur aus Tagen mit Ernährungseinträgen. Nicht erfasste Tage sind keine Null-Tage. Einträge können unvollständig sein.</p>
+        <div className="of-analysis-coverage"><strong>{week.daysLogged}/7 Tage erfasst</strong><span>{fmt(week.loggedCoverage)} % Abdeckung</span></div>
+        <div className="of-analysis-kpis">{[['kcal','Kalorien','kcal'],['protein','Protein','g'],['carbs','Kohlenhydrate','g'],['fat','Fett','g']].map(([key,label,unit]) => <div key={key}><span>Ø {label}</span><strong>{week.daysLogged ? fmt(week.average[key]) : '–'} <small>{unit}</small></strong></div>)}</div>
+        <h3>Tag für Tag</h3>
+        <div className="of-analysis-days">{week.days.map(d=><div key={d.date} className={'of-analysis-day' + (!d.consumed ? ' of-analysis-empty' : '')}>
+          <strong>{d.date.slice(5)}</strong>
+          <div className="of-analysis-meter"><span style={{width:`${d.consumed ? Math.min(100,100*d.kcal/Math.max(1,macroGoals.kcal)) : 0}%`}} /></div>
+          <span>{d.consumed ? `${fmt(d.kcal)} kcal` : 'Keine Einträge'}</span>
+          <small>{d.consumed ? `P ${fmt(d.protein)} · KH ${fmt(d.carbs)} · F ${fmt(d.fat)} g` : 'Keine Bewertung'}</small>
+        </div>)}</div>
+        <h3>Zielerreichung</h3>
+        <div className="of-analysis-targets">{[['kcal','Kalorien (max.)'],['protein','Protein (min.)'],['fat','Fett (max.)']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{week.goalStats[key].met}/{week.goalStats[key].evaluated} erfasste Tage</strong></div>)}</div>
+        <p className="of-dim">Kohlenhydrate: Ø {fmt(week.average.carbs)} g. Das KH-Ziel dient als Orientierung; keine separate Erfolgsquote.</p>
+      </section>
+      <section className="card of-week of-analysis">
+        <h2>Gewichtstrend</h2>
+        {week.weights.length ? <>
+          <div className="of-analysis-weights">{week.weights.map((w,i)=><div key={w.date+'-'+i}><span>{w.date.slice(5)}</span><strong>{fmt(w.weight)} kg</strong></div>)}</div>
+          <p>{week.weightDelta == null ? 'Für einen Trend brauchen wir mindestens zwei Messungen innerhalb der sieben Tage.' : `Veränderung zwischen erster und letzter Messung: ${week.weightDelta > 0 ? '+' : ''}${fmt(week.weightDelta)} kg`}</p>
+        </> : <p className="of-dim">Keine Gewichtsmessungen innerhalb dieser sieben Tage gespeichert. Gewicht kannst du in der Körperentwicklung erfassen.</p>}
+        <p className="of-dim">Kurzfristige Schwankungen durch Wasser und Verdauung sind normal. Aus sieben Tagen lässt sich kein zuverlässiger Fettverlust ableiten.</p>
+      </section>
+      <section className="card of-week of-analysis">
+        <h2>Häufige Mahlzeiten</h2>
+        <p className="of-dim">Tippen, um die zuletzt verwendete Portion für den ausgewählten Tag erneut einzutragen.</p>
+        {frequent.length ? <div className="of-analysis-frequent">{frequent.map(item=><div key={item.name+item.latest.unit}><span><strong>{item.name}</strong><small>{item.count}× · {fmt(item.energy)} kcal</small></span><button type="button" onClick={()=>log(item.latest,item.latest.mealType||selectedMeal)}>+ Eintragen</button></div>)}</div> : <p>Erfasse zuerst Mahlzeiten, um sie hier wiederholen zu können.</p>}
+      </section>
     </>}
     {tab === 'backup' && <>
       <div className="card of-backup"><h2>Ernährungsbackup</h2><p>Dieser Export sichert ausschließlich Ernährung, inklusive Wasser, Aktivitäten, Mahlzeiten und Ziele. Das gemeinsame Training-und-Ernährung-Backup findest du in den allgemeinen openForm-Einstellungen.</p>

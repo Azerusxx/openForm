@@ -1,5 +1,5 @@
 // Additive nutrition helpers for openForm 0.2. Never touch gym_state_v1.
-import { createEntry, dayTotals, entryTotals, dateLocal, cleanMicros } from './nutrition.js'
+import { createEntry, dayTotals, entryTotals, dateLocal, cleanMicros, cleanMicrosSources } from './nutrition.js'
 
 const round = value => Math.round(value * 10) / 10
 const validNum = value => Number.isFinite(Number(value)) && Number(value) > 0
@@ -11,7 +11,8 @@ const isTemplate = item => item && typeof item.name === 'string' && item.name.tr
 export const foodTemplate = item => ({ name: String(item.name).trim().slice(0, 160), quantity: Number(item.quantity), unit: item.unit,
   basis: item.basis, pieceSize: item.unit === 'piece' ? Number(item.pieceSize) : null,
   per100: { kcal: Number(item.per100.kcal), protein: Number(item.per100.protein), carbs: Number(item.per100.carbs), fat: Number(item.per100.fat) },
-  per100Micros: cleanMicros(item.per100Micros), barcode: item.barcode || null, source: item.source || 'manual' })
+  per100Micros: cleanMicros(item.per100Micros), microsSources: cleanMicrosSources(item.microsSources, cleanMicros(item.per100Micros)),
+  fiberSource: item.fiberSource || null, barcode: item.barcode || null, source: item.source || 'manual' })
 export function cleanFavorites(value) {
   return Array.isArray(value) ? value.filter(x => x && typeof x.id === 'string' && isTemplate(x.food))
     .map(x => ({ id: x.id, food: foodTemplate(x.food) })).slice(0, 100) : []
