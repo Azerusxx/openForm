@@ -15,8 +15,10 @@ export function nextDay(iso) {
 const validMap=m=>!!m&&typeof m==='object'&&!Array.isArray(m)
 export function cleanIllness(raw) {
  if(!validMap(raw)||!validDay(raw.start))return null
+ if(raw.end && !validDay(raw.end))return null
  const end=validDay(raw.end)?raw.end:null
  if(end&&end<raw.start)return null
+ if(raw.plannedReturn && !validDay(raw.plannedReturn))return null
  const plannedReturn=validDay(raw.plannedReturn)?raw.plannedReturn:null
  if(plannedReturn&&(!end||plannedReturn<=end))return null
  return {

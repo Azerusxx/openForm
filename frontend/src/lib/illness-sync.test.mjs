@@ -44,3 +44,10 @@ test('guest-only sickness is counted as unsynced setup, protecting it at sign-in
  assert.ok(setup.setup>=1)
  assert.equal(localExtras({illnessPeriods:clearIllness(local.illnessPeriods,'a',200)},{illnessPeriods:{}}).setup||0,0)
 })
+
+test('server nudge suppresses a sickness interval without masking a later training date',async()=>{
+ const {excusedOn}=await import('../../../api/nudge.js')
+ const s={illnessPeriods:putIllness({},'test',{start:'2026-10-22',end:'2026-10-25'},100)}
+ assert.equal(excusedOn(s,'2026-10-23'),true)
+ assert.equal(excusedOn(s,'2026-10-26'),false)
+})
