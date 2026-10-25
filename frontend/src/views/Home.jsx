@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore.js'
 import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekStartOf, weekDayOffset, DAYS, DAYN } from '../lib/format.js'
 import { t, tn, dateLocale } from '../lib/i18n.js'
-import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, starterPlanSheet, bwDeltaColor, weighInsSheet } from '../sheets.jsx'
+import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, starterPlanSheet, bwDeltaColor, weighInsSheet, illnessSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import QueueRow from '../components/QueueRow.jsx'
@@ -15,6 +15,7 @@ import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
 import { dayNoteOf } from '../lib/day-notes.js'
+import { illnessOnDay, latestIllness, recoveryStatus } from '../lib/illness.js'
 import { loadNutrition, dayTotals } from '../lib/nutrition.js'
 import './Nutrition.css'
 
@@ -79,7 +80,7 @@ export default function Home() {
     const iso = isoOf(d)
     const eff = effectiveRoutineIds(S, iso).length > 0, ovr = S.dayPlan[iso] !== undefined, done = doneDays.has(iso)
     // A day off with a note (#261) reads as excused, not as a plan that went by.
-    const dot = done ? ' done' : dayNoteOf(S, iso) ? ' noted' : ovr && eff ? ' ovr' : eff ? ' plan' : ''
+    const dot = illnessOnDay(S,iso,todayISO()) ? ' sick' : done ? ' done' : dayNoteOf(S, iso) ? ' noted' : ovr && eff ? ' ovr' : eff ? ' plan' : ''
     strip.push(<div key={i} className={'wday' + (iso === todayISO() ? ' today' : '')} {...tappable(() => dayOverrideSheet(iso))}>
       <div className="lbl">{t(DAYS[d.getDay()])}</div><div className="num">{d.getDate()}</div><div className={'dot' + dot} /></div>)
   }
@@ -116,6 +117,10 @@ export default function Home() {
   // A chip on the coach week's progress row starts that one routine, in any order. A session
   // already in progress wins, as on the today row — starting another would overwrite it.
   const onQueueStart = id => { if (S.active) nav('/workout'); else startFlow([id]) }
+  const todayIllness = illnessOnDay(S,todayISO(),todayISO())
+  const lastIllness = latestIllness(S,todayISO())
+  const showRecovery = !todayIllness && lastIllness?.end && (new Date(todayISO()+'T12:00:00') - new Date(lastIllness.end+'T12:00:00')) / 86400000 <= 14
+  const recovery = showRecovery ? recoveryStatus(lastIllness,todayISO()) : null
 
   return <div className="narrow">
     <div className="hdr">
@@ -123,6 +128,14 @@ export default function Home() {
       <button className="iconbtn" onClick={() => nav('/settings')} aria-label={trouble ? t('Settings') + ', ' + t('Connection problem') : t('Settings')}><Icon name="gear" />{trouble && <span className="tab-dot" aria-hidden="true" />}</button>
     </div>
 
+    {(todayIllness || showRecovery) && <div className="illness-home-card">
+      <div className="row between"><strong><Icon name="cloud" /> {todayIllness ? 'Krank gemeldet' : 'Wiedereinstieg'}</strong>
+      <Button size="sm" variant="ghost" onClick={() => illnessSheet(todayISO(),(todayIllness||lastIllness)?.id)}>Bearbeiten</Button></div>
+      <p>{todayIllness
+        ? 'Krank seit ' + fmtDate(todayIllness.start,true) + (todayIllness.end ? ' · bis '+fmtDate(todayIllness.end,true) : ' · Ende noch offen')
+        : recovery?.label}</p>
+      {showRecovery && <p className="muted small">Erst bei deutlicher Genesung behutsam trainieren. Ein Datum im Kalender ersetzt keine medizinische Abklärung.</p>}
+    </div>}
     <div className="card">
       {/* A coach week runs by order, not by weekday, so its progress row stands in for the
           seven dots (components/QueueRow.jsx). The today row below stays as it is: the queue's
