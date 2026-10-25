@@ -2196,3 +2196,13 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
  #rest-circle-overlay .rest-circle-clock{width:min(40vh,185px);height:min(40vh,185px)}
  #rest-circle-overlay .rest-circle-hint{margin:8px auto 6px;min-height:0}}
 @media(prefers-reduced-motion:reduce){#rest-circle-overlay .rest-circle-track{transition:none}}
+
+/* 0.3.7c: optional subjective effort inside the circular in-app rest timer */
+#rest-circle-overlay .rest-circle-effort{margin:4px 0 10px}
+#rest-circle-overlay .rest-circle-effort-title{font-size:12px;font-weight:650;text-align:start;margin:0 0 7px}
+#rest-circle-overlay .rest-circle-effort-title small{display:block;margin-top:2px;font-weight:400;color:var(--label-2);font-size:11px}
+#rest-circle-overlay .rest-circle-effort-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#rest-circle-overlay .rest-circle-effort-options button{border:1px solid var(--surface-3);background:var(--surface-2);color:var(--label);border-radius:11px;min-height:40px;font-size:12px;font-weight:700}
+#rest-circle-overlay .rest-circle-effort-options button.selected{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
+#rest-circle-overlay .rest-circle-effort-options button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media(max-height:700px){#rest-circle-overlay .rest-circle-effort{margin:0 0 6px}#rest-circle-overlay .rest-circle-effort-options button{min-height:33px}#rest-circle-overlay .rest-circle-hint{margin:3px auto}}

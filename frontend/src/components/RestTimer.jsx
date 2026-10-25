@@ -84,7 +84,7 @@ export default function RestTimer() {
   // Only a real new rest opens the full-screen overlay again; pausing or adding 15 seconds
   // must not undo the user's choice to keep the workout visible.
   const [minimizedRestId, setMinimizedRestId] = useState(null)
-  const { addRest, stopRest, pauseRest, resumeRest, finishWorkEarly, stopWork } = useUI()
+  const { addRest, stopRest, pauseRest, resumeRest, setSmartRestEffort, finishWorkEarly, stopWork } = useUI()
   const on = work || timer
   const actsRef = useRef(null)
   const skipFits = useSkipFits(actsRef, [!!timer && !work, t('Skip'), t('Dismiss')])
@@ -138,6 +138,18 @@ export default function RestTimer() {
           <p className="rest-circle-hint">{timer.ready ? 'Du kannst den nächsten Satz beginnen.' :
             timer.smartNote ? timer.smartNote + ' · Zeit jederzeit anpassbar' :
             'Tippe auf den Kreis, um die Zeit anzupassen.'}</p>
+          {timer.smartContext && !timer.ready && <div className="rest-circle-effort">
+            <div className="rest-circle-effort-title">Belastung nach dem Satz
+              <small>Optional · nur für diese Pause</small>
+            </div>
+            <div className="rest-circle-effort-options" role="group" aria-label="Wiederholungen in Reserve">
+              {[{ key: 'hard', label: '0–1 RIR' }, { key: 'normal', label: '2–3 RIR' },
+                { key: 'easy', label: '4+ RIR' }].map(option =>
+                <button key={option.key} type="button" aria-pressed={timer.smartEffortChoice === option.key}
+                  className={timer.smartEffortChoice === option.key ? 'selected' : ''}
+                  onClick={() => setSmartRestEffort(option.key)}>{option.label}</button>)}
+            </div>
+          </div>}
           <div className="rest-circle-adjust">
             <button type="button" onClick={() => addRest(-15)} disabled={!!timer.ready} aria-label="Pause um 15 Sekunden verkürzen">− 15 s</button>
             <button type="button" onClick={() => addRest(15)} disabled={!timer.ready && timer.left >= REST_MAX} aria-label="Pause um 15 Sekunden verlängern">+ 15 s</button>
