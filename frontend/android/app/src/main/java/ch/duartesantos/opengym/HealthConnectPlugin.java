@@ -7,6 +7,8 @@ import androidx.activity.result.ActivityResult;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.health.connect.client.HealthConnectClient;
 import androidx.health.connect.client.request.AggregateRequest;
+import androidx.health.connect.client.request.ReadRecordsRequest;
+import androidx.health.connect.client.response.ReadRecordsResponse;
 import androidx.health.connect.client.records.StepsRecord;
 import androidx.health.connect.client.time.TimeRangeFilter;
 import androidx.health.connect.client.aggregate.AggregationResult;
@@ -75,6 +77,7 @@ public class HealthConnectPlugin extends Plugin {
     private static final String WRITE_EXERCISE = "android.permission.health.WRITE_EXERCISE";
     private static final String WRITE_WEIGHT = "android.permission.health.WRITE_WEIGHT";
     private static final String READ_STEPS = "android.permission.health.READ_STEPS";
+    private static final String READ_EXERCISE = "android.permission.health.READ_EXERCISE";
     // Health Connect takes at most this many records in one insert.
     private static final int CHUNK = 500;
 
@@ -171,7 +174,9 @@ public class HealthConnectPlugin extends Plugin {
         worker.execute(() -> {
             try {
                 JSObject out=new JSObject();
-                out.put("granted",granted().contains(READ_STEPS));
+                Set<String> userPermissions=granted();
+                out.put("granted",userPermissions.contains(READ_STEPS));
+                out.put("exerciseGranted",userPermissions.contains(READ_EXERCISE));
                 call.resolve(out);
             } catch(Exception e) {call.reject(e.getMessage(),"failed");}
         });
@@ -180,7 +185,9 @@ public class HealthConnectPlugin extends Plugin {
     @PluginMethod
     public void requestStepPermission(PluginCall call) {
         if (!"available".equals(sdkStatus())) { call.reject("Health Connect unavailable", "unavailable"); return; }
-        Set<String> requested=Collections.singleton(READ_STEPS);
+        Set<String> requested=new HashSet<>();
+        requested.add(READ_STEPS);
+        requested.add(READ_EXERCISE);
         ActivityResultContract<Set<String>, Set<String>> contract = PermissionController.createRequestPermissionResultContract(PROVIDER);
         startActivityForResult(call, contract.createIntent(getContext(),requested), "stepPermissionResult");
     }
@@ -194,6 +201,50 @@ public class HealthConnectPlugin extends Plugin {
                 out.put("granted",granted().contains(READ_STEPS));
                 call.resolve(out);
             }catch(Exception e){call.reject(e.getMessage(),"failed");}
+        });
+    }
+
+    // Explicit exercise read access, limited to actual walking sessions and
+    // to the selected day. No calories are read from step counts.
+    @PluginMethod
+    @SuppressWarnings("unchecked")
+    public void readWalkingSessions(PluginCall call) {
+        if (!"available".equals(sdkStatus())) {call.reject("Health Connect unavailable","unavailable");return;}
+        String date=call.getString("date","");
+        final LocalDate day;
+        try{day=LocalDate.parse(date);}
+        catch(DateTimeParseException e){call.reject("Invalid ISO date","invalid");return;}
+        worker.execute(()->{
+            try{
+                if(!granted().contains(READ_EXERCISE)){call.reject("Read exercise not granted","permission");return;}
+                Instant start=day.atStartOfDay(ZoneId.systemDefault()).toInstant();
+                Instant end=day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+                ReadRecordsRequest<ExerciseSessionRecord> request=new ReadRecordsRequest<>(
+                    JvmClassMappingKt.getKotlinClass(ExerciseSessionRecord.class),
+                    TimeRangeFilter.between(start,end),Collections.emptySet(),true,250,null);
+                ReadRecordsResponse<ExerciseSessionRecord> response=
+                    (ReadRecordsResponse<ExerciseSessionRecord>)BuildersKt.runBlocking(
+                    EmptyCoroutineContext.INSTANCE,(scope,cont)->client().readRecords(request,cont));
+                JSArray sessions=new JSArray();
+                for(ExerciseSessionRecord rec:response.getRecords()){
+                    if(rec.getExerciseType()!=ExerciseSessionRecord.EXERCISE_TYPE_WALKING)continue;
+                    long begin=rec.getStartTime().toEpochMilli();
+                    long finish=rec.getEndTime().toEpochMilli();
+                    if(finish-begin<300000||finish-begin>43200000)continue;
+                    JSObject item=new JSObject();
+                    item.put("externalId",rec.getMetadata().getId());
+                    item.put("start",begin);
+                    item.put("end",finish);
+                    item.put("title",rec.getTitle()==null?"Spazierengehen":rec.getTitle());
+                    sessions.put(item);
+                }
+                JSObject result=new JSObject();
+                result.put("date",date);
+                result.put("sessions",sessions);
+                result.put("more",response.getPageToken()!=null);
+                call.resolve(result);
+            }catch(SecurityException e){call.reject(e.getMessage(),"permission");}
+            catch(Exception e){call.reject(e.getMessage(),"failed");}
         });
     }
 
