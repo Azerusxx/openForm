@@ -284,3 +284,18 @@
 .of-032 .of-calorie-ring{background:conic-gradient(var(--acc) var(--of-ring-pct),var(--sep) var(--of-ring-pct))}
 .of-032 .of-calorie-ring[aria-valuenow]:not([aria-valuenow="0"]){transition:background .2s}
 .of-032 .of-nutrient-detail strong small{display:block;font-weight:400;font-size:11px;text-align:right}
+
+
+/* Supplement editor: single-column mobile form, no overflowing fourth column. */
+.of-032 .of-inline-supp-form{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.of-032 .of-supp-form-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.of-032 .of-supp-field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;color:var(--label-2)}
+.of-032 .of-inline-supp-form .of-supp-field input,
+.of-032 .of-inline-supp-form .of-supp-field select{min-height:42px;padding:10px;font-size:14px}
+.of-032 .of-inline-supp-form>button{min-height:42px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;color:var(--on-acc)}
+.of-032 .of-supp-optional{border:1px solid var(--sep);border-radius:10px;padding:10px}
+.of-032 .of-supp-optional summary{cursor:pointer;font-size:13px;font-weight:600}
+.of-032 .of-supp-optional p{margin:8px 0}
+.of-032 .of-micros-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:16px 0;margin-top:8px;border-top:1px solid var(--sep);color:var(--label);font-weight:700;text-align:left}
+.of-032 .of-micros-toggle>span:last-child{display:flex;align-items:center;gap:7px;color:var(--label-3);font-size:11px;white-space:nowrap;font-weight:400}
+.of-032 .of-micros-content{padding-bottom:10px}
