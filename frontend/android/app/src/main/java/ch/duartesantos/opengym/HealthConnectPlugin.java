@@ -188,7 +188,8 @@ public class HealthConnectPlugin extends Plugin {
         Set<String> requested=new HashSet<>();
         requested.add(READ_STEPS);
         ActivityResultContract<Set<String>, Set<String>> contract = PermissionController.createRequestPermissionResultContract(PROVIDER);
-        startActivityForResult(call, contract.createIntent(getContext(),requested), "stepPermissionResult");
+        try { startActivityForResult(call, contract.createIntent(getContext(),requested), "stepPermissionResult"); }
+        catch(Exception e){call.reject("Health Connect Berechtigungsdialog: "+e.getMessage(),"permission_launch");}
     }
 
     @PluginMethod
