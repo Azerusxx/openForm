@@ -276,7 +276,7 @@ export default function Settings({ page = null, find = null, via = null }) {
   const doCompleteExport = async () => {
     try {
       const backup = createCompleteBackup(useStore.getState().S, loadNutrition())
-      const verified=verifyCompleteSnapshot(backup,{...backup,nutrition:backup.nutrition})
+      const verified=verifyBackupRoundTrip(useStore.getState().S,loadNutrition())
       if(!verified.ok)throw new Error('Backup-Vollständigkeitsprüfung fehlgeschlagen: '+verified.missing.join(', '))
       const json = JSON.stringify(backup, null, 2)
       const name = 'openform-komplett-' + todayISO() + '.json'
