@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { restProgress } from '../lib/rest-circle.js'
 import { useUI } from '../store/useUI.js'
 import { t } from '../lib/i18n.js'
 import { REST_MAX } from '../lib/duration.js'
-import { restCircleProgress, shouldOpenRestCircle } from '../lib/rest-circle.js'
 import { durationSheet } from './DurationWheel.jsx'
 import { Button } from './ui.jsx'
 import Icon from './Icon.jsx'
@@ -35,56 +36,6 @@ export function applyRestLeft(v, opened) {
   if (v <= 0) { ui.stopRest(); return }
   if (now.ready) { ui.startRest(v, now.forIdx); return }
   if (v !== now.left) ui.addRest(v - now.left)
-}
-
-// The in-app rest presentation does not own time or notifications; useUI remains
-// the sole clock and Android RestAlert continues when this screen is minimized.
-function RestCircle({ timer, onMinimize, addRest, stopRest, pauseRest, resumeRest }) {
-  const { remaining, circumference, offset } = restCircleProgress(timer.left, timer.total)
-  const title = timer.kind === 'switch' ? 'Seite wechseln' : timer.smartNote ? 'Empfohlene Pause' : 'Satzpause'
-  const paused = !!timer.paused
-  return (
-    <div className="rest-circle-layer" data-testid="rest-circle-overlay">
-      <button type="button" className="rest-circle-backdrop" aria-label="Zum Training zurückkehren" onClick={onMinimize} />
-      <section className="rest-circle-dialog" role="dialog" aria-modal="true" aria-labelledby="rest-circle-heading"
-        aria-describedby="rest-circle-description">
-        <header className="rest-circle-head">
-          <div><span className="rest-circle-kicker">TRAINING</span><h2 id="rest-circle-heading">{title}</h2></div>
-          <button type="button" className="rest-circle-minimize" onClick={onMinimize}
-            aria-label="Pausentimer einklappen und weitertrainieren"><Icon name="chevronDown" /> Einklappen</button>
-        </header>
-        <button type="button" className="rest-circle-dial" onClick={adjustRestSheet}
-          aria-label={`Restzeit ${clock(timer.left)}. Tippen, um die Zeit zu ändern.`}>
-          <svg className="rest-circle-svg" viewBox="0 0 240 240" aria-hidden="true">
-            <circle className="rest-circle-track" cx="120" cy="120" r="102" />
-            <circle className="rest-circle-progress" cx="120" cy="120" r="102"
-              strokeDasharray={circumference} strokeDashoffset={offset} />
-          </svg>
-          <span className="rest-circle-center">
-            <span className="rest-circle-time">{clock(timer.left)}</span>
-            <span className="rest-circle-state">{paused ? 'PAUSIERT' : 'RESTZEIT'}</span>
-            <span className="rest-circle-hint">Zeit ändern <Icon name="chevronDown" /></span>
-          </span>
-        </button>
-        <p id="rest-circle-description" className="rest-circle-caption">
-          {paused ? 'Countdown angehalten' : `${Math.round(remaining)} % der Pause übrig`}
-        </p>
-        <div className="rest-circle-controls">
-          <button type="button" onClick={() => addRest(-15)} aria-label="15 Sekunden weniger">− 15 s</button>
-          <button type="button" onClick={paused ? resumeRest : pauseRest}
-            aria-pressed={paused} aria-label={paused ? 'Pause fortsetzen' : 'Countdown pausieren'}>
-            <Icon name={paused ? 'play' : 'pause'} /> {paused ? 'Weiter' : 'Pause'}
-          </button>
-          <button type="button" onClick={() => addRest(15)} disabled={timer.left >= REST_MAX}
-            aria-label="15 Sekunden mehr">+ 15 s</button>
-        </div>
-        <button type="button" className="rest-circle-skip" onClick={stopRest}>Pause überspringen</button>
-        <button type="button" className="rest-circle-continue" onClick={onMinimize}>
-          Weitertrainieren · Timer läuft weiter
-        </button>
-      </section>
-    </div>
-  )
 }
 
 // One bar, two meanings: the rest countdown between sets, and the work countdown during a
@@ -129,35 +80,22 @@ function useSkipFits(actsRef, deps) {
 export default function RestTimer() {
   const timer = useUI(s => s.timer)
   const work = useUI(s => s.work)
+  const { pathname } = useLocation()
+  // Only a real new rest opens the full-screen overlay again; pausing or adding 15 seconds
+  // must not undo the user's choice to keep the workout visible.
+  const [minimizedRestId, setMinimizedRestId] = useState(null)
   const { addRest, stopRest, pauseRest, resumeRest, finishWorkEarly, stopWork } = useUI()
   const on = work || timer
   const actsRef = useRef(null)
   const skipFits = useSkipFits(actsRef, [!!timer && !work, t('Skip'), t('Dismiss')])
-  const [minimized, setMinimized] = useState(false)
-  const knownRest = useRef(null)
-  // New sets reopen the circle; changing the remaining time does not.
+  // The page keeps room at its bottom for the bar (index.css body.resting), so the last set and
+  // the Finish button can scroll clear of it.
   useEffect(() => {
-    if (!timer) { knownRest.current = null; setMinimized(false); return }
-    if (timer.startedAt != null && timer.startedAt !== knownRest.current) {
-      knownRest.current = timer.startedAt
-      setMinimized(!!timer.ready)
-    }
-    if (timer.ready) setMinimized(true) // Never block the next set after Ready.
-  }, [timer?.startedAt, timer?.ready, !!timer])
-  const showCircle = shouldOpenRestCircle({ timer, work, minimized })
-  useEffect(() => {
-    if (!showCircle) return
-    const onKey = e => { if (e.key === 'Escape') { setMinimized(true); e.preventDefault() } }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [showCircle])
-  // Reserve footer space only for the docked bar. The circle is a fixed overlay.
-  useEffect(() => {
-    document.body.classList.toggle('resting', !!work || (!!timer && !showCircle))
+    document.body.classList.toggle('resting', !!on)
     return () => document.body.classList.remove('resting')
-  }, [!!work, !!timer, showCircle])
+  }, [!!on])
   if (!on) return null
-  const pct = Math.max(0, Math.min(100, (on.left / on.total) * 100))
+  const pct = restProgress(on.left, on.total)
 
   if (work) return (
     <div id="timer" className="working">
@@ -172,9 +110,59 @@ export default function RestTimer() {
       </div>
     </div>
   )
-  if (showCircle) return (
-    <RestCircle timer={timer} onMinimize={() => setMinimized(true)}
-      addRest={addRest} stopRest={stopRest} pauseRest={pauseRest} resumeRest={resumeRest} />
+  // The native Android notification is unaffected: this is ONLY an in-app presentation.
+  // A switch-sides pause stays compact because blocking a ten-second handover is disruptive.
+  const expandedEligible = pathname === '/workout' && timer.kind !== 'switch'
+  const restId = timer.startedAt || `legacy-${timer.forIdx ?? 'x'}-${timer.forSet ?? 'x'}-${timer.total}`
+  if (expandedEligible && minimizedRestId !== restId) {
+    const label = timer.ready ? 'Pause beendet' : timer.paused ? 'Pausiert' : timer.smartNote ? 'Empfohlene Pause' : 'Satzpause'
+    return (
+      <div id="rest-circle-overlay" role="dialog" aria-modal="true" aria-label="Satzpause">
+        <div className="rest-circle-card">
+          <div className="rest-circle-head">
+            <span className="rest-circle-eyebrow">TRAININGSPAUSE</span>
+            <button type="button" className="rest-circle-minimize" onClick={() => setMinimizedRestId(restId)}>
+              <Icon name="chevronDown" /> Training ansehen
+            </button>
+          </div>
+          <div className="rest-circle-status">{label}</div>
+          <button type="button" className="rest-circle-clock" onClick={adjustRestSheet}
+            aria-label={(timer.ready ? 'Bereit' : clock(timer.left)) + '. Verbleibende Pause bearbeiten'}>
+            <span className="rest-circle-track" style={{ '--rest-remaining': `${pct}%` }}>
+              <span className="rest-circle-inner">
+                <strong role={timer.ready ? 'status' : 'timer'}>{timer.ready ? 'Bereit' : clock(timer.left)}</strong>
+                <span>{timer.ready ? 'Nächster Satz' : timer.paused ? 'Angehalten' : 'verbleibend'}</span>
+              </span>
+            </span>
+          </button>
+          <p className="rest-circle-hint">{timer.ready ? 'Du kannst den nächsten Satz beginnen.' :
+            timer.smartNote ? timer.smartNote + ' · Zeit jederzeit anpassbar' :
+            'Tippe auf den Kreis, um die Zeit anzupassen.'}</p>
+          <div className="rest-circle-adjust">
+            <button type="button" onClick={() => addRest(-15)} disabled={!!timer.ready} aria-label="Pause um 15 Sekunden verkürzen">− 15 s</button>
+            <button type="button" onClick={() => addRest(15)} disabled={!timer.ready && timer.left >= REST_MAX} aria-label="Pause um 15 Sekunden verlängern">+ 15 s</button>
+          </div>
+          <div className="rest-circle-actions">
+            {!timer.ready && <button type="button" className="rest-circle-toggle"
+              onClick={timer.paused ? resumeRest : pauseRest}
+              aria-pressed={!!timer.paused}>{timer.paused ? 'Fortsetzen' : 'Pausieren'}</button>}
+            <button type="button" className="rest-circle-skip" onClick={stopRest}>
+              {timer.ready ? 'Schließen' : 'Überspringen'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (expandedEligible) return (
+    <button type="button" className="rest-circle-mini" onClick={() => setMinimizedRestId(null)}
+      aria-label={`Pausenkreis anzeigen. ${timer.ready ? 'Bereit' : clock(timer.left)}`}>
+      <span className="rest-circle-mini-track" style={{ '--rest-remaining': `${pct}%` }}>
+        <span className="rest-circle-mini-inner"><Icon name="timer" /></span>
+      </span>
+      <span className="rest-circle-mini-copy"><strong>{timer.ready ? 'Bereit' : clock(timer.left)}</strong><small>Pause anzeigen</small></span>
+      <Icon name="chevronUp" />
+    </button>
   )
   // −15 and +15 sit together in number-line order; Skip is pushed to the far edge, away from the
   // button you tap to buy more time. Pause sits between them as an icon (#193): it holds the
@@ -187,10 +175,10 @@ export default function RestTimer() {
   return (
     <div id="timer" className={'rest' + (timer.paused ? ' paused' : '') + (timer.kind === 'switch' ? ' switch' : '') + (timer.ready ? ' ready' : '')}>
       <div className="bar" aria-hidden="true"><i style={{ width: pct + '%' }} /></div>
-      <button type="button" className="tclock" onClick={() => setMinimized(false)}
-        aria-label={(timer.ready ? t('Ready') : clock(timer.left)) + '. Kreis-Pausentimer öffnen'}>
+      <button type="button" className="tclock" onClick={adjustRestSheet}
+        aria-label={(timer.ready ? t('Ready') : clock(timer.left)) + '. ' + t('Change the time left')}>
         <span className="t" role={timer.ready ? 'status' : undefined} data-alt={timer.ready ? '0:00' : t('Ready')}>{timer.ready ? t('Ready') : clock(timer.left)}</span>
-        <span className="lbl">{label}<Icon name="chevronUp" /></span>
+        <span className="lbl">{label}<Icon name="chevronDown" /></span>
       </button>
       <div className="acts" ref={actsRef}>
         <Button size="sm" className="adj" icon="minus" onClick={() => addRest(-15)}>15s</Button>

@@ -1,36 +1,31 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { restCircleProgress, shouldOpenRestCircle } from './rest-circle.js'
-test('ring starts full, decreases, and ends empty without NaN', () => {
- const begin=restCircleProgress(90,90)
- const middle=restCircleProgress(45,90)
- const end=restCircleProgress(0,90)
- assert.equal(begin.remaining,100)
- assert.equal(begin.offset,0)
- assert.equal(middle.remaining,50)
- assert.ok(Math.abs(middle.offset-begin.circumference/2)<0.0001)
- assert.equal(end.remaining,0)
- assert.equal(end.offset,begin.circumference)
- assert.equal(restCircleProgress(-10,0).remaining,0)
- assert.equal(restCircleProgress(150,90).remaining,100)
+import { restProgress } from './rest-circle.js'
+const read = path => readFileSync(new URL(path,import.meta.url),'utf8')
+test('ring represents remaining time, clamps safely and handles zero duration',()=>{
+ assert.equal(restProgress(90,90),100)
+ assert.equal(restProgress(45,90),50)
+ assert.equal(restProgress(0,90),0)
+ assert.equal(restProgress(160,90),100)
+ assert.equal(restProgress(-1,90),0)
+ assert.equal(restProgress(15,0),0)
 })
-test('overlay only for running, visible rest—not timed work or ready', () => {
- const timer={left:90,total:90}
- assert.equal(shouldOpenRestCircle({timer,minimized:false}),true)
- assert.equal(shouldOpenRestCircle({timer,minimized:true}),false)
- assert.equal(shouldOpenRestCircle({timer,work:{left:15},minimized:false}),false)
- assert.equal(shouldOpenRestCircle({timer:{...timer,ready:true},minimized:false}),false)
- assert.equal(shouldOpenRestCircle({timer:null,minimized:false}),false)
+test('overlay contains editable circular timer and can be reduced without stopping countdown',()=>{
+ const src=read('../components/RestTimer.jsx')
+ for(const term of ['rest-circle-overlay','rest-circle-track','Training ansehen','rest-circle-mini','adjustRestSheet','pauseRest','resumeRest','stopRest'])assert.ok(src.includes(term),term)
+ assert.ok(src.includes('const expandedEligible = pathname === \'/workout\''))
+ assert.ok(src.includes('timer.startedAt'))
 })
-test('overlay retains pause, ±15, skip and edit controls', () => {
- const s=readFileSync(new URL('../components/RestTimer.jsx',import.meta.url),'utf8')
- for(const name of ['rest-circle-dialog','rest-circle-svg','rest-circle-backdrop','adjustRestSheet','addRest(-15)','addRest(15)','resumeRest','pauseRest','stopRest','Weitertrainieren'])assert.ok(s.includes(name),name)
- assert.ok(s.includes('className="working"'),'timed sets keep their existing docked timer')
+test('new pause is identified by persistent start time; native notification is unchanged',()=>{
+ const store=read('../store/useUI.js')
+ for(const term of ['const startedAt = Date.now()','startedAt: tm.startedAt || null','startedAt: saved.startedAt || now'])assert.ok(store.includes(term),term)
+ const src=read('../components/RestTimer.jsx')
+ assert.ok(src.includes('if (work) return ('))
 })
-test('rest identity persists across resumed and restored rest', () => {
- const s=readFileSync(new URL('../store/useUI.js',import.meta.url),'utf8')
- assert.match(s,/const startedAt = Date\.now\(\)/)
- assert.match(s,/startedAt: saved\.startedAt \|\| now/)
- assert.match(s,/startedAt: tm\.startedAt \|\| null/)
+test('overlay blur is scoped to the app and disabled for reduced motion',()=>{
+ const css=read('../index.css')
+ assert.ok(css.includes('#rest-circle-overlay'))
+ assert.ok(css.includes('backdrop-filter:blur(8px)'))
+ assert.ok(css.includes('prefers-reduced-motion'))
 })
