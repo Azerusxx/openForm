@@ -129,3 +129,89 @@
 .of-quick-actions button .icn{font-size:22px}
 .of-nutrition .of-list-head{margin-top:24px}
 @media(max-width:350px){.of-quick-actions{gap:5px}.of-quick-actions button{font-size:11px}}
+
+/* openForm 0.3.2 – original OpenNutriTracker-inspired nutrition dashboard.
+   Scoped strictly to the nutrition route; main app navigation stays unchanged. */
+.of-032{--of-teal:#15b9ad;--of-orange:#f2a955;--of-pink:#f1837d;--of-card:#242421;--of-stroke:rgba(255,255,255,.09);padding-bottom:64px}
+.of-032 .of-appbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0 20px}
+.of-032 .of-appbar-brand{display:flex;align-items:center;gap:10px}
+.of-032 .of-appbar h1{font-size:25px;line-height:1.1;font-weight:750;letter-spacing:-.035em;margin:0}
+.of-032 .of-appbar small{font-size:11px;color:var(--label-3);display:block;margin-top:4px}
+.of-032 .of-brand-symbol{height:37px;width:37px;border:2px solid var(--of-teal);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--of-teal);font-size:25px}
+.of-032 .of-menu-trigger{height:44px;width:44px;display:grid;place-items:center;border-radius:12px;border:1px solid var(--sep);font-size:25px;color:var(--label)}
+.of-032 .of-date-032{margin:0 0 15px;gap:5px}
+.of-032 .of-date-032 input{background:transparent;border:none;font-size:13px;color:var(--label-2);padding:9px}
+.of-032 .of-date-032 button{color:var(--label-2)}
+.of-032 .of-health-chips{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}
+.of-032 .of-health-chip{display:flex;align-items:center;gap:8px;border-radius:24px;border:1px solid var(--sep);background:var(--bg-el);padding:10px 13px;font-weight:650;font-size:15px;color:var(--label);min-height:46px}
+.of-032 .of-health-chip>.icn:first-child{color:var(--of-teal)}
+.of-032 .of-health-chip>.icn:last-child{font-size:14px;color:var(--label-3)}
+.of-032 .of-water-glyph{color:var(--of-teal);font-size:23px;line-height:14px}
+.of-032 .of-water-wrap{position:relative}
+.of-032 .of-water-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:15;width:min(286px,90vw);background:var(--bg-el);border:1px solid var(--sep);border-radius:15px;padding:14px;box-shadow:0 14px 30px #0005}
+.of-032 .of-water-menu>div{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+.of-032 .of-water-menu button{padding:12px;background:var(--bg);color:var(--label);border-radius:9px}
+.of-032 .of-water-menu .of-water-close{width:100%;color:var(--of-teal);margin-top:6px;background:transparent}
+.of-032 .of-calorie-card{position:relative;min-height:315px;display:flex;flex-direction:column;align-items:center;background:var(--bg-el);border:1px solid var(--sep);border-radius:28px;padding:23px 24px 14px;margin-bottom:14px}
+.of-032 .of-calorie-meta{display:flex;width:100%;justify-content:space-between;align-items:flex-start}
+.of-032 .of-calorie-meta>div{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.of-032 .of-calorie-meta>div:last-child{align-items:flex-end}
+.of-032 .of-calorie-meta strong{font-size:19px;font-variant-numeric:tabular-nums}
+.of-032 .of-calorie-meta small{font-size:12px;color:var(--label-3)}
+.of-032 .of-calorie-symbol{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;font-size:21px}
+.of-032 .of-intake{color:var(--of-teal);background:color-mix(in srgb,var(--of-teal),transparent 86%)}
+.of-032 .of-burn{color:var(--of-orange);background:color-mix(in srgb,var(--of-orange),transparent 85%)}
+.of-032 .of-calorie-ring{width:178px;height:178px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;margin:-14px 0 0;position:relative;isolation:isolate;background:conic-gradient(var(--of-teal) var(--of-ring-pct),var(--sep) var(--of-ring-pct))}
+.of-032 .of-calorie-ring:before{content:"";position:absolute;inset:16px;border-radius:50%;background:var(--bg-el);z-index:-1}
+.of-032 .of-calorie-ring strong{font-size:39px;line-height:1.2;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.of-032 .of-calorie-ring>span{font-size:15px;color:var(--label-3)}
+.of-032 .of-calorie-foot{margin-top:auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;width:100%;gap:6px;font-size:11px;color:var(--label-3);padding-top:12px}
+.of-032 .of-macro-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:28px}
+.of-032 .of-macro-tile{background:var(--bg-el);border:1px solid var(--sep);border-radius:18px;padding:16px 11px 17px;display:flex;flex-direction:column;gap:13px;min-width:0}
+.of-032 .of-macro-tile strong{font-size:13px;display:flex;align-items:center;gap:5px;white-space:nowrap;letter-spacing:-.025em}
+.of-032 .of-macro-tile strong i{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--of-orange)}
+.of-032 .of-macro-tile.of-fat strong i{background:var(--of-pink)}
+.of-032 .of-macro-tile.of-protein strong i{background:var(--of-teal)}
+.of-032 .of-macro-tile>span{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.of-032 .of-mini-track{height:7px;background:var(--sep);border-radius:10px;overflow:hidden}
+.of-032 .of-mini-track>span{height:100%;display:block;border-radius:inherit;background:var(--of-orange)}
+.of-032 .of-fat .of-mini-track>span{background:var(--of-pink)}
+.of-032 .of-protein .of-mini-track>span{background:var(--of-teal)}
+.of-032 .of-plus-zone{position:relative;text-align:center;margin:0 0 56px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.of-032 .of-big-plus{width:74px;height:74px;display:grid;place-items:center;color:white;background:var(--of-teal);border-radius:50%;font-size:32px;box-shadow:0 8px 26px #00bfa83a}
+.of-032 .of-plus-zone>p{color:var(--label-2);font-size:14px;line-height:1.5;margin:0;max-width:300px}
+.of-032 .of-add-popover{display:grid;gap:3px;position:absolute;z-index:10;top:84px;left:50%;transform:translateX(-50%);width:min(320px,96vw);padding:8px;border:1px solid var(--sep);border-radius:17px;background:var(--bg-el);box-shadow:0 10px 28px #0008;text-align:left}
+.of-032 .of-add-popover button{display:flex;align-items:center;gap:13px;width:100%;padding:13px 14px;color:var(--label);font-size:14px;border-radius:11px}
+.of-032 .of-add-popover button:hover{background:var(--bg)}
+.of-032 .of-add-popover .icn{color:var(--of-teal);font-size:18px}
+.of-032 .of-day-groups{display:flex;flex-direction:column;gap:30px}
+.of-032 .of-meal-section h2{margin:0 0 12px;display:flex;align-items:center;gap:11px;font-size:21px;font-weight:700}
+.of-032 .of-section-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:13px;color:var(--of-teal);background:color-mix(in srgb,var(--of-teal),transparent 90%);font-size:21px;flex-shrink:0}
+.of-032 .of-meal-section h2 small{font-size:12px;font-weight:500;color:var(--label-3);margin-left:auto}
+.of-032 .of-meal-add{display:flex;align-items:center;justify-content:center;width:100%;height:58px;border-radius:17px;background:var(--bg-el);color:var(--label-3);font-size:24px}
+.of-032 .of-meal-add:active{background:var(--sep)}
+.of-032 .of-section-more{margin-left:auto;color:var(--label-3);padding:7px;font-size:20px}
+.of-032 .of-logged-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0;border-top:1px solid var(--sep);font-size:14px}
+.of-032 .of-logged-row div:first-child{min-width:0}
+.of-032 .of-logged-row strong{display:block;overflow-wrap:anywhere}
+.of-032 .of-logged-row small{display:block;margin-top:4px;font-size:11px;color:var(--label-3)}
+.of-032 .of-item-btn button{padding:5px;font-size:15px;color:var(--label-2)}
+.of-032 .of-activity-form{display:grid;grid-template-columns:1fr 95px;gap:8px;margin-bottom:10px}
+.of-032 .of-activity-form input{min-width:0;border:1px solid var(--sep);background:var(--bg-el);color:var(--label);border-radius:9px;padding:10px}
+.of-032 .of-activity-form button{grid-column:1/-1;background:var(--of-teal);color:white;padding:11px;border-radius:10px}
+.of-032 .of-subview-head{display:flex;align-items:center;gap:12px;margin:7px 0 18px}
+.of-032 .of-subview-head button{padding:8px;color:var(--label-2)}
+.of-032 .of-subview-head h2{margin:0;font-size:22px}
+.of-032 .of-diary-sum{padding:14px 0;font-weight:700}
+.of-032 .of-diary-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:13px 0;border-top:1px solid var(--sep);font-size:13px;color:var(--label)}
+.of-032 .of-diary-row span{display:flex;align-items:center;gap:8px;color:var(--label-2)}
+.of-032 .of-drawer-overlay{position:fixed;inset:0;background:#000b;z-index:110;display:flex;justify-content:flex-end}
+.of-032 .of-drawer{display:flex;flex-direction:column;gap:4px;background:var(--bg-el);height:100%;width:min(320px,84vw);padding:calc(env(safe-area-inset-top,0px) + 28px) 17px 32px;box-shadow:-12px 0 35px #0006;overflow-y:auto}
+.of-032 .of-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:0 8px 22px;font-size:21px}
+.of-032 .of-drawer-head button{display:grid;place-items:center;font-size:20px;padding:7px}
+.of-032 .of-drawer>button{display:flex;align-items:center;gap:14px;padding:15px 14px;text-align:left;color:var(--label);border-radius:13px;font-size:15px}
+.of-032 .of-drawer>button.current{color:var(--of-teal);background:color-mix(in srgb,var(--of-teal),transparent 90%);font-weight:700}
+.of-032 .of-drawer>button>.icn{font-size:20px;flex-shrink:0}
+.of-032 .of-drawer>button>.icn:last-child:not(:first-child){margin-left:auto}
+.of-032 .of-drawer-divider{height:1px;background:var(--sep);margin:14px 0}
+@media(max-width:370px){.of-032 .of-macro-cards{gap:6px}.of-032 .of-macro-tile{padding:12px 7px;gap:10px}.of-032 .of-macro-tile strong{font-size:11px}.of-032 .of-macro-tile>span{font-size:11px}.of-032 .of-calorie-ring{width:158px;height:158px}}

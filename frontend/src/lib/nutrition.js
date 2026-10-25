@@ -6,7 +6,9 @@ export const NUTRITION_VERSION = 1
 export const NEW_NUTRITION = () => ({
   schemaVersion: NUTRITION_VERSION,
   goals: { kcal: 2200, protein: 150, carbs: null, fat: null },
-  profile: { activity: 'moderate' },
+  profile: { activity: 'moderate', waterGoal: 1900 },
+  water: {},
+  activities: [],
   entries: [],
   favorites: [],
   recipes: [],
@@ -30,7 +32,10 @@ export const nutrients = e => ({
 export function normalizedNutrition(data) {
   const d = NEW_NUTRITION()
   if (!data || typeof data !== 'object' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) return d
-  d.profile = { activity: ['low', 'light', 'moderate', 'high'].includes(data.profile?.activity) ? data.profile.activity : 'moderate' }
+  d.profile = { activity: ['low', 'light', 'moderate', 'high'].includes(data.profile?.activity) ? data.profile.activity : 'moderate',
+    waterGoal: positive(data.profile?.waterGoal) ? Math.min(10000, n(data.profile.waterGoal)) : 1900 }
+  d.water = Object.fromEntries(Object.entries(data.water && typeof data.water === 'object' && !Array.isArray(data.water) ? data.water : {}).filter(([day, amount]) => validDate(day) && Number.isFinite(Number(amount)) && Number(amount) >= 0).map(([day, amount]) => [day, Math.min(30000, n(amount))]))
+  d.activities = (Array.isArray(data.activities) ? data.activities : []).filter(a => a && typeof a.id === 'string' && validDate(a.date) && typeof a.name === 'string' && a.name.trim() && positive(a.kcal)).map(a => ({ id: a.id, date: a.date, name: a.name.trim().slice(0, 120), kcal: Math.min(10000, n(a.kcal)), createdAt: a.createdAt || 0 }))
   d.goals = {
     kcal: positive(data.goals?.kcal) ? n(data.goals.kcal) : 2200,
     protein: positive(data.goals?.protein) ? n(data.goals.protein) : 150,
@@ -39,6 +44,7 @@ export function normalizedNutrition(data) {
   }
   d.entries = data.entries.filter(e => e && typeof e.id === 'string' && validDate(e.date) && typeof e.name === 'string' && positive(e.quantity) && (e.unit === 'g' || e.unit === 'ml' || e.unit === 'piece') && positive(e.unitPer100 || 100)).map(e => ({
     ...e, name: e.name.slice(0, 160), date: e.date, quantity: n(e.quantity),
+    mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(e.mealType) ? e.mealType : 'other',
     unitPer100: n(e.unitPer100 || 100), per100: nutrients(e.per100),
     pieceSize: positive(e.pieceSize) ? n(e.pieceSize) : null,
     source: typeof e.source === 'string' ? e.source : 'manual'
@@ -81,14 +87,14 @@ export function dayTotals(entries, date) {
     return sum
   }, nutrients({}))
 }
-export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null }) {
+export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other' }) {
   const cleanName = String(name || '').trim()
   if (!cleanName || !positive(quantity) || !validDate(date) || !['g', 'ml', 'piece'].includes(unit)) throw new Error('Bitte Name und gültige Portion eingeben.')
   if (!['g', 'ml'].includes(basis) || (unit !== 'piece' && basis !== unit) || (unit === 'piece' && !positive(pieceSize))) throw new Error('Einheit und Nährwertbasis passen nicht zusammen.')
   const uid = id || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
   return { id: uid, date, name: cleanName.slice(0, 160), quantity: n(quantity), unit, basis,
     unitPer100: 100, pieceSize: unit === 'piece' ? n(pieceSize) : null,
-    per100: nutrients(per100), source, barcode, createdAt: Date.now() }
+    per100: nutrients(per100), source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
 }
 export function mergeNutrition(existing, imported) {
   const old = normalizedNutrition(existing), incoming = normalizedNutrition(imported)
@@ -96,7 +102,9 @@ export function mergeNutrition(existing, imported) {
   // Existing entries win for duplicate IDs; import never silently replaces a meal.
   incoming.entries.forEach(e => { if (!entries.has(e.id)) entries.set(e.id, e) })
   const keepNew = (a, b) => { const found = new Map(a.map(v => [v.id, v])); b.forEach(v => { if (!found.has(v.id)) found.set(v.id, v) }); return [...found.values()] }
-  return { ...old, entries: [...entries.values()], favorites: keepNew(old.favorites, incoming.favorites),
+  const activities = keepNew(old.activities, incoming.activities)
+  const water = { ...incoming.water, ...old.water } // existing logged days win; new days import
+  return { ...old, entries: [...entries.values()], water, activities, favorites: keepNew(old.favorites, incoming.favorites),
     recipes: keepNew(old.recipes, incoming.recipes), supplements: keepNew(old.supplements, incoming.supplements) }
 }
 export function readNutritionBackup(raw) {

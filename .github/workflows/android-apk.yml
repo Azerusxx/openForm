@@ -54,7 +54,7 @@ jobs:
 
       - name: Ernaehrung, Backup und Navigation testen
         working-directory: frontend
-        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs
+        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs
 
       - name: Mobile Web-App bauen
         working-directory: frontend
@@ -114,7 +114,7 @@ jobs:
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: openForm-0.3.1-debug
+          name: openForm-0.3.2-debug
           path: frontend/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14

@@ -11,10 +11,11 @@ export default function NutritionGoalsSettings() {
   const gym = useStore(s => s.S)
   const lastWeight = gym.bodyweight?.at(-1)?.w
   const [draft, setDraft] = useState(() => ({ ...loadNutrition().goals }))
+  const [waterGoal, setWaterGoal] = useState(() => loadNutrition().profile?.waterGoal || 1900)
   const [activity, setActivity] = useState(() => loadNutrition().profile?.activity || 'moderate')
   const [notice, setNotice] = useState('')
   useEffect(() => {
-    const changed = () => { const d = loadNutrition(); setData(d); setDraft({ ...d.goals }); setActivity(d.profile?.activity || 'moderate') }
+    const changed = () => { const d = loadNutrition(); setData(d); setDraft({ ...d.goals }); setActivity(d.profile?.activity || 'moderate'); setWaterGoal(d.profile?.waterGoal || 1900) }
     window.addEventListener('openform-nutrition-changed', changed)
     return () => window.removeEventListener('openform-nutrition-changed', changed)
   }, [])
@@ -22,10 +23,11 @@ export default function NutritionGoalsSettings() {
     e.preventDefault()
     const kcal = Number(draft.kcal), protein = Number(draft.protein)
     const optional = key => draft[key] === '' || draft[key] == null ? null : Number(draft[key])
+    if (!(Number(waterGoal) > 0 && Number(waterGoal) <= 10000)) { setNotice('Wasserziel muss zwischen 1 und 10000 ml liegen.'); return }
     if (!(kcal > 0 && protein > 0) || !['carbs','fat'].every(key => optional(key) === null || (Number.isFinite(optional(key)) && optional(key) >= 0))) {
       setNotice('Bitte gültige Zielwerte eingeben.'); return
     }
-    try { saveNutrition({ ...data, profile: { activity }, goals: { kcal, protein, carbs: optional('carbs'), fat: optional('fat') } }); setNotice('Ernährungsziele gespeichert.') }
+    try { saveNutrition({ ...data, profile: { ...data.profile, activity, waterGoal: Number(waterGoal) }, goals: { kcal, protein, carbs: optional('carbs'), fat: optional('fat') } }); setNotice('Ernährungsziele gespeichert.') }
     catch { setNotice('Speichern fehlgeschlagen. Bitte vorher ein Backup erstellen.') }
   }
   return <div className="card of-profile">
@@ -52,6 +54,7 @@ export default function NutritionGoalsSettings() {
         </select>
         <small>Ändert dein Kalorienziel nicht automatisch. Training wird separat erfasst.</small>
       </label>
+      <label className="of-activity">Wasserziel pro Tag (ml)<input type="number" min="1" max="10000" step="50" value={waterGoal} onChange={e => setWaterGoal(e.target.value)} /></label>
       {[['kcal','Kalorien pro Tag (kcal)'],['protein','Protein pro Tag (g)'],['carbs','Kohlenhydrate (g, optional)'],['fat','Fett (g, optional)']].map(([key,label]) =>
         <label key={key}>{label}<input type="number" inputMode="decimal" min={key === 'kcal' || key === 'protein' ? '1' : '0'} step="any" value={draft[key] ?? ''} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}/></label>)}
       <button className="of-save-goals" type="submit">Ziele speichern</button>
