@@ -2345,12 +2345,13 @@ function IllnessPeriodEditor({ iso, editId, close }) {
   const [end, setEnd] = useState(record?.end || '')
   const [plannedReturn, setPlannedReturn] = useState(record?.plannedReturn || '')
   const [note, setNote] = useState(record?.note || '')
+  const [fatigueLevel, setFatigueLevel] = useState(record?.fatigueLevel || '')
   const [feverFree, setFeverFree] = useState(record?.feverFree || false)
   const [improving, setImproving] = useState(record?.improving || false)
   const [noWarning, setNoWarning] = useState(record?.noWarning || false)
   const [dailyEnergy, setDailyEnergy] = useState(record?.dailyEnergy || false)
   const draft = { start, end: end || null, plannedReturn: plannedReturn || null,
-    note, feverFree, improving, noWarning, dailyEnergy }
+    note, fatigueLevel: fatigueLevel || null, feverFree, improving, noWarning, dailyEnergy }
   const valid = cleanIllness(draft)
   const status = recoveryStatus(draft, todayISO())
   const save = () => {
@@ -2371,9 +2372,17 @@ function IllnessPeriodEditor({ iso, editId, close }) {
   })
   return <div className="illness-editor">
     <h3>Krankmeldung & Wiedereinstieg</h3>
-    <p className="muted small">Krankheitspause im Kalender türkis markieren. Dein Trainingsplan und vorhandene Einträge werden nicht gelöscht.</p>
+    <p className="muted small">Krankheitspause im Kalender mit der Kontrastfarbe zu deinem Design markieren. Deine Trainings und bisherigen Einträge bleiben erhalten.</p>
     <label className="illness-field">Krank seit<input type="date" className="input" value={start} max={todayISO()} onChange={e=>setStart(e.target.value)} /></label>
     <label className="illness-field">Letzter Krankheitstag (optional)<input type="date" className="input" min={start} value={end} onChange={e=>{setEnd(e.target.value);setPlannedReturn('')}} /></label>
+    <label className="illness-field">Erschöpfung durch Krankheit (optional)
+      <select className="input" value={fatigueLevel} onChange={e=>setFatigueLevel(e.target.value)}>
+        <option value="">Nicht eingeschätzt</option>
+        <option value="mild">Leicht</option>
+        <option value="moderate">Mittel</option>
+        <option value="strong">Stark</option>
+      </select>
+    </label>
     <label className="illness-field">Notiz (optional)<textarea className="input" rows={2} maxLength={300} value={note} onChange={e=>setNote(e.target.value)} placeholder="z. B. Erkältung. Keine Diagnose nötig." /></label>
     <h4>Wiedereinstieg prüfen</h4>
     <p className="muted small">Kein automatisches Gesundschreiben. Erst bei deutlicher Erholung an leichte Belastung denken.</p>

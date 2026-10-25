@@ -23,6 +23,7 @@ export function cleanIllness(raw) {
  if(plannedReturn&&(!end||plannedReturn<=end))return null
  return {
   start:raw.start,end,plannedReturn,
+  fatigueLevel:['mild','moderate','strong'].includes(raw.fatigueLevel)?raw.fatigueLevel:null,
   note:typeof raw.note==='string'?raw.note.trim().slice(0,300):'',
   // These are self-reported checkboxes, never a diagnosis or medical approval.
   feverFree:raw.feverFree===true, improving:raw.improving===true,

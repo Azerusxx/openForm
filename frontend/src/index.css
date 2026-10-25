@@ -2261,3 +2261,19 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .hm-legend{justify-content:flex-end;flex-wrap:wrap;gap:4px 6px}
 .hm-illness-key{display:inline-flex;gap:5px;align-items:center;margin-inline-start:7px;white-space:nowrap}
 .hm-illness-key .hm-c{display:inline-block;width:10px;height:10px}
+
+
+/* 0.3.7g: illness-related general fatigue is separate from muscle fatigue numbers. */
+.stats-illness-summary,.stats-illness-impact{border:1px solid color-mix(in srgb,var(--illness-color) 55%,var(--sep));border-radius:17px;background:color-mix(in srgb,var(--illness-color) 9%,var(--surface));padding:14px;margin:12px 0}
+.stats-illness-title{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--illness-color)}
+.stats-illness-title>strong{font-weight:750;flex:1}
+.stats-illness-title>span{font-size:11px;border:1px solid var(--illness-color);border-radius:12px;padding:4px 7px;white-space:nowrap}
+.stats-illness-measures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 7px}
+.stats-illness-measures>div{display:flex;flex-direction:column;gap:5px;border:1px solid var(--sep);background:var(--surface);border-radius:12px;padding:10px;min-width:0}
+.stats-illness-measures strong{font-size:19px;line-height:1.2;color:var(--label);overflow-wrap:anywhere}
+.stats-illness-measures span{font-size:11px;line-height:1.4;color:var(--label-2)}
+.stats-illness-summary p,.stats-illness-impact p{font-size:13px;line-height:1.45;margin:9px 0;color:var(--label)}
+.stats-illness-summary small{display:block;color:var(--label-2);font-size:11px;line-height:1.4;margin-top:9px}
+.stats-illness-impact .stats-illness-advice{color:var(--label-2)}
+.stats-illness-impact button{min-height:37px;border-radius:10px;border:1px solid var(--illness-color);color:var(--illness-color);background:transparent;padding:8px 11px;font-size:12px;font-weight:650}
+.stats-illness-impact button:focus-visible{outline:2px solid var(--illness-color);outline-offset:2px}

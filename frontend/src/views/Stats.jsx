@@ -6,7 +6,7 @@ import { lastBW, streakWeeks, setLabel, modeOf, effortOf, entriesForExercise, me
 import { fmtNum, fmtDate, fmtVol, todayISO, isoOf, weekKey, weekStartOf, exerciseNameText } from '../lib/format.js'
 import { speedUnitOf, speedLabel, toSpeed } from '../lib/speed.js'
 import { t, exerciseNameFor, exerciseNameClass, getLang } from '../lib/i18n.js'
-import { bwSheet, goalSheet, calendarSheet, dayOverrideSheet, workoutDetailSheet, exerciseHistorySheet, WorkoutRow, bwDeltaColor, weighInsSheet } from '../sheets.jsx'
+import { bwSheet, goalSheet, calendarSheet, dayOverrideSheet, workoutDetailSheet, exerciseHistorySheet, WorkoutRow, bwDeltaColor, weighInsSheet, illnessSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Heatmap from '../components/Heatmap.jsx'
 import Icon from '../components/Icon.jsx'
@@ -15,6 +15,7 @@ import { loadOfWeeklyPlan, loadOfWorkouts, muscleBalanceWindow, rankOf, MUSCLES,
 import { fatigueOf, strengthOf, STRENGTH_FLOOR, LB_TO_KG } from '../lib/recovery.js'
 import { strengthExerciseRowsForMuscle } from '../lib/strength-exercises.js'
 import { fatigueStateOf } from '../lib/recovery-view.js'
+import { illnessBurdenStats, ILLNESS_FATIGUE_LABELS } from '../lib/illness-burden.js'
 import { e1rmSeries, best1RM, formulaOf } from '../lib/onerm.js'
 import { currentDbLoad, workoutAs } from '../lib/dumbbells.js'
 import { maxRepsSeries } from '../lib/pyramid.js'
@@ -134,6 +135,7 @@ function MuscleBalance({ S }) {
   const workouts = S.workouts
   const bodyweightKg = useMemo(() => profileBodyweightKg(S), [S.bodyweight, S.unit])
   const fatigue = useMemo(() => fatigueOf(workouts, now, { bodyweightKg, unit: S.unit }), [workouts, now, bodyweightKg, S.unit])
+  const illnessImpact = illnessBurdenStats(S, todayISO())
   const strength = useMemo(() => strengthOf(workouts, now, { bodyweightKg, unit: S.unit }), [workouts, now, bodyweightKg, S.unit])
   const muscleExercises = useMemo(() => (sel ? strengthExerciseRowsForMuscle(S, now, sel) : []), [S, now, sel, lang])
   const lastTrained = useMemo(() => latestMuscleTraining(workouts), [workouts])
@@ -251,6 +253,21 @@ function MuscleBalance({ S }) {
       </> : <div className="muted small">{t('No workouts in this period yet.')}</div>}
     </> : view === 'fatigue' ? <>
       <h2>{t('Fatigue')}</h2>
+      {illnessImpact.state !== 'none' && <section className="stats-illness-impact" aria-label="Krankheitsbedingte Belastung">
+        <div className="stats-illness-title"><Icon name="cloud" />
+          <strong>Krankheitsbedingte Belastung</strong>
+          <span>{illnessImpact.state === 'ill' ? 'Aktuell krank' : 'Erholung'}</span>
+        </div>
+        <p>{illnessImpact.message}</p>
+        <p className="stats-illness-advice">{illnessImpact.recommendation}</p>
+        <button type="button" onClick={() => illnessSheet(todayISO(), illnessImpact.record?.id || null)}>
+          Krankmeldung und Erholung prüfen
+        </button>
+      </section>}
+      <p className="muted small" style={{ margin: '8px 0 12px' }}>
+        Die Muskelkarte zeigt ausschließlich Ermüdung durch absolvierte Trainingssätze.
+        Krankheit beeinflusst die allgemeine Trainingsbereitschaft separat.
+      </p>
       <BodyMap className="tappable hm-fatigue" load={fatigue} thresholds={FATIGUE_LEVELS} body={S.body} selected={sel} onMuscle={toggleSel} />
       <FatigueLegend />
       <div className="muted small" style={{ marginTop: 10 }}>{t('Fatigue shows how recently each muscle was trained. High means rest.')}</div>
@@ -433,6 +450,7 @@ export default function Stats() {
   const bwDelta30 = bw30.length > 1 ? bw30[bw30.length - 1].w - bw30[0].w : null
   const workouts = S.workouts
   const monthW = workouts.filter(w => workoutDay(w)?.slice(0, 7) === todayISO().slice(0, 7)).length
+  const illnessImpact = illnessBurdenStats(S, todayISO())
 
   // Dumbbell weights are read in each exercise's current meaning (lib/dumbbells.js), so the
   // chart and its best compare like with like across a switch between per bell and total.
@@ -643,6 +661,19 @@ export default function Stats() {
       <div className="tile"><div className="l"><Icon name="scale" />{t('Weight 30d')}</div><div className="v" style={{ fontSize: 22, color: bwDelta30 === null ? 'inherit' : bwDeltaColor(bwDelta30, (lastBW(S) || {}).w || 0) }}>{bwDelta30 === null ? '–' : (bwDelta30 > 0 ? '+' : '') + fmtNum(bwDelta30) + ' ' + S.unit}</div></div>
 
     </div>
+
+    {illnessImpact.sickDays > 0 && <section className="stats-illness-summary" aria-label="Krankheitsbedingte Belastung">
+      <div className="stats-illness-title"><Icon name="cloud" /><strong>Krankheitsbedingte Belastung</strong></div>
+      <div className="stats-illness-measures">
+        <div><strong>{illnessImpact.sickDays}</strong><span>Krankheitstage · 30 Tage</span></div>
+        <div><strong>{illnessImpact.state === 'ill' ? 'Eingeschränkt'
+          : illnessImpact.state === 'recovering' || illnessImpact.state === 'return' ? 'Vorsicht'
+          : 'Nicht bewertet'}</strong><span>Allgemeine Belastbarkeit</span></div>
+      </div>
+      {illnessImpact.record?.fatigueLevel && <p>Gemeldete Erschöpfung: {ILLNESS_FATIGUE_LABELS[illnessImpact.record.fatigueLevel]}</p>}
+      {illnessImpact.message && <p>{illnessImpact.message}</p>}
+      <small>Nur ein Hinweis aus deinen eigenen Krankheitseinträgen, kein medizinischer Erholungswert. Trainingsvolumen und Muskelermüdung bleiben unverändert.</small>
+    </section>}
 
     <div className="card">
       <h2>{t('Activity (last 12 months)')}</h2>
