@@ -21,19 +21,18 @@ export function nutritionWeekAnalysis(entries, anchor, goals, bodyweight = [], u
     const evaluated = logged.map(d=>d.goals[k]).filter(v=>v && v.met !== null)
     return [k,{met:evaluated.filter(v=>v.met).length,evaluated:evaluated.length}]
   }))
-  const first = days[0]?.date, last=days.at(-1)?.date
-  const measurements = (Array.isArray(bodyweight) ? bodyweight : [])
-    .filter(p=>p && typeof p.d === 'string' && p.d >= first && p.d <= last &&
-      Number.isFinite(Number(p.w)) && Number(p.w) > 0)
-    .map(p=>({date:p.d,weight:round(Number(p.w) * (unit === 'lb' ? 0.45359237 : 1))}))
-    .sort((a,b)=>a.date.localeCompare(b.date))
-  const weightsByDay = new Map()
-  measurements.forEach(p=>weightsByDay.set(p.date,p))
-  const weights=[...weightsByDay.values()]
-  return { ...base, days, goalStats, weights,
-    weightDelta:weights.length>=2 ? round(weights.at(-1).weight - weights[0].weight) : null,
-    weightInsufficient:weights.length<2,
+  const weightTrend = analyzeWeightTrend(bodyweight,anchor,30,unit)
+  const mealContributions = highestContributors(entries,anchor)
+  const averageDeviation = Object.fromEntries(TYPES.map(k=>[k,
+    logged.length && Number.isFinite(Number(goals?.[k])) && Number(goals[k])>0
+      ? round(base.average[k]-Number(goals[k])) : null]))
+  return { ...base, days, goalStats, weights:weightTrend.weights, weightTrend, mealContributions,
+    averageDeviation, quality:logged.length === 0 ? 'none' : logged.length < 3 ? 'insufficient'
+      : logged.length < 5 ? 'preliminary' : 'useful',
+    weightDelta:weightTrend.weightDelta,
+    weightInsufficient:weightTrend.weeklyMeans.length < 2,
     loggedCoverage:round(logged.length/7*100) }
+
 }
 export function frequentMeals(entries, limit = 6) {
   const groups = new Map()
@@ -46,4 +45,70 @@ export function frequentMeals(entries, limit = 6) {
     else { prev.count++; if(time>prev.time) {prev.latest=entry;prev.time=time;prev.energy=entryTotals(entry).kcal} }
   }
   return [...groups.values()].sort((a,b)=>b.count-a.count || b.time.localeCompare(a.time)).slice(0,limit)
+}
+
+const isoDay = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value||'')) ? value : null
+const minusDays = (date,amount) => {
+  const [y,m,d]=date.split('-').map(Number)
+  const x=new Date(Date.UTC(y,m-1,d-amount))
+  return x.toISOString().slice(0,10)
+}
+export function analyzeWeightTrend(bodyweight, anchor, windowDays = 30, unit = 'kg') {
+  const end=isoDay(anchor) || new Date().toISOString().slice(0,10)
+  const lower=windowDays === 'all' ? null : minusDays(end, Math.max(1,Number(windowDays)||30)-1)
+  const measurements=(Array.isArray(bodyweight)?bodyweight:[])
+    .filter(x=>isoDay(x?.d) && x.d <= end && (!lower || x.d>=lower) &&
+      Number.isFinite(Number(x.w)) && Number(x.w)>0)
+    .map(x=>({date:x.d,weight:round(Number(x.w)*(unit==='lb'?0.45359237:1))}))
+    .sort((a,b)=>a.date.localeCompare(b.date))
+  const daily=new Map(); measurements.forEach(x=>daily.set(x.date,x))
+  const weights=[...daily.values()]
+  // ISO Monday-to-Sunday weeks; 1 observation is shown but cannot establish
+  // a statistically meaningful week-to-week direction on its own.
+  const weeks=new Map()
+  for(const x of weights){
+    const dt=new Date(x.date+'T12:00:00Z')
+    const offset=(dt.getUTCDay()+6)%7
+    dt.setUTCDate(dt.getUTCDate()-offset)
+    const key=dt.toISOString().slice(0,10)
+    const group=weeks.get(key)||[]
+    group.push(x.weight);weeks.set(key,group)
+  }
+  const weeklyMeans=[...weeks].sort((a,b)=>a[0].localeCompare(b[0]))
+    .map(([date,values])=>({date,mean:round(values.reduce((s,n)=>s+n,0)/values.length),measurements:values.length}))
+  const weightDelta=weeklyMeans.length>=2 ? round(weeklyMeans.at(-1).mean-weeklyMeans[0].mean):null
+  return { weights, weeklyMeans, weightDelta, windowDays, first:weights[0]?.date||null,
+    last:weights.at(-1)?.date||null, insufficient:weeklyMeans.length<2,
+    limited:weeklyMeans.some(x=>x.measurements<2)}
+}
+export function highestContributors(entries,anchor,limit=5) {
+  const days=new Set(Array.from({length:7},(_,i)=>minusDays(anchor,6-i)))
+  const matching=(entries||[]).filter(e=>days.has(e.date))
+  const byName=new Map()
+  for(const e of matching){
+    const name=String(e.name||'Unbenannt').trim()
+    const t=entryTotals(e)
+    const x=byName.get(name)||{name,kcal:0,protein:0,carbs:0,fat:0,count:0}
+    for(const key of TYPES)x[key]+=t[key]
+    x.count++;byName.set(name,x)
+  }
+  return [...byName.values()].map(x=>({...x,...Object.fromEntries(TYPES.map(k=>[k,round(x[k])]))}))
+    .sort((a,b)=>b.kcal-a.kcal).slice(0,limit)
+}
+export function similarMealSuggestions(entries, limit=8) {
+  // Only suggest, never merge distinct dishes: first two nontrivial normalized
+  // tokens are a conservative resemblance hint, not proof of equal ingredients.
+  const normalized=x=>String(x||'').toLocaleLowerCase('de')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^\p{L}\p{N}]+/gu,' ').trim()
+  const candidates=frequentMeals(entries,Math.max(30,limit*4))
+  return candidates.map(item=>{
+    const a=normalized(item.name).split(' ').filter(w=>w.length>=4)
+    const related=candidates.filter(other=>{
+      if(other===item)return false
+      const b=normalized(other.name).split(' ')
+      return a.some(token=>b.includes(token))
+    }).map(x=>x.name).slice(0,3)
+    return {...item,related}
+  }).slice(0,limit)
 }
