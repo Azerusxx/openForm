@@ -35,6 +35,7 @@ import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { defaultIncrement, weightIncrement, stepWeight } from '../lib/progression.js'
 import { progressionGuidance } from '../lib/progression-copy.js'
+import { needsProgressionReview, canHoldPrevious, acceptProgression, holdPreviousProgression } from '../lib/progression-review.js'
 import { buildPlannedEntry, plannedConfigOf, builtOutOfProgression } from '../lib/session-start.js'
 import { routineChangesFromEntry, updateRoutineFromEntry } from '../lib/routines.js'
 import { sessionNoProg, setSessionNoProg, setEntryNoProg, joinSessionNoProg } from '../lib/session-noprog.js'
@@ -924,6 +925,18 @@ function ActiveWorkout() {
   const { startRest: liveRest, stopRest, stopWork, work, timer } = useUI()
   const A = S.active
   const editing = !!A.editingWorkoutId
+  // Existing progression.js already built today's suggestions. Review affects only the
+  // active workout; no history, nutrition or routine is modified.
+  const reviews = !editing && !A.backfill ? A.entries.map((entry,idx) => ({
+    entry, idx, previous: lastEntryFor(S, entry.id, entry.rid),
+  })).filter(({entry}) => needsProgressionReview(entry)) : []
+  const decideProgression = (idx, id, keepPrevious = false) => update(s => {
+    const entry = s.active?.entries?.[idx]
+    if (!entry || entry.id !== id) return
+    const previous = keepPrevious ? lastEntryFor(s, entry.id, entry.rid) : null
+    const revised = keepPrevious ? holdPreviousProgression(entry, previous) : acceptProgression(entry)
+    if (revised) s.active.entries[idx] = revised
+  }, true)
   // A past workout has no rest to time — the sets were done days ago. The work timer for
   // timed sets stays, since counting a hold is how its duration gets entered.
   const startRest = (A.backfill || editing) ? () => {} : liveRest
@@ -1959,6 +1972,24 @@ function ActiveWorkout() {
     </div>
     {editing && <p className="muted small">{t('Editing a saved workout. Date and duration stay unchanged.')}</p>}
     {A.backfill && <div className="muted small" style={{ marginBottom: 8 }}>{t('Logging a past workout, so no rest timers.')}</div>}
+    {reviews.length > 0 && <section className="progression-review" aria-label="Trainingsprogression für heute">
+      <h3><Icon name="chartLine" /> Trainingsprogression <span>{reviews.length} Vorschläge</span></h3>
+      <p>Die vorgeschlagenen Werte stehen bereits in deinen Sätzen. Vor dem Training kannst du jeden Vorschlag bestätigen oder die letzten Werte beibehalten. Bei komplexen Sätzen bleiben Änderungen bewusst manuell.</p>
+      {reviews.map(({entry,idx,previous}) => <div className="progression-review-item" key={idx}>
+        <strong>{exerciseNameFor(exOr(entry.id))}</strong>
+        <div className="progression-review-values">
+          {entry.sets.filter(s => !isWarmupRow(s)).map((s,i) =>
+            <span key={i}>{s.w ?? '–'} {S.unit} × {s.r ?? '–'}</span>)}
+        </div>
+        <div className="progression-review-reason">{Array.isArray(entry.plan?.why) ? t(...entry.plan.why) : 'Aus deinen letzten Trainings berechnet'}</div>
+        <div className="progression-review-actions">
+          <button type="button" onClick={() => decideProgression(idx,entry.id)}>Vorschlag übernehmen</button>
+          {canHoldPrevious(entry,previous)
+            ? <button type="button" className="secondary" onClick={() => decideProgression(idx,entry.id,true)}>Letzte Werte</button>
+            : <span>Zum Ablehnen die Satzwerte manuell ändern</span>}
+        </div>
+      </div>)}
+    </section>}
 
     {A.entries.length ? (listMode ? (
       <div className="workout-list" data-testid="workout-list" ref={listRef}>

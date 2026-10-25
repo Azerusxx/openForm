@@ -2206,3 +2206,18 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 #rest-circle-overlay .rest-circle-effort-options button.selected{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
 #rest-circle-overlay .rest-circle-effort-options button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-height:700px){#rest-circle-overlay .rest-circle-effort{margin:0 0 6px}#rest-circle-overlay .rest-circle-effort-options button{min-height:33px}#rest-circle-overlay .rest-circle-hint{margin:3px auto}}
+
+/* 0.3.7d – explicit review of the existing progression prescriptions */
+.progression-review{border:1px solid var(--sep);border-radius:18px;background:var(--surface);padding:14px;margin:12px 0 18px}
+.progression-review h3{display:flex;align-items:center;gap:8px;font-size:17px;margin:0 0 8px}
+.progression-review h3>span{margin-left:auto;font-size:11px;color:var(--label-2);font-weight:500}
+.progression-review>p{font-size:12px;color:var(--label-2);line-height:1.5;margin:0 0 10px}
+.progression-review-item{border-top:1px solid var(--sep);padding:11px 0 5px}
+.progression-review-item>strong{font-size:14px}
+.progression-review-values{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0}
+.progression-review-values span{font-size:12px;border:1px solid var(--sep);border-radius:8px;padding:4px 7px;font-variant-numeric:tabular-nums}
+.progression-review-reason{font-size:12px;color:var(--label-2);margin:6px 0}
+.progression-review-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:9px}
+.progression-review-actions button{border:0;border-radius:10px;background:var(--acc);color:var(--on-acc,#111);padding:10px 12px;font-size:12px;font-weight:700}
+.progression-review-actions button.secondary{background:var(--surface-2);border:1px solid var(--sep);color:var(--label)}
+.progression-review-actions span{color:var(--label-3);font-size:11px}
