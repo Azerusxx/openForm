@@ -54,6 +54,7 @@ export default function Nutrition() {
   const [suppUnit, setSuppUnit] = useState('g')
   const fileInput = useRef(null)
   const backupInput = useRef(null)
+  const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
   const totals = dayTotals(data.entries, date)
   const drank = data.water?.[date] || 0
   const burned = (data.activities || []).filter(a => a.date === date).reduce((total, a) => total + Number(a.kcal || 0), 0)
@@ -63,7 +64,7 @@ export default function Nutrition() {
   const remaining = Math.round((data.goals.kcal || 0) - totals.kcal)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
-  const week = weeklyNutrition(data.entries, date, data.goals)
+  const week = weeklyNutrition(data.entries, date, macroGoals)
   const micros = dayMicros(data.entries, date)
 
   useEffect(() => {
@@ -233,11 +234,12 @@ export default function Nutrition() {
         <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt, kein Extra-Kalorienbudget</span></div>
       </section>
       <div className="of-macro-cards" aria-label="Makro-Tagesziele">
-        {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${data.goals[key] != null && totals[key] > data.goals[key] ? " of-over-goal" : ""}`} key={key}>
-          <strong><i />{label}</strong><div className="of-mini-track"><span style={{width:`${data.goals[key] == null ? 0 : Math.min(100, 100*totals[key]/Math.max(1,data.goals[key]))}%`}} /></div>
-          <span>{data.goals[key] == null ? `${fmt(totals[key])} g erfasst` : `${fmt(totals[key])} / ${fmt(data.goals[key])} g`}</span>
+        {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${macroGoals[key] != null && totals[key] > macroGoals[key] ? " of-over-goal" : ""}`} key={key}>
+          <strong><i />{label}</strong><div className="of-mini-track"><span style={{width:`${macroGoals[key] == null ? 0 : Math.min(100, 100*totals[key]/Math.max(1,macroGoals[key]))}%`}} /></div>
+          <span>{macroGoals[key] == null ? `${fmt(totals[key])} g erfasst` : `${fmt(totals[key])} / ${fmt(macroGoals[key])} g`}</span>
         </div>)}
       </div>
+      <p className="of-dim" style={{margin:"6px 0 12px"}}>Kohlenhydrate und Fett: automatisch aus Kalorienziel und Protein berechnet, sofern kein eigenes Ziel gespeichert ist.</p>
       <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
         <button className="of-accordion-toggle" type="button" aria-expanded={showNutritionExtras} aria-controls="of-nutrition-details" onClick={() => setShowNutritionExtras(v => !v)}>
           <span><Icon name="clipboard" /> Nährstoffe &amp; Supplements</span>
@@ -245,7 +247,7 @@ export default function Nutrition() {
         </button>
         {showNutritionExtras && <div id="of-nutrition-details" className="of-accordion-body">
           <h3>Makronährstoffe</h3>
-          <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {data.goals[key] == null ? '' : `von ${fmt(data.goals[key])} g`}</strong></div>)}</div>
+          <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {macroGoals[key] == null ? '' : `von ${fmt(macroGoals[key])} g`}</strong></div>)}</div>
           <h3>Mikronährstoffe &amp; Ballaststoffe</h3>
           {Object.keys(micros).length ? <div className="of-nutrient-detail">{MICRO_NUTRIENTS.filter(({key}) => micros[key] != null).map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{fmt(micros[key])} {unit}</strong></div>)}</div> : <p className="of-dim">Noch keine Mikronährstoffdaten erfasst. Fehlende Angaben werden nicht als null Gramm gewertet. Du kannst sie beim Lebensmittel ergänzen.</p>}
           <h3>Supplements heute</h3>
