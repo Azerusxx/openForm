@@ -11,6 +11,8 @@ import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRec
 import { trainingEnergyForDay } from '../lib/training-energy.js'
 import './Nutrition.css'
 
+// Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
+const MICRO_GUIDES = { fiber:30, sodium:2000, calcium:1000, iron:10, magnesium:350, potassium:4000, vitaminC:110, vitaminD:20, vitaminA:850, vitaminE:14, vitaminB1:1.2, vitaminB2:1.4, vitaminB6:1.6, vitaminB12:4, folate:300, zinc:11, iodine:200, selenium:70 }
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(), mealType: 'breakfast',
   per100: { kcal: '', protein: '', carbs: '', fat: '' }, per100Micros: {}, barcode: null, source: 'manual' })
@@ -249,7 +251,8 @@ export default function Nutrition() {
           <h3>Makronährstoffe</h3>
           <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {macroGoals[key] == null ? '' : `von ${fmt(macroGoals[key])} g`}</strong></div>)}</div>
           <h3>Mikronährstoffe &amp; Ballaststoffe</h3>
-          {Object.keys(micros).length ? <div className="of-nutrient-detail">{MICRO_NUTRIENTS.filter(({key}) => micros[key] != null).map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{fmt(micros[key])} {unit}</strong></div>)}</div> : <p className="of-dim">Noch keine Mikronährstoffdaten erfasst. Fehlende Angaben werden nicht als null Gramm gewertet. Du kannst sie beim Lebensmittel ergänzen.</p>}
+          <p className="of-dim">Ungefähre Orientierungswerte für Erwachsene, keine individuellen medizinischen Empfehlungen. Nicht erfasste Nährwerte bleiben unbekannt. Natrium ist eine Obergrenze, kein Mindestziel.</p>
+          <div className="of-nutrient-detail">{MICRO_NUTRIENTS.map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{micros[key] == null ? 'Nicht erfasst' : `${fmt(micros[key])} ${unit}`} <small className="of-dim">/ Richtwert {fmt(MICRO_GUIDES[key])} {unit}</small></strong></div>)}</div>
           <h3>Supplements heute</h3>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}</small></span></label>
