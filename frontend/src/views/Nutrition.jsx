@@ -56,7 +56,7 @@ export default function Nutrition() {
   const [suppName, setSuppName] = useState('')
   const [suppDose, setSuppDose] = useState('')
   const [suppUnit, setSuppUnit] = useState('piece')
-  const [suppNutrient, setSuppNutrient] = useState('magnesium')
+  const [suppNutrient, setSuppNutrient] = useState('')
   const [suppAmount, setSuppAmount] = useState('')
   const [suppNutrients, setSuppNutrients] = useState({})
   const [editingSupplement, setEditingSupplement] = useState(null)
@@ -190,18 +190,18 @@ export default function Nutrition() {
     const sameName = data.supplements.find(s => s.id !== editingSupplement && s.name.trim().toLocaleLowerCase('de') === suppName.trim().toLocaleLowerCase('de'))
     if (sameName && !window.confirm(`„${sameName.name}“ ist bereits vorhanden. Wirklich einen weiteren Eintrag anlegen?`)) return
     const nutrients = { ...suppNutrients }
-    if (amount !== null) nutrients[suppNutrient] = amount
+    if (amount !== null && suppNutrient) nutrients[suppNutrient] = amount
     const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: Object.fromEntries(Object.entries(nutrients).map(([k,v]) => [k, Number(v)])), logs: previous?.logs || [] }
     if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) resetSupplementForm()
   }
   const selectSupplementForEdit = s => {
     setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose))
     setSuppUnit(s.unit); setSuppNutrients({ ...(s.nutrients || {}) })
-    setSuppNutrient('magnesium'); setSuppAmount(''); setSuppFormOpen(true)
+    setSuppNutrient(''); setSuppAmount(''); setSuppFormOpen(true)
   }
   const resetSupplementForm = () => {
     setEditingSupplement(null); setSuppName(''); setSuppDose('')
-    setSuppUnit('piece'); setSuppNutrient('magnesium')
+    setSuppUnit('piece'); setSuppNutrient('')
     setSuppAmount(''); setSuppNutrients({}); setSuppFormOpen(false)
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
@@ -280,22 +280,28 @@ export default function Nutrition() {
             <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{nutrientRows.filter(n => n.known).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
           {showMicros && <div className="of-micros-content">
-            <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
+            <p className="of-micro-note">Nur erfasste Mengen. Fehlende Angaben bleiben unbekannt. Details antippen.</p>
             {nutrientRows.some(n => n.known)
               ? <div className="of-micro-cards">{nutrientRows.filter(n => n.known).map(n => {
-                  const limitText = n.upper ? `Obergrenze: ${fmt(n.upper.max)} ${n.unit} (${n.upper.scope === 'supplement' ? 'nur aus Ergänzungen' : 'Gesamtaufnahme'})` : null
-                  return <div className="of-micro-card" key={n.key}>
-                    <div className="of-micro-heading"><strong>{n.label}</strong><span className={n.limitExceeded ? 'of-micro-over' : ''}>{fmt(n.total)}{n.guide != null ? ` / ${fmt(n.guide)}` : ''} {n.unit}</span></div>
-                    {n.guide != null && <div className="of-micro-track" role="progressbar" aria-label={n.label} aria-valuenow={n.total} aria-valuemin={0} aria-valuemax={n.guide}><span style={{width:`${Math.min(100,100*n.total / Math.max(1,n.guide))}%`}} /></div>}
-                    <small className="of-dim">Nahrung: {n.food == null ? 'unbekannt' : fmt(n.food)} {n.unit} · Supplements: {n.supplement == null ? 'nicht erfasst' : fmt(n.supplement)} {n.unit}</small>
-                    {n.incomplete && <small className="of-dim">Lebensmitteldaten unvollständig. Gesamtmenge ist ein Mindestwert der erfassten Angaben.</small>}
-                    {n.limitExceeded && <small className="of-micro-over">⚠ Erfasste Menge überschreitet die EFSA-Obergrenze. {limitText}. Bitte Dosierung prüfen.</small>}
-                    {!n.limitExceeded && limitText && <small className="of-dim">{limitText}</small>}
-                    {n.key === 'sodium' && <small className="of-dim">2.000 mg Natrium: Orientierung zur Begrenzung, kein Mindestziel.</small>}
-                    {n.key === 'magnesium' && <small className="of-dim">350 mg = täglicher Orientierungswert. 250 mg = ergänzungsbezogener EFSA-Grenzwert für bestimmte Magnesiumverbindungen, kein Zielwert.</small>}
-                    {n.key === 'creatine' && <small className="of-dim">Kreatin ist kein Vitamin oder Mineralstoff. Die Anzeige dokumentiert nur die erfasste Einnahme, ohne pauschale Tagesbedarf-Aussage.</small>}
+                const limitText = n.upper ? `Obergrenze: ${fmt(n.upper.max)} ${n.unit} (${n.upper.scope === 'supplement' ? 'nur aus Ergänzungen' : 'Gesamtaufnahme'})` : null
+                return <details className={'of-micro-card of-micro-compact' + (n.limitExceeded ? ' of-micro-warning' : '')} key={n.key}>
+                  <summary className="of-micro-summary">
+                    <span className="of-micro-name">{n.label}{n.limitExceeded && <span className="of-micro-alert">⚠ Grenzwert prüfen</span>}</span>
+                    <span className="of-micro-value">{fmt(n.total)} {n.unit}{n.guide != null && <small> / {fmt(n.guide)} {n.unit}</small>}</span>
+                    <Icon name="chevronDown" />
+                  </summary>
+                  {n.guide != null && <div className="of-micro-track" role="progressbar" aria-label={n.label} aria-valuenow={n.total} aria-valuemin={0} aria-valuemax={n.guide}><span className={n.limitExceeded ? 'of-micro-over-fill' : ''} style={{width:`${Math.min(100,100*n.total / Math.max(1,n.guide))}%`}} /></div>}
+                  <div className="of-micro-details">
+                    <div>Nahrung: {n.food == null ? 'unbekannt' : `${fmt(n.food)} ${n.unit}`}</div>
+                    <div>Supplements: {n.supplement == null ? 'nicht erfasst' : `${fmt(n.supplement)} ${n.unit}`}</div>
+                    {n.incomplete && <p>Lebensmitteldaten unvollständig. Der tatsächliche Wert kann höher sein.</p>}
+                    {n.guide != null && <p>{n.key === 'sodium' ? 'Orientierung zur Begrenzung, kein Mindestziel.' : 'Der Vergleichswert ist ein Orientierungswert, keine sichere Obergrenze.'}</p>}
+                    {limitText && <p className={n.limitExceeded ? 'of-micro-over' : ''}>{n.limitExceeded ? '⚠ Erfasste Menge überschreitet den angegebenen Grenzwert. ' : ''}{limitText}. Bitte Dosierung und Produktform prüfen.</p>}
+                    {n.key === 'magnesium' && <p>350 mg = täglicher Orientierungswert. 250 mg gilt nur für bestimmte ergänzte Magnesiumverbindungen und ist kein Zielwert.</p>}
+                    {n.key === 'creatine' && <p>Kreatin ist kein Vitamin oder Mineralstoff. Hier wird nur die dokumentierte Einnahme angezeigt.</p>}
                   </div>
-                })}</div>
+                </details>
+              })}</div>
               : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
           </div>}
           <button type="button" className="of-micros-toggle of-supplements-toggle" aria-expanded={showSupplements} onClick={() => { setShowSupplements(v => !v); setSuppFormOpen(false); setEditingSupplement(null) }}>
@@ -318,11 +324,11 @@ export default function Nutrition() {
               <label className="of-supp-field">Einheit<select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="piece">Stk.</option><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option></select></label>
             </div>
             <div className="of-supp-form-row">
-              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.filter(n => n.key !== 'creatine' || suppName.toLocaleLowerCase('de').includes('kreatin')).map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
+              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}><option value="">Wirkstoff auswählen</option>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
               <label className="of-supp-field">Wirkstoffgehalt pro {suppUnit === 'piece' ? 'Stück' : suppUnit}<input aria-label="Wirkstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
             </div>
             <button type="button" className="of-supp-open" onClick={() => {
-              if (suppAmount === '' || !Number.isFinite(Number(suppAmount)) || Number(suppAmount) < 0) { setNotice('Wirkstoffgehalt prüfen.'); return }
+              if (!suppNutrient || suppAmount === '' || !Number.isFinite(Number(suppAmount)) || Number(suppAmount) < 0) { setNotice('Wirkstoff und Gehalt prüfen.'); return }
               setSuppNutrients(old => ({ ...old, [suppNutrient]: Number(suppAmount) }))
               setSuppAmount('')
             }}>Wirkstoff zur Liste hinzufügen</button>
@@ -330,7 +336,7 @@ export default function Nutrition() {
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
           </form>}
-          <p className="of-dim">Für Kreatin bitte „Kreatin“ als Wirkstoff mit Gramm pro Portion eintragen, nicht als Magnesium. Frühere falsche Angaben bitte manuell berichtigen; die App verändert sie nicht automatisch. Ein Produkt kann mehrere Wirkstoffe haben. EPA und DHA sind Bestandteile von Omega-3 und dürfen nicht zusätzlich zur Gesamtmenge addiert werden. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
+          <p className="of-dim">Wirkstoffe und Mengen laut Etikett eintragen. Frühere Fehlzuordnungen werden nicht automatisch verändert. EPA und DHA sind Bestandteile von Omega-3.</p>
           </>}
         </div>}
       </section>
