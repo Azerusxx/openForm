@@ -313,3 +313,48 @@
 .of-032 .of-micro-track>.of-micro-over-fill{background:#ef4444}
 .of-032 .of-micro-heading .of-micro-over{color:#ef4444}
 .of-032 .of-micro-card>small{font-size:11px;line-height:1.5}
+
+/* 0.4.0c: one compact disclosure row per known nutrient. */
+.of-032 .of-micro-cards{gap:0;padding:2px 0}
+.of-032 details.of-micro-compact{display:block;padding:0;border-bottom:1px solid var(--sep)}
+.of-032 .of-micro-compact .of-micro-summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:54px;cursor:pointer;padding:10px 0;font-size:13px}
+.of-032 .of-micro-compact .of-micro-summary::-webkit-details-marker{display:none}
+.of-032 .of-micro-name{min-width:0;flex:1;font-weight:650}
+.of-032 .of-micro-value{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:650}
+.of-032 .of-micro-value small{display:block;color:var(--label-3);font-weight:400}
+.of-032 .of-micro-summary>svg{flex:0 0 auto;color:var(--label-3);width:15px;height:15px}
+.of-032 details[open]>.of-micro-summary>svg{transform:rotate(180deg)}
+.of-032 .of-micro-alert{display:block;color:#ef4444;font-size:11px;font-weight:600;margin-top:3px}
+.of-032 .of-micro-warning .of-micro-value{color:#ef4444}
+.of-032 .of-micro-compact .of-micro-track{margin:0 0 8px;height:5px}
+.of-032 .of-micro-compact .of-micro-track>.of-micro-over-fill{background:#ef4444}
+.of-032 .of-micro-details{display:grid;gap:6px;padding:4px 0 14px;color:var(--label-2);font-size:12px;line-height:1.5}
+.of-032 .of-micro-details p{margin:4px 0 0}
+.of-032 .of-micro-details .of-micro-over{color:#ef4444}
+.of-032 .of-micro-note{font-size:12px;color:var(--label-3);margin:8px 0 10px}
+.of-032 .of-inline-supp-form .of-inline-supp input[type=number]{width:100%;height:auto;min-height:40px;font-size:14px}
+
+/* Explicit repair action only for the known, unambiguous creatine/Mg typo. */
+.of-032 .of-inline-supp .of-creatine-repair{width:auto;flex-shrink:0;border:1px solid var(--acc);border-radius:8px;color:var(--acc);font-size:11px;font-weight:650;padding:7px 9px;white-space:nowrap}
+
+/* 0.4.0e: conservative EPA + DHA supplement consolidation. */
+.of-032 .of-omega3-merge{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;margin:8px 0;border:1px solid var(--sep);border-radius:10px}
+.of-032 .of-omega3-merge>div{flex:1;min-width:0;font-size:13px}
+.of-032 .of-omega3-merge small{display:block;font-size:11px;color:var(--label-3);margin-top:3px}
+.of-032 .of-omega3-merge button{flex-shrink:0;padding:9px;border-radius:8px;background:var(--acc);color:var(--on-acc);font-size:12px;font-weight:650}
+.of-032 .of-omega3-merge button:disabled{opacity:.45;cursor:not-allowed}
+
+/* 0.4.0f: readable daily fibre total and source-specific data completeness. */
+.of-032 .of-fiber-report{border:1px solid var(--sep);border-radius:12px;padding:13px 12px;margin:10px 0 16px}
+.of-032 .of-fiber-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:14px}
+.of-032 .of-fiber-heading span{font-variant-numeric:tabular-nums;font-weight:700}
+.of-032 .of-fiber-report>.of-micro-track{margin:10px 0 8px}
+.of-032 .of-fiber-report p{font-size:12px;line-height:1.5;margin:6px 0}
+.of-032 .of-fiber-sources{border-top:1px solid var(--sep);margin-top:10px;padding-top:10px;font-size:12px}
+.of-032 .of-fiber-sources summary{cursor:pointer;font-weight:650}
+.of-032 .of-fiber-source-list{display:grid;gap:7px;margin:12px 0}
+.of-032 .of-fiber-source-list>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.of-032 .of-fiber-source-list small{font-size:11px;color:var(--label-3);display:block}
+.of-032 .of-fiber-source-list strong{white-space:nowrap}
+.of-032 .of-fiber-missing{border-top:1px solid var(--sep);padding-top:10px;display:grid;gap:5px;color:var(--label-2)}
+.of-032 .of-fiber-missing>strong{color:var(--label)}
