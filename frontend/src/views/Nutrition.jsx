@@ -13,6 +13,7 @@ import { nutrientOverview } from '../lib/nutrient-overview.js'
 import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/creatine-repair.js'
 import { omega3Pairs, mergeOmega3Pair } from '../lib/omega3-merge.js'
 import { dailyFiberReport } from '../lib/fiber-report.js'
+import { nutritionWeekAnalysis, frequentMeals } from '../lib/nutrition-analysis.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -77,7 +78,8 @@ export default function Nutrition() {
   const remaining = Math.round((data.goals.kcal || 0) - totals.kcal)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
-  const week = weeklyNutrition(data.entries, date, macroGoals)
+  const week = nutritionWeekAnalysis(data.entries, date, macroGoals, gym.bodyweight, gym.unit)
+  const frequent = frequentMeals(data.entries)
   const nutrientRows = nutrientOverview(data, date)
   const fiberReport = dailyFiberReport(data.entries, date)
   const micros = Object.fromEntries(nutrientRows.filter(n => n.known).map(n => [n.key, n.total]))
@@ -455,7 +457,8 @@ export default function Nutrition() {
     {tab === 'favorites' && <div className="card of-reusable"><h2>Favoriten</h2>{data.favorites.length ? data.favorites.map(f => <div className="of-reuse-row" key={f.id}><span>{f.food.name}</span><button onClick={() => { log(f.food, selectedMeal); goSection('today') }}>Eintragen</button></div>) : <p>Markiere Lebensmittel im Tagebuch mit dem Stern, um sie hier schnell wiederzufinden.</p>}</div>}
     {tab === 'food' && <>
       <div className="of-meal-context">Eintragen für <strong>{MEAL_GROUPS.find(g => g.id === selectedMeal)?.title || 'Snacks'}</strong></div>
-      {!showForm && (data.favorites.length > 0 || unique.length > 0) && <section className="of-food-shortcuts" aria-label="Schnell eintragen">
+      {!showForm && (data.favorites.length > 0 || unique.length > 0 || frequent.length > 0) && <section className="of-food-shortcuts" aria-label="Schnell eintragen">
+        {!!frequent.length && <><h3><Icon name="repeat" /> Häufig gegessen</h3><div className="of-quick-food-list">{frequent.map(item => <button type="button" key={item.name + item.latest.unit} onClick={() => log(item.latest, item.latest.mealType || selectedMeal)}><strong>{item.name}</strong><small>{item.count}× bisher · {fmt(item.energy)} kcal · letzte Portion {fmt(item.latest.quantity)} {item.latest.unit}</small><span>+</span></button>)}</div></>}
         {!!data.favorites.length && <><h3><Icon name="star" /> Favoriten</h3><div className="of-quick-food-list">{data.favorites.slice(0,6).map(f => <button type="button" key={f.id} onClick={() => log(f.food)}><strong>{f.food.name}</strong><small>{fmt(entryTotals(f.food).kcal)} kcal · {fmt(entryTotals(f.food).protein)} g Protein</small><span>+</span></button>)}</div></>}
         {!!unique.length && <><h3><Icon name="repeat" /> Zuletzt gegessen</h3><div className="of-quick-food-list">{unique.filter(e => !isFavorite(data,e)).slice(0,5).map(e => <button type="button" key={e.id} onClick={() => log(e)}><strong>{e.name}</strong><small>{fmt(entryTotals(e).kcal)} kcal</small><span>+</span></button>)}</div></>}
       </section>}
@@ -517,15 +520,35 @@ export default function Nutrition() {
       </div> }) : <div className="of-empty">Noch keine Rezepte gespeichert.</div>}
     </>}
     {tab === 'analysis' && <>
-      <div className="card of-week"><h2>Letzte 7 Tage</h2><p className="of-dim">Nur Tage mit Ernährungseinträgen zählen zum Durchschnitt. Leere Tage gelten nicht als Fastentage.</p>
-        <div className="of-macro-main"><div><span>Ø Kalorien / erfasster Tag</span><strong>{week.average.kcal} <small>kcal</small></strong></div>
-          <div><span>Ø Protein / erfasster Tag</span><strong>{week.average.protein} <small>g</small></strong></div></div>
-        <div className="of-dim">{week.daysLogged} von 7 Tagen erfasst · Protein-Ziel an {week.goalsReached} Tagen erreicht</div>
-        <div className="of-week-bars">{week.days.map(d => <div className="of-week-day" key={d.date} title={`${d.date}: ${d.kcal} kcal`}>
-          <div className="of-week-bar"><span style={{ height: `${Math.min(100, data.goals.kcal ? d.kcal / data.goals.kcal * 100 : 0)}%` }} /></div>
-          <small>{d.date.slice(8)}</small></div>)}</div>
-        <div className="of-macro-sub"><span>Ø Kohlenhydrate <b>{week.average.carbs} g</b></span><span>Ø Fett <b>{week.average.fat} g</b></span></div>
-      </div>
+      <section className="card of-week of-analysis">
+        <h2>Ernährungsanalyse · 7 Tage</h2>
+        <p className="of-dim">Durchschnitte nur aus Tagen mit Ernährungseinträgen. Nicht erfasste Tage sind keine Null-Tage. Einträge können unvollständig sein.</p>
+        <div className="of-analysis-coverage"><strong>{week.daysLogged}/7 Tage erfasst</strong><span>{fmt(week.loggedCoverage)} % Abdeckung</span></div>
+        <div className="of-analysis-kpis">{[['kcal','Kalorien','kcal'],['protein','Protein','g'],['carbs','Kohlenhydrate','g'],['fat','Fett','g']].map(([key,label,unit]) => <div key={key}><span>Ø {label}</span><strong>{week.daysLogged ? fmt(week.average[key]) : '–'} <small>{unit}</small></strong></div>)}</div>
+        <h3>Tag für Tag</h3>
+        <div className="of-analysis-days">{week.days.map(d=><div key={d.date} className={'of-analysis-day' + (!d.consumed ? ' of-analysis-empty' : '')}>
+          <strong>{d.date.slice(5)}</strong>
+          <div className="of-analysis-meter"><span style={{width:`${d.consumed ? Math.min(100,100*d.kcal/Math.max(1,macroGoals.kcal)) : 0}%`}} /></div>
+          <span>{d.consumed ? `${fmt(d.kcal)} kcal` : 'Keine Einträge'}</span>
+          <small>{d.consumed ? `P ${fmt(d.protein)} · KH ${fmt(d.carbs)} · F ${fmt(d.fat)} g` : 'Keine Bewertung'}</small>
+        </div>)}</div>
+        <h3>Zielerreichung</h3>
+        <div className="of-analysis-targets">{[['kcal','Kalorien (max.)'],['protein','Protein (min.)'],['fat','Fett (max.)']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{week.goalStats[key].met}/{week.goalStats[key].evaluated} erfasste Tage</strong></div>)}</div>
+        <p className="of-dim">Kohlenhydrate: Ø {fmt(week.average.carbs)} g. Das KH-Ziel dient als Orientierung; keine separate Erfolgsquote.</p>
+      </section>
+      <section className="card of-week of-analysis">
+        <h2>Gewichtstrend</h2>
+        {week.weights.length ? <>
+          <div className="of-analysis-weights">{week.weights.map((w,i)=><div key={w.date+'-'+i}><span>{w.date.slice(5)}</span><strong>{fmt(w.weight)} kg</strong></div>)}</div>
+          <p>{week.weightDelta == null ? 'Für einen Trend brauchen wir mindestens zwei Messungen innerhalb der sieben Tage.' : `Veränderung zwischen erster und letzter Messung: ${week.weightDelta > 0 ? '+' : ''}${fmt(week.weightDelta)} kg`}</p>
+        </> : <p className="of-dim">Keine Gewichtsmessungen innerhalb dieser sieben Tage gespeichert. Gewicht kannst du in der Körperentwicklung erfassen.</p>}
+        <p className="of-dim">Kurzfristige Schwankungen durch Wasser und Verdauung sind normal. Aus sieben Tagen lässt sich kein zuverlässiger Fettverlust ableiten.</p>
+      </section>
+      <section className="card of-week of-analysis">
+        <h2>Häufige Mahlzeiten</h2>
+        <p className="of-dim">Tippen, um die zuletzt verwendete Portion für den ausgewählten Tag erneut einzutragen.</p>
+        {frequent.length ? <div className="of-analysis-frequent">{frequent.map(item=><div key={item.name+item.latest.unit}><span><strong>{item.name}</strong><small>{item.count}× · {fmt(item.energy)} kcal</small></span><button type="button" onClick={()=>log(item.latest,item.latest.mealType||selectedMeal)}>+ Eintragen</button></div>)}</div> : <p>Erfasse zuerst Mahlzeiten, um sie hier wiederholen zu können.</p>}
+      </section>
     </>}
     {tab === 'backup' && <>
       <div className="card of-backup"><h2>Ernährungsbackup</h2><p>Dieser Export sichert ausschließlich Ernährung, inklusive Wasser, Aktivitäten, Mahlzeiten und Ziele. Das gemeinsame Training-und-Ernährung-Backup findest du in den allgemeinen openForm-Einstellungen.</p>
