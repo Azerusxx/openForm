@@ -24,9 +24,9 @@ test('weight unit label is preserved and pounds goal uses same scale',()=>{
  assert.ok(x.projected.lower>100)
 })
 test('duplicates, future, impossible and stale readings do not invent certainty',()=>{
- const r=weigh([['2026-08-01',80],['2026-08-08',79.7],['2026-08-15',79.4],['2026-08-22',79.1]])
+ const r=weigh([['2026-08-01',80],['2026-08-08',79.7],['2026-08-15',79.4],['2026-08-22',79.1],['2026-08-29',78.8]])
  assert.equal(weightForecast(r,today).status,'stale')
- assert.equal(weightForecast(weigh([['2026-09-01',77],['2026-09-08',69],['2026-09-15',90],['2026-09-22',76],['2026-10-18',77]]),today).status,'volatile')
+ assert.equal(weightForecast(weigh([['2026-09-01',70],['2026-09-08',75],['2026-09-15',80],['2026-09-22',85],['2026-10-18',105]]),today).status,'volatile')
  const w=weightWeeks(weigh([['2026-10-12',77],['2026-10-12',76],['2026-10-26',60],['2026-10-13',0],['2026-10-14',800]]),today)
  assert.equal(w.length,1)
  assert.equal(w[0].n,1)
