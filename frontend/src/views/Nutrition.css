@@ -272,3 +272,10 @@
 .of-032 .of-meal-context strong{color:var(--label)}
 .of-032 .of-macro-tile>span{line-height:1.3}
 @media(max-width:360px){.of-032 .of-water-fast{gap:4px}.of-032 .of-water-fast button{padding:8px 5px;font-size:10px}}
+
+
+/* 0.3.6: respect the user-selected appearance accent throughout nutrition. */
+.of-032{--of-teal:var(--acc);--of-orange:var(--acc);--of-pink:var(--acc)}
+.of-032 .of-macro-tile.of-over-goal strong i,
+.of-032 .of-macro-tile.of-over-goal .of-mini-track>span{background:#ef4444}
+.of-032 .of-macro-tile.of-over-goal>span{color:#ef4444}
