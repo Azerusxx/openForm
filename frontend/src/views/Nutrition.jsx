@@ -72,8 +72,13 @@ export default function Nutrition() {
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = weeklyNutrition(data.entries, date, macroGoals)
-  const micros = dayMicros(data.entries, date)
-  for (const s of data.supplements) if (s.logs.includes(date)) for (const [key, amount] of Object.entries(s.nutrients || {})) { const value = Number(amount) * Number(s.dose); if (value > 0) micros[key] = Math.round(((micros[key] || 0) + value) * 100) / 100 }
+  const foodMicros = dayMicros(data.entries, date)
+  const supplementMicros = {}
+  for (const s of data.supplements) if (s.logs.includes(date)) for (const [key, amount] of Object.entries(s.nutrients || {})) {
+    const value = Number(amount) * Number(s.dose)
+    if (Number.isFinite(value) && value > 0) supplementMicros[key] = (supplementMicros[key] || 0) + value
+  }
+  const micros = Object.fromEntries(MICRO_NUTRIENTS.map(({key}) => [key, Math.round(((foodMicros[key] || 0) + (supplementMicros[key] || 0)) * 100) / 100]))
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -267,7 +272,15 @@ export default function Nutrition() {
           {showMicros && <div className="of-micros-content">
             <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
             {MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).length
-              ? <div className="of-nutrient-detail">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{fmt(micros[key])} {unit}{MICRO_GUIDES[key] != null && <small className="of-dim">/ Richtwert {fmt(MICRO_GUIDES[key])} {unit}</small>}</strong></div>)}</div>
+              ? <div className="of-micro-cards">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => {
+                  const guide = MICRO_GUIDES[key]
+                  const exceededUpperLimit = key === 'sodium' && guide != null && micros[key] > guide
+                  return <div className="of-micro-card" key={key}>
+                    <div className="of-micro-heading"><strong>{label}</strong><span className={exceededUpperLimit ? 'of-micro-over' : ''}>{fmt(micros[key])}{guide != null ? ` / ${fmt(guide)}` : ''} {unit}</span></div>
+                    {guide != null && <div className="of-micro-track" role="progressbar" aria-label={label} aria-valuenow={micros[key]} aria-valuemin={0} aria-valuemax={guide}><span className={exceededUpperLimit ? 'of-micro-over-fill' : ''} style={{width:`${Math.min(100, 100 * micros[key] / Math.max(1,guide))}%`}} /></div>}
+                    <small className="of-dim">Nahrung: {fmt(foodMicros[key] || 0)} {unit} · Supplements: {fmt(supplementMicros[key] || 0)} {unit}{guide == null ? ' · Kein pauschaler Tagesrichtwert' : key === 'sodium' ? ' · Obergrenze' : ' · Orientierungswert'}</small>
+                  </div>
+                })}</div>
               : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
           </div>}
           <h3>Supplements heute</h3>
