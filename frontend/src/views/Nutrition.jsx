@@ -12,6 +12,7 @@ import { trainingEnergyForDay } from '../lib/training-energy.js'
 import { nutrientOverview } from '../lib/nutrient-overview.js'
 import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/creatine-repair.js'
 import { omega3Pairs, mergeOmega3Pair } from '../lib/omega3-merge.js'
+import { dailyFiberReport } from '../lib/fiber-report.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -77,6 +78,7 @@ export default function Nutrition() {
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = weeklyNutrition(data.entries, date, macroGoals)
   const nutrientRows = nutrientOverview(data, date)
+  const fiberReport = dailyFiberReport(data.entries, date)
   const micros = Object.fromEntries(nutrientRows.filter(n => n.known).map(n => [n.key, n.total]))
 
   useEffect(() => {
@@ -304,8 +306,17 @@ export default function Nutrition() {
           </button>
           {showMicros && <div className="of-micros-content">
             <p className="of-micro-note">Nur erfasste Mengen. Fehlende Angaben bleiben unbekannt. Details antippen.</p>
-            {nutrientRows.some(n => n.known)
-              ? <div className="of-micro-cards">{nutrientRows.filter(n => n.known).map(n => {
+            <section className="of-fiber-report" aria-label="Ballaststoff Tagesübersicht">
+              <div className="of-fiber-heading"><strong>Ballaststoffe</strong><span>{fmt(fiberReport.recorded)} / {fmt(fiberReport.target)} g</span></div>
+              <div className="of-micro-track" role="progressbar" aria-label="Erfasste Ballaststoffe" aria-valuenow={fiberReport.recorded} aria-valuemin={0} aria-valuemax={fiberReport.target}><span style={{width:`${fiberReport.progress}%`}} /></div>
+              <p className="of-dim">{fiberReport.complete ? `Noch ${fmt(fiberReport.remaining)} g bis zum Orientierungswert.` : `${fmt(fiberReport.recorded)} g nachgewiesen. ${fiberReport.unknownCount} Lebensmittel ohne verwertbare Ballaststoffangabe, tatsächliche Tagesmenge unbekannt.`}</p>
+              <details className="of-fiber-sources"><summary>Lebensmittelquellen ({fiberReport.knownCount}) und Datenlücken ({fiberReport.unknownCount})</summary>
+                {fiberReport.sources.length ? <div className="of-fiber-source-list">{fiberReport.sources.map((food,i) => <div key={food.id || i}><span>{food.name} <small>{fmt(food.quantity)} {food.unit}</small></span><strong>{fmt(food.fiber)} g</strong></div>)}</div> : <p className="of-dim">Noch keine Lebensmittel mit verlässlichen Ballaststoffangaben erfasst.</p>}
+                {fiberReport.missing.length > 0 && <div className="of-fiber-missing"><strong>Angaben fehlen</strong>{fiberReport.missing.map((food,i) => <div key={food.id || i}>{food.name} ({fmt(food.quantity)} {food.unit})</div>)}<p>Lebensmittel bei Bedarf bearbeiten und den Ballaststoffwert pro 100 g/ml vom Etikett nachtragen. Keine automatische Schätzung.</p></div>}
+              </details>
+            </section>
+            {nutrientRows.some(n => n.known && n.key !== 'fiber')
+              ? <div className="of-micro-cards">{nutrientRows.filter(n => n.known && n.key !== 'fiber').map(n => {
                 const limitText = n.upper ? `Obergrenze: ${fmt(n.upper.max)} ${n.unit} (${n.upper.scope === 'supplement' ? 'nur aus Ergänzungen' : 'Gesamtaufnahme'})` : null
                 return <details className={'of-micro-card of-micro-compact' + (n.limitExceeded ? ' of-micro-warning' : '')} key={n.key}>
                   <summary className="of-micro-summary">
