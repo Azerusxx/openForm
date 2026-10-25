@@ -360,6 +360,9 @@ export default function Nutrition() {
                   <div className="of-micro-details">
                     <div>Nahrung: {n.food == null ? 'unbekannt' : `${fmt(n.food)} ${n.unit}`}</div>
                     <div>Supplements: {n.supplement == null ? 'nicht erfasst' : `${fmt(n.supplement)} ${n.unit}`}</div>
+                    <div>Lebensmittelwerte: {fmt(n.confirmedFood)} {n.unit} erfasst · {fmt(n.estimatedFood)} {n.unit} KI-geschätzt</div>
+                    {n.estimatedFood > 0 && <p>KI-Werte sind Näherungen und keine gemessenen Produktangaben.</p>}
+                    {n.estimatedExceedance && <p>⚠ Geschätzte Gesamtaufnahme liegt über einer Obergrenze. Das ist keine bestätigte Überschreitung.</p>}
                     {n.incomplete && <p>Lebensmitteldaten unvollständig. Der tatsächliche Wert kann höher sein.</p>}
                     {n.guide != null && <p>{n.key === 'sodium' ? 'Orientierung zur Begrenzung, kein Mindestziel.' : 'Der Vergleichswert ist ein Orientierungswert, keine sichere Obergrenze.'}</p>}
                     {limitText && <p className={n.limitExceeded ? 'of-micro-over' : ''}>{n.limitExceeded ? '⚠ Erfasste Menge überschreitet den angegebenen Grenzwert. ' : ''}{limitText}. Bitte Dosierung und Produktform prüfen.</p>}
