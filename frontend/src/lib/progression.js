@@ -337,6 +337,29 @@ export function sessionsFor(S, exId, fallback, rid) {
   return sessionsIn(S, exId, fallback, null)
 }
 
+// Historical workouts imported or recorded before 'planned' was saved still carry
+// their actual target on most entries. Use that only when it matches the current
+// prescription. This avoids treating every plan change as a fresh exercise.
+function compatibleExerciseSession(session, cfg) {
+  const source = session.planned || session.target
+  if (!source || planChanged(source, cfg)) return false
+  // Different load tracks (heavy/light) are intentionally independent. For a
+  // progressed workout the original planned weight, not its achieved load, is
+  // the comparable reference; legacy targets may only have an actual weight.
+  if (source.weight != null && cfg?.weight != null &&
+      Number(source.weight) !== Number(cfg.weight)) return false
+  return true
+}
+
+const elapsedDays = (date, now = new Date()) => {
+  if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return null
+  const then = Date.parse(date + 'T12:00:00Z')
+  if (!Number.isFinite(then)) return null
+  const days = Math.floor((now.getTime() - then) / 86400000)
+  return days >= 0 ? days : null
+}
+export const LONG_EXERCISE_BREAK_DAYS = 42
+
 // 0.3.8: exercise-level progression across compatible routines. A heavy/light variant
 // with a different prescription remains separate; old un-stamped records are only
 // borrowed if this routine has no own history (legacy behavior in sessionsFor).
@@ -345,10 +368,7 @@ export function exerciseSessionsFor(S, exId, cfg, rid) {
   const all = sessionsIn(S, exId, cfg, null)
   if (!rid) return all
   const own = all.filter(s => s.rid === rid)
-  const compatible = all.filter(s => s.rid !== rid && s.planned &&
-    !planChanged(s.planned, cfg) &&
-    (s.planned.weight == null || cfg?.weight == null ||
-      Number(s.planned.weight) === Number(cfg.weight)))
+  const compatible = all.filter(s => s.rid !== rid && compatibleExerciseSession(s, cfg))
   // No stamped cross-routine match: preserve the established routine-specific
   // progress (including historic sessions with no planned snapshot).
   if (!compatible.length) return own.length ? own : sessionsFor(S, exId, cfg, rid)
@@ -503,6 +523,20 @@ export function nextPrescription(S, cfg, routine) {
     return { policy, kind: 'first', why: ['Nothing logged yet, so this session sets the baseline.'] }
   }
 
+  // A successful session months ago is not evidence that a heavier weight is
+  // sensible today. Preserve the old record and propose a conservative review
+  // instead of applying an automatic increase or a guessed detraining percentage.
+  // Users can still edit the session's working weight before lifting.
+  const daysSinceLast = S.progressionScope === 'exercise' ? elapsedDays(last.d) : null
+  if (daysSinceLast != null && daysSinceLast > LONG_EXERCISE_BREAK_DAYS) {
+    const heldWeight = cfg.weight > 0 && last.planned &&
+      (last.planned.weight ?? null) !== cfg.weight ? cfg.weight :
+      last.weight > 0 ? last.weight : cfg.weight
+    return { policy, kind: 'hold', ...(heldWeight > 0 ? { weight: heldWeight } : {}),
+      ...(mode === 'time' ? { sec: cfg.sec || last.goal || undefined } : { reps: cfg.reps || undefined }),
+      why: ['Last exercise session was {0} days ago. Review your starting weight before progressing.', daysSinceLast] }
+  }
+
   // Start again from the plan (issue #275) when the last session was built from a different one:
   // the routine's sets or reps were edited since, or the session is borrowed from another routine
   // (this one has none of its own yet, see sessionsFor) whose plan was not this one's. Its
@@ -512,7 +546,9 @@ export function nextPrescription(S, cfg, routine) {
   // inside its new range, from what you managed).
   // A borrowed session saved before plans were stamped is taken as a different plan.
   const borrowed = !!routine?.id && last.rid !== routine.id
-  if (last.planned ? planChanged(last.planned, cfg) : borrowed) {
+  if (last.planned ? planChanged(last.planned, cfg) : (borrowed && !(
+    S.progressionScope === 'exercise' && compatibleExerciseSession(last, cfg)
+  ))) {
     const why = borrowed ? ['First time in this routine, so starting from its own target.'] : ['Plan changed, so starting from your new target.']
     // The weight holds at what was last lifted, unless the plan's own weight is not the one the
     // session was built from: the same edit that turned 3 × 5 @ 100 into 3 × 10 @ 70 set 70,
