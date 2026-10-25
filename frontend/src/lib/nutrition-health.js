@@ -29,6 +29,12 @@ export async function healthStepsForDay(date,{ask=false}={}){
  return {ok:true,date,steps:Number(res.steps)||0,source:'health_connect_aggregated'}
 }
 
+export async function requestHealthExerciseRead(){
+ const p=await api()
+ if(!p)return {granted:false,reason:'unsupported'}
+ const result=await p.requestExerciseReadPermission()
+ return {granted:!!result.exerciseGranted}
+}
 export async function healthWalkingSessionsForDay(date){
  const p=await api()
  if(!p)return {ok:false,reason:'unsupported'}
