@@ -11,6 +11,7 @@ import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRec
 import { trainingEnergyForDay } from '../lib/training-energy.js'
 import { nutrientOverview } from '../lib/nutrient-overview.js'
 import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/creatine-repair.js'
+import { omega3Pairs, mergeOmega3Pair } from '../lib/omega3-merge.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -212,6 +213,20 @@ export default function Nutrition() {
       s.id === supplement.id ? (repairMisattributedCreatine(s) || s) : s
     ) }))) setNotice('Kreatin-Eintrag korrigiert. Magnesium wird dafür nicht mehr mitgerechnet.')
   }
+  const mergeOmega3 = (left, right) => {
+    const result = mergeOmega3Pair(data.supplements, left.id, right.id)
+    if (!result.changed) {
+      setNotice(result.reason === 'different-history'
+        ? 'EPA und DHA haben unterschiedliche Einnahmetage. Zusammenführen ist gesperrt, damit keine Einnahmen erfunden werden. Bitte Historien prüfen.'
+        : 'Diese beiden Einträge sind nicht sicher zusammenführbar.')
+      return
+    }
+    if (!window.confirm('EPA und DHA in EIN Omega-3-Produkt zusammenführen? Die gleichen Einnahmetage bleiben erhalten. Der zweite Eintrag wird entfernt.')) return
+    if (update(d => {
+      const next = mergeOmega3Pair(d.supplements, left.id, right.id)
+      return next.changed ? { ...d, supplements: next.supplements } : d
+    })) setNotice('Omega-3 zusammengeführt. EPA und DHA bleiben getrennte Wirkstoffe in einem Produkt.')
+  }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
 
@@ -318,6 +333,13 @@ export default function Nutrition() {
           </button>
           {!showSupplements && <p className="of-dim of-supp-hint">{data.supplements.length ? 'Hier kannst du deine täglichen Einnahmen abhaken und die hinterlegten Dosierungen bearbeiten.' : 'Hier einmal deine Supplements und Tagesdosen hinterlegen, danach täglich abhaken.'}</p>}
           {showSupplements && <>
+          {omega3Pairs(data.supplements).map(({left, right, review}) => <div className="of-omega3-merge" key={left.id + ':' + right.id}>
+            <div><strong>Omega-3: EPA + DHA</strong><small>{review.allowed
+              ? 'Gleiche Einnahmetage und Dosierung. Als ein Produkt speichern.'
+              : 'Unterschiedliche Einnahmehistorie. Nicht automatisch zusammenführen.'}</small></div>
+            <button type="button" onClick={() => mergeOmega3(left, right)} disabled={!review.allowed}
+              aria-label="Omega-3-Einträge zusammenführen">Zusammenführen</button>
+          </div>)}
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
             {isMisattributedCreatine(s) && <button type="button" className="of-creatine-repair" onClick={() => repairCreatine(s)} aria-label="Kreatin-Zuordnung korrigieren">Kreatin korrigieren</button>}
