@@ -1,3 +1,4 @@
+import { normalizeActivity } from './activity-energy.js'
 import { cleanFavorites, cleanRecipes, cleanSupplements } from './nutrition-extra.js'
 // openForm nutrition v0.1: intentionally separate from gym_state_v1 until sync/merge
 // and complete-backup support have been implemented and tested.
@@ -90,7 +91,7 @@ export function normalizedNutrition(data) {
   d.profile = { activity: ['low', 'light', 'moderate', 'high'].includes(data.profile?.activity) ? data.profile.activity : 'moderate',
     waterGoal: positive(data.profile?.waterGoal) ? Math.min(10000, n(data.profile.waterGoal)) : 1900 }
   d.water = Object.fromEntries(Object.entries(data.water && typeof data.water === 'object' && !Array.isArray(data.water) ? data.water : {}).filter(([day, amount]) => validDate(day) && Number.isFinite(Number(amount)) && Number(amount) >= 0).map(([day, amount]) => [day, Math.min(30000, n(amount))]))
-  d.activities = (Array.isArray(data.activities) ? data.activities : []).filter(a => a && typeof a.id === 'string' && validDate(a.date) && typeof a.name === 'string' && a.name.trim() && positive(a.kcal)).map(a => ({ id: a.id, date: a.date, name: a.name.trim().slice(0, 120), kcal: Math.min(10000, n(a.kcal)), createdAt: a.createdAt || 0 }))
+  d.activities = (Array.isArray(data.activities) ? data.activities : []).map(normalizeActivity).filter(Boolean)
   d.goals = {
     kcal: positive(data.goals?.kcal) ? n(data.goals.kcal) : 2200,
     protein: positive(data.goals?.protein) ? n(data.goals.protein) : 150,
