@@ -8,7 +8,7 @@ export function dailyFiberReport(entries, date, guide = FIBER_DAILY_GUIDE_G) {
   const foods = (entries || []).filter(e => e?.date === date)
   const sources = []
   const missing = []
-  let knownGrams = 0
+  let knownGrams = 0, confirmedGrams = 0, estimatedGrams = 0
   for (const entry of foods) {
     const declared = entry?.per100Micros?.fiber
     const isKnown = declared !== undefined && declared !== null && declared !== '' &&
@@ -20,13 +20,16 @@ export function dailyFiberReport(entries, date, guide = FIBER_DAILY_GUIDE_G) {
       continue
     }
     knownGrams += fiber
+    const estimated = entry.fiberSource === 'ai_estimate' || (entry.fiberSource == null && entry.source === 'ai_estimate')
+    if (estimated) estimatedGrams += fiber
+    else confirmedGrams += fiber
     sources.push({ id: entry.id, name: entry.name, quantity: entry.quantity, unit: entry.unit,
-      fiber: round(fiber), source: entry.source || 'manual' })
+      fiber: round(fiber), estimated, source: entry.fiberSource || entry.source || 'manual' })
   }
   sources.sort((a,b) => b.fiber - a.fiber)
   const recorded = round(knownGrams)
   const target = Number.isFinite(Number(guide)) && Number(guide) > 0 ? Number(guide) : FIBER_DAILY_GUIDE_G
-  return { recorded, target, remaining: round(Math.max(0,target-recorded)),
+  return { recorded, confirmed: round(confirmedGrams), estimated: round(estimatedGrams), target, remaining: round(Math.max(0,target-recorded)),
     progress: Math.min(100,Math.round(recorded/target*100)),
     sources, missing, knownCount:sources.length, unknownCount:missing.length,
     complete:missing.length===0 && foods.length>0, hasFood: foods.length>0 }
