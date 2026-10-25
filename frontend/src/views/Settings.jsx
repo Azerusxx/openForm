@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, forwardRef, useSyncExternalStore } from 'r
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useStore, DEF, hasData } from '../store/useStore.js'
 import { healthStatus, loadHealth, enableHealth, disableHealth, openHealthConnect, onHealthChange } from '../lib/health-sync.js'
-import { healthStepStatus, healthStepsForDay, healthWalkingSessionsForDay } from '../lib/nutrition-health.js'
+import { healthStepStatus, healthStepsForDay, healthWalkingSessionsForDay, requestHealthExerciseRead } from '../lib/nutrition-health.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { speedUnitOf } from '../lib/speed.js'
 import { formulaOf, FORMULA_NAMES } from '../lib/onerm.js'
@@ -1524,6 +1524,7 @@ function HealthConnectCard({ S, toast }) {
   const [readStatus, setReadStatus] = useState(null)
   const [lastSync, setLastSync] = useState(null)
   const [readBusy, setReadBusy] = useState(false)
+  const [readMessage,setReadMessage] = useState('Noch kein Verbindungstest durchgeführt')
   const refreshRead = () => healthStepStatus().then(setReadStatus).catch(() => setReadStatus({status:'error',granted:false}))
   useEffect(() => {
     let gone = false
@@ -1573,21 +1574,26 @@ function HealthConnectCard({ S, toast }) {
 
   const askRead = async () => {
     setReadBusy(true)
+    setReadMessage('Lese Schrittberechtigung und heutige Schritte…')
     try {
       const result = await healthStepsForDay(new Date().toLocaleDateString('sv-SE'), {ask:true})
       await refreshRead()
-      if(result.ok){setLastSync({time:Date.now(),steps:result.steps}); toast('Health Connect: Schritte gelesen')}
-      else toast(result.reason==='permission'?'Berechtigung nicht erteilt':'Health Connect nicht verfügbar')
-    } catch(e){toast('Schritte konnten nicht gelesen werden')}
+      if(result.ok){setLastSync({time:Date.now(),steps:result.steps});setReadMessage('Verbunden: '+result.steps+' Schritte für heute. Auch null kann korrekt sein.');toast('Schritte gelesen')}
+      else {const message=result.reason==='permission'?'Schrittberechtigung abgelehnt. Bitte in Health Connect prüfen.':'Health Connect: '+result.reason;setReadMessage(message);toast(message)}
+    } catch(e){const message='Fehler beim Schrittlesen: '+(e?.message||'Unbekannter Fehler');setReadMessage(message);toast(message)}
     setReadBusy(false)
   }
   const readWalking = async () => {
     setReadBusy(true)
+    setReadMessage('Prüfe Aktivitätsberechtigung…')
     try {
+      let permission=await healthStepStatus()
+      if(!permission.exerciseGranted){await requestHealthExerciseRead();permission=await healthStepStatus()}
+      if(!permission.exerciseGranted){setReadMessage('Leseberechtigung für Spaziergänge wurde nicht erteilt.');setReadBusy(false);return}
       const result=await healthWalkingSessionsForDay(new Date().toLocaleDateString('sv-SE'))
-      if(result.ok){setLastSync(x=>({...x,time:Date.now(),walking:result.sessions.length}));toast(result.sessions.length+' Spaziergänge gefunden (nur Vorschau)')}
-      else toast('Berechtigung für Aktivitäten fehlt oder Health Connect nicht verfügbar')
-    } catch(e){toast('Aktivitäten konnten nicht gelesen werden')}
+      if(result.ok){setLastSync(x=>({...x,time:Date.now(),walking:result.sessions.length}));setReadMessage(result.sessions.length+' Spaziergänge gefunden (Vorschau, nicht importiert)');toast('Spaziergänge geprüft')}
+      else {setReadMessage('Aktivitäten konnten nicht gelesen werden: '+result.reason);toast('Aktivitäten konnten nicht gelesen werden')}
+    } catch(e){setReadMessage('Fehler bei Aktivitäten: '+(e?.message||'Unbekannter Fehler'));toast('Aktivitäten konnten nicht gelesen werden')}
     setReadBusy(false)
   }
   return (
@@ -1606,10 +1612,12 @@ function HealthConnectCard({ S, toast }) {
         accessory="chevron" onClick={askRead} disabled={readBusy} />
       <Row icon="heart" iconTint="var(--teal)" title="Spaziergänge prüfen"
         subtitle={readStatus?.exerciseGranted ? 'Freigegeben · keine automatische Übernahme' : 'Berechtigung für Aktivitäten erforderlich'}
-        accessory="chevron" onClick={readWalking} disabled={readBusy || !readStatus?.exerciseGranted} />
+        accessory="chevron" onClick={readWalking} disabled={readBusy} />
       <Row icon="list" iconTint="var(--blue)" title="Berechtigungen verwalten"
         subtitle="Zugriff jederzeit in Health Connect ändern"
         accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />
+      <Row icon="info" iconTint="var(--blue)" title="Verbindungsdiagnose"
+        subtitle={readMessage} />
       <Row icon="check" iconTint="var(--green)" title="Letzte Synchronisierung"
         subtitle={lastSync?.time ? new Date(lastSync.time).toLocaleString('de-AT') + (lastSync.steps!=null?' · '+lastSync.steps+' Schritte':'') : 'In dieser Sitzung noch nicht synchronisiert'} />
     </Section>
