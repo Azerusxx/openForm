@@ -28,12 +28,16 @@ export function trendSeries(entries=[],weights=[],anchor,window='30',unit='kg') 
  })
  return {daily,weekly,start,end,weight:weightReport}
 }
-function Line({points,min,max,width,height,color,drawDots=true}) {
+export function chartLinePath(points,min,max,width,height,connectMissing=false) {
  let path='',prev=false
- points.forEach((p,i)=>{if(p.value===null){prev=false;return}
-   const x=(i/Math.max(1,points.length-1))*width
-   const y=height-((p.value-min)/Math.max(.01,max-min))*height
-   path+=(prev?' L':' M')+round(x)+' '+round(y);prev=true})
+ points.forEach((p,i)=>{if(p.value===null){if(!connectMissing)prev=false;return}
+ const x=(i/Math.max(1,points.length-1))*width
+ const y=height-((p.value-min)/Math.max(.01,max-min))*height
+ path+=(prev?' L':' M')+round(x)+' '+round(y);prev=true})
+ return path
+}
+function Line({points,min,max,width,height,color,drawDots=true,connectMissing=false}) {
+ const path=chartLinePath(points,min,max,width,height,connectMissing)
  return <><path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
  {drawDots&&points.length<=75&&points.map((p,i)=>p.value===null?null:<circle key={i} cx={i/Math.max(1,points.length-1)*width} cy={height-((p.value-min)/Math.max(.01,max-min))*height} r="2.5" fill={color}/>)}</>
 }
@@ -51,10 +55,10 @@ export default function NutritionTrendChart({data=[],field='weight',target=null,
    {[0,.5,1].map(v=><g key={v}><line x1="30" x2="550" y1={20+(1-v)*h} y2={20+(1-v)*h} stroke="currentColor" opacity=".15" strokeDasharray="4 5"/><text x="25" textAnchor="end" y={24+(1-v)*h} fill="currentColor" fontSize="11" opacity=".65">{round(min+(max-min)*v)}</text></g>)}
    <g transform="translate(30 20)">{target!=null&&<line x1="0" x2={w} y1={h-(target-min)/(max-min)*h} y2={h-(target-min)/(max-min)*h} stroke="#facc15" strokeDasharray="7 5" strokeWidth="2"/>}
    {bars?data.map((p,i)=>!Number.isFinite(p[field])?null:<rect key={i} x={i*w/data.length+1} width={Math.max(1,w/data.length-2)} y={h-(p[field]-min)/(max-min)*h} height={(p[field]-min)/(max-min)*h} fill={color} opacity=".85" rx="2"/>)
-   :<Line points={pts} min={min} max={max} width={w} height={h} color={color} drawDots={data.length<85}/>}</g>
+   :<Line points={pts} min={min} max={max} width={w} height={h} color={color} drawDots={data.length<85} connectMissing={field==='weight'}/>}</g>
    <text x="30" y="196" fill="currentColor" fontSize="11" opacity=".65">{data[0]?.date?.slice(5)}</text>
    <text x="550" y="196" textAnchor="end" fill="currentColor" fontSize="11" opacity=".65">{data.at(-1)?.date?.slice(5)}</text>
   </svg>
-  <small>{active.length} erfasste Werte · {unit}{target!=null?' · gelb = Ziel':''}. Leere Tage bleiben ohne Wert.</small>
+  <small>{active.length} erfasste Werte · {unit}{target!=null?' · gelb = Ziel':''}. {field==='weight'?'Messpunkte chronologisch verbunden; dazwischen keine Zwischenwerte.':'Leere Tage bleiben Datenlücken.'}</small>
  </div>
 }
