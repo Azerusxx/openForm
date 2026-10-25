@@ -51,7 +51,6 @@ export default function Nutrition() {
   const [activityDistance,setActivityDistance] = useState('')
   const [activitySteps,setActivitySteps] = useState('')
   const [stepInfo,setStepInfo] = useState(null)
-  const [stepsBusy,setStepsBusy] = useState(false)
   const [showActivity, setShowActivity] = useState(false)
   const [date, setDate] = useState(dateLocal)
   const [form, setForm] = useState(EMPTY)
@@ -301,16 +300,6 @@ export default function Nutrition() {
       setShowActivity(false);setActivityDistance('');setActivitySteps('')
     }
   }
-  const fetchSteps = async ask => {
-    setStepsBusy(true)
-    try {
-      const result=await healthStepsForDay(date,{ask})
-      if(result.ok) setStepInfo(result)
-      else setNotice(result.reason==='permission'?'Health Connect Schrittzugriff nicht freigegeben.':
-        'Health Connect auf diesem Gerät nicht verfügbar.')
-    }catch(e){setNotice('Schrittimport nicht möglich: '+(e?.message||'Berechtigung oder Dienst prüfen'))}
-    finally{setStepsBusy(false)}
-  }
   useEffect(()=>{
     let alive=true
     healthStepStatus().then(status=>{
@@ -358,10 +347,15 @@ export default function Nutrition() {
       <section className="of-calorie-card" aria-label="Kalorienbilanz">
         <div className="of-calorie-meta"><div><span className="of-calorie-symbol of-intake"><Icon name="download" /></span><strong>{fmt(totals.kcal)}</strong><small>zugeführt</small></div>
           <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>{training.kcal ? 'Aktivität + Training (ca. verbrannt)' : 'Aktivität (ca. verbrannt)'}</small></div></div>
-        <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={data.goals.kcal} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,data.goals.kcal) * 100))}%` }}>
+        <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={(data.goals.kcal||0)+activeBonus} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,(data.goals.kcal||0)+activeBonus) * 100))}%` }}>
           <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
         </div>
-        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal{activeBonus>0?` + ${fmt(activeBonus)} kcal Aktivität (optional)`:''} <span>*Training geschätzt, nicht automatisch als Extra-Budget. Schrittwerte nicht doppelt gezählt.</span></div>
+        <div className="of-calorie-foot of-calorie-breakdown">
+          <div><span>Grundziel</span><strong>{fmt(data.goals.kcal)} kcal</strong></div>
+          <div><span>Aktivitätsbonus {data.profile?.includeActivityCalories?'aktiv':'aus'}</span><strong>+ {fmt(activeBonus)} kcal</strong></div>
+          <div><span>Wirksames Budget</span><strong>{fmt((data.goals.kcal||0)+activeBonus)} kcal</strong></div>
+          <span>*Training und Schritte nicht automatisch gutgeschrieben; Verbrauch ist geschätzt.</span>
+        </div>
       </section>
       <div className="of-macro-cards" aria-label="Makro-Tagesziele">
         {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${macroGoals[key] != null && totals[key] > macroGoals[key] ? " of-over-goal" : ""}`} key={key}>
@@ -486,8 +480,8 @@ export default function Nutrition() {
           {activitySummary.skipped>0 && <p className="of-dim">Krafttraining aus Aktivitäten nicht doppelt berücksichtigt.</p>}
           <div className="of-step-info">
             <span>{stepInfo?.date===date?`${stepInfo.steps.toLocaleString('de-DE')} Schritte (Health Connect)`:'Schritte aus Health Connect'}</span>
-            <button type="button" onClick={()=>fetchSteps(true)} disabled={stepsBusy}>{stepsBusy?'Lese…':stepInfo?.date===date?'Aktualisieren':'Verbinden'}</button>
-            <small>Optional. Schritte erhöhen niemals zusätzlich die Aktivitätskalorien, um Überschneidungen zu vermeiden.</small>
+            <small>Verbindung über Einstellungen → Health Connect verwalten</small>
+            <small>Schritte erhöhen das Kalorienbudget nicht. Freigaben erfolgen nur in den allgemeinen Einstellungen.</small>
           </div>
           <label className="of-budget-toggle"><input type="checkbox" checked={!!data.profile?.includeActivityCalories}
             onChange={e=>update(d=>({...d,profile:{...d.profile,includeActivityCalories:e.target.checked}}))}/>
