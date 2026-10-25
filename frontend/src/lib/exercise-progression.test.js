@@ -31,10 +31,27 @@ describe('0.3.8 progression per exercise, not per training plan', () => {
       .toMatchObject({ kind: 'up', weight: 65 })
   })
 
-  it('ignores how many days or weeks elapsed between exercise sessions', () => {
+  it('does not automatically increase load after a long exercise break', () => {
     const S = state([logged('leg-day', '2026-01-05')])
-    expect(nextPrescription(S, cfg, routine('leg-day')))
+    const plan = nextPrescription(S, cfg, routine('leg-day'))
+    expect(plan).toMatchObject({ kind: 'hold', weight: 60 })
+    expect(plan.why[0]).toContain('days ago')
+  })
+
+  it('uses matching historical targets even when planned snapshots are absent', () => {
+    const past = logged('fullbody', '2026-10-17')
+    delete past.entries[0].planned
+    const S = state([past])
+    expect(exerciseSessionsFor(S, LIFT, cfg, 'push').map(s => s.rid)).toEqual(['fullbody'])
+    expect(nextPrescription(S, cfg, routine('push')))
       .toMatchObject({ kind: 'up', weight: 62.5 })
+  })
+
+  it('does not borrow an incompatible legacy rep target', () => {
+    const past = logged('light', '2026-10-17', { weight: 40, reps: 15, targetReps: 15 })
+    delete past.entries[0].planned
+    const S = state([past])
+    expect(nextPrescription(S, cfg, routine('heavy'))).toMatchObject({ kind: 'hold', weight: 60, reps: 10 })
   })
 
   it('does not mix a 15-rep light day with a 10-rep heavy day', () => {
