@@ -423,3 +423,13 @@
 .of-032 .of-chart-wrap>strong{font-size:13px}
 .of-032 .of-chart-wrap>small{color:var(--label-3);font-size:11px;line-height:1.4}
 .of-032 .of-chart-wrap svg{display:block;max-width:100%;color:var(--label-2)}
+
+/* 0.4.2a: concise trends and explicit calorie-budget accounting */
+.of-032 .of-calorie-breakdown{display:grid;gap:6px;margin-top:9px}
+.of-032 .of-calorie-breakdown>div{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px}
+.of-032 .of-calorie-breakdown>div strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.of-032 .of-calorie-breakdown>div:last-of-type{padding-top:7px;border-top:1px solid var(--sep);font-size:13px}
+.of-032 .of-calorie-breakdown>span{font-size:11px;color:var(--label-3);line-height:1.45}
+.of-032 .of-chart-wrap{padding:9px 12px;gap:2px;margin:4px 0}
+.of-032 .of-chart-wrap svg{max-height:160px}
+.of-032 .of-chart-wrap>small{font-size:10px}
