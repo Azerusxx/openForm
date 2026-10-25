@@ -14,6 +14,9 @@ import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/cre
 import { omega3Pairs, mergeOmega3Pair } from '../lib/omega3-merge.js'
 import { dailyFiberReport } from '../lib/fiber-report.js'
 import { nutritionWeekAnalysis, frequentMeals, analyzeWeightTrend, similarMealSuggestions } from '../lib/nutrition-analysis.js'
+import { ACTIVITY_CATALOG, activityEnergy, latestWeightKg, activityDaySummary } from '../lib/activity-energy.js'
+import { healthStepStatus, healthStepsForDay } from '../lib/nutrition-health.js'
+import NutritionTrendChart, { trendSeries } from '../lib/nutrition-trends.jsx'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -41,8 +44,14 @@ export default function Nutrition() {
   const [showMicros, setShowMicros] = useState(true)
   const [showSupplements, setShowSupplements] = useState(false)
   const [selectedMeal, setSelectedMeal] = useState('breakfast')
-  const [activityName, setActivityName] = useState('')
-  const [activityKcal, setActivityKcal] = useState('')
+  const [activityTypeId,setActivityTypeId] = useState('walk')
+  const [activityLevel,setActivityLevel] = useState('1')
+  const [activityMinutes,setActivityMinutes] = useState('40')
+  const [activityWeightOverride,setActivityWeightOverride] = useState('')
+  const [activityDistance,setActivityDistance] = useState('')
+  const [activitySteps,setActivitySteps] = useState('')
+  const [stepInfo,setStepInfo] = useState(null)
+  const [stepsBusy,setStepsBusy] = useState(false)
   const [showActivity, setShowActivity] = useState(false)
   const [date, setDate] = useState(dateLocal)
   const [form, setForm] = useState(EMPTY)
@@ -71,11 +80,20 @@ export default function Nutrition() {
   const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
   const totals = dayTotals(data.entries, date)
   const drank = data.water?.[date] || 0
-  const burned = (data.activities || []).filter(a => a.date === date).reduce((total, a) => total + Number(a.kcal || 0), 0)
   const training = trainingEnergyForDay(gym.workouts, date, weight, gym.unit)
+  const activitySummary = activityDaySummary(data.activities || [],date,training.sessions.map(x=>({date})))
+  const burned = activitySummary.net
   const displayedBurned = burned + training.kcal
+  const activeBonus = data.profile?.includeActivityCalories ? burned : 0
+  const inferredWeight=latestWeightKg(gym.bodyweight,date,gym.unit,weight)
+  const activityWeight=Number(activityWeightOverride)>0?Number(activityWeightOverride):inferredWeight
+  const activityEstimate=activityEnergy({type:activityTypeId,level:activityLevel,minutes:activityMinutes,
+    weightKg:activityWeight,distanceKm:activityDistance,steps:activitySteps})
+  const activitySelection=ACTIVITY_CATALOG.find(a=>a.id===activityTypeId)
+  const trendData=trendSeries(data.entries,gym.bodyweight,date,weightWindow,gym.unit)
+  const chartPoints=(weightWindow==='7'||weightWindow==='30')?trendData.daily:trendData.weekly
   // Recorded and estimated exercise is displayed, but does not increase the deficit budget.
-  const remaining = Math.round((data.goals.kcal || 0) - totals.kcal)
+  const remaining = Math.round((data.goals.kcal || 0) + activeBonus - totals.kcal)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = nutritionWeekAnalysis(data.entries, date, macroGoals, gym.bodyweight, gym.unit)
@@ -273,11 +291,34 @@ export default function Nutrition() {
   const addWater = amount => update(d => ({ ...d, water: { ...d.water, [date]: Math.max(0, (d.water?.[date] || 0) + amount) } }))
   const saveActivity = e => {
     e.preventDefault()
-    const kcal = Number(activityKcal)
-    if (!activityName.trim() || !(kcal > 0) || kcal > 10000) { setNotice('Aktivität und gültige Kalorien eingeben.'); return }
-    const item = { id: globalThis.crypto?.randomUUID?.() ?? `activity-${Date.now()}`, date, name: activityName.trim(), kcal, createdAt: Date.now() }
-    if (update(d => ({ ...d, activities: [...(d.activities || []), item] }))) { setActivityName(''); setActivityKcal(''); setShowActivity(false) }
+    if(!activityEstimate){setNotice('Bitte gültige Dauer und Körpergewicht eingeben.');return}
+    if(activityTypeId==='strength' && training.sessions.length){
+      setNotice('Krafttraining ist an diesem Tag bereits im Trainingsprotokoll erfasst. Nicht doppelt speichern.');return
+    }
+    const item={...activityEstimate,id:globalThis.crypto?.randomUUID?.()??`activity-${Date.now()}`,
+      date,createdAt:Date.now()}
+    if(update(d=>({...d,activities:[...(d.activities||[]),item]}))){
+      setShowActivity(false);setActivityDistance('');setActivitySteps('')
+    }
   }
+  const fetchSteps = async ask => {
+    setStepsBusy(true)
+    try {
+      const result=await healthStepsForDay(date,{ask})
+      if(result.ok) setStepInfo(result)
+      else setNotice(result.reason==='permission'?'Health Connect Schrittzugriff nicht freigegeben.':
+        'Health Connect auf diesem Gerät nicht verfügbar.')
+    }catch(e){setNotice('Schrittimport nicht möglich: '+(e?.message||'Berechtigung oder Dienst prüfen'))}
+    finally{setStepsBusy(false)}
+  }
+  useEffect(()=>{
+    let alive=true
+    healthStepStatus().then(status=>{
+      if(status.granted && alive) healthStepsForDay(date).then(x=>{if(alive&&x.ok)setStepInfo(x)}).catch(()=>{})
+      else if(alive)setStepInfo(null)
+    }).catch(()=>{})
+    return()=>{alive=false}
+  },[date])
   useEffect(() => {
     if (!drawer && !addMenu) return
     const escape = e => { if (e.key === 'Escape') { setDrawer(false); setAddMenu(false) } }
@@ -320,7 +361,7 @@ export default function Nutrition() {
         <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={data.goals.kcal} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,data.goals.kcal) * 100))}%` }}>
           <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
         </div>
-        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt, kein Extra-Kalorienbudget</span></div>
+        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal{activeBonus>0?` + ${fmt(activeBonus)} kcal Aktivität (optional)`:''} <span>*Training geschätzt, nicht automatisch als Extra-Budget. Schrittwerte nicht doppelt gezählt.</span></div>
       </section>
       <div className="of-macro-cards" aria-label="Makro-Tagesziele">
         {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${macroGoals[key] != null && totals[key] > macroGoals[key] ? " of-over-goal" : ""}`} key={key}>
@@ -437,8 +478,33 @@ export default function Nutrition() {
       <div className="of-day-groups">
         <section className="of-meal-section of-activity-section"><h2><span className="of-section-icon"><Icon name="figureRun" /></span>Aktivität <button className="of-section-more" onClick={() => setShowActivity(v => !v)} aria-label="Aktivität hinzufügen"><Icon name="plus" /></button></h2>
           {training.sessions.map(w => <div className="of-logged-row" key={`gym-${w.id}`}><span><strong>{w.name}</strong><small>≈ {w.kcal} kcal · {w.minutes} Min. · aus Trainingsdauer und Gewicht geschätzt</small></span></div>)}
-          {(data.activities || []).filter(a => a.date === date).map(a => <div className="of-logged-row" key={a.id}><span>{a.name} <small>{a.kcal} kcal verbrannt</small></span><button aria-label="Aktivität löschen" onClick={() => update(d => ({ ...d, activities: d.activities.filter(x => x.id !== a.id) }))}><Icon name="trash" /></button></div>)}
-          {showActivity && <form className="of-activity-form" onSubmit={saveActivity}><input aria-label="Aktivität" placeholder="z. B. Spazierengehen" value={activityName} onChange={e => setActivityName(e.target.value)} required /><input aria-label="Verbrannte kcal" type="number" min="1" max="10000" placeholder="kcal" value={activityKcal} onChange={e => setActivityKcal(e.target.value)} required /><button type="submit">Speichern</button></form>}
+          {(data.activities||[]).filter(a=>a.date===date).map(a=><div className="of-logged-row" key={a.id}>
+            <span><strong>{a.name}</strong><small>{a.source==='manual_legacy'?'Manuell erfasst: '+fmt(a.kcal)+' kcal':
+              `≈ ${fmt(a.kcalNet)} zusätzliche kcal · ${a.minutes} Min. · ${fmt(a.kcalGross)} kcal brutto (MET ${a.met})`}{a.source==='health_connect'?' · Health Connect':''}</small></span>
+            <button aria-label="Aktivität löschen" onClick={()=>update(d=>({...d,activities:d.activities.filter(x=>x.id!==a.id)}))}><Icon name="trash"/></button>
+          </div>)}
+          {activitySummary.skipped>0 && <p className="of-dim">Krafttraining aus Aktivitäten nicht doppelt berücksichtigt.</p>}
+          <div className="of-step-info">
+            <span>{stepInfo?.date===date?`${stepInfo.steps.toLocaleString('de-DE')} Schritte (Health Connect)`:'Schritte aus Health Connect'}</span>
+            <button type="button" onClick={()=>fetchSteps(true)} disabled={stepsBusy}>{stepsBusy?'Lese…':stepInfo?.date===date?'Aktualisieren':'Verbinden'}</button>
+            <small>Optional. Schritte erhöhen niemals zusätzlich die Aktivitätskalorien, um Überschneidungen zu vermeiden.</small>
+          </div>
+          <label className="of-budget-toggle"><input type="checkbox" checked={!!data.profile?.includeActivityCalories}
+            onChange={e=>update(d=>({...d,profile:{...d.profile,includeActivityCalories:e.target.checked}}))}/>
+            Zusätzliche MET-Aktivitätskalorien zum Tagesziel addieren (standardmäßig aus)</label>
+          {showActivity && <form className="of-activity-form of-activity-smart" onSubmit={saveActivity}>
+            <label>Aktivität<select value={activityTypeId} onChange={e=>{setActivityTypeId(e.target.value);setActivityLevel('1')}}>
+              {ACTIVITY_CATALOG.map(a=><option value={a.id} key={a.id}>{a.label}</option>)}</select></label>
+            <label>Intensität<select value={activityLevel} onChange={e=>setActivityLevel(e.target.value)}>
+              {activitySelection?.levels.map(([label],i)=><option key={i} value={String(i)}>{label}</option>)}</select></label>
+            <label>Dauer (Min.)<input aria-label="Dauer" type="number" min="1" max="720" value={activityMinutes} onChange={e=>setActivityMinutes(e.target.value)} required/></label>
+            <label>Gewicht (kg, optional überschreiben)<input aria-label="Aktivitätsgewicht" type="number" min="25" max="300" step=".1" value={activityWeightOverride} placeholder={inferredWeight!=null?String(inferredWeight):'Bitte eintragen'} onChange={e=>setActivityWeightOverride(e.target.value)}/></label>
+            <label>Distanz (km, optional)<input type="number" min="0" max="500" step=".1" value={activityDistance} onChange={e=>setActivityDistance(e.target.value)}/></label>
+            <label>Schritte (optional)<input type="number" min="0" max="150000" value={activitySteps} onChange={e=>setActivitySteps(e.target.value)}/></label>
+            <div className="of-activity-result"><strong>{activityEstimate?`≈ ${activityEstimate.kcalNet} kcal netto`:'Gewicht oder Dauer fehlt'}</strong>
+              <small>{activityEstimate?`${activityEstimate.kcalGross} kcal brutto · MET ${activityEstimate.met}`:'Kein erfundener Kalorienwert'}</small></div>
+            <button type="submit" disabled={!activityEstimate}>Aktivität speichern</button>
+          </form>}
           {!showActivity && <button className="of-meal-add" onClick={() => setShowActivity(true)} aria-label="Aktivität erfassen"><Icon name="plus" /></button>}
         </section>
         {MEAL_GROUPS.filter(g => g.id !== 'other' || meals.some(m => (m.mealType || 'other') === 'other')).map(group => {
@@ -547,6 +613,8 @@ export default function Nutrition() {
         </div>
         {fullWeightTrend.weights.length ? <>
           <p className="of-dim">{fullWeightTrend.weights.length} Wägungen im gewählten Zeitraum · {fullWeightTrend.weeklyMeans.length} Wochen mit Messungen</p>
+          <NutritionTrendChart data={chartPoints} field="weight" title="Körpergewicht" unit="kg" target={gym.targetW!=null?Number(gym.targetW)*(gym.unit==='lb'?.45359237:1):null}/>
+          <NutritionTrendChart data={trendData.weekly} field="weight" title="Wochenmittelgewicht" unit="kg" color="#e8ae40"/>
           <div className="of-analysis-weights">{fullWeightTrend.weeklyMeans.map(w=><div key={w.date}><span>Woche ab {w.date.slice(5)} · {w.measurements} Messung{w.measurements!==1?'en':''}</span><strong>Ø {fmt(w.mean)} kg</strong></div>)}</div>
           <p>{fullWeightTrend.weightDelta === null ? 'Für eine Veränderung zwischen Wochenmittelwerten sind mindestens zwei Wochen nötig.' : `Veränderung erster zu letzter Wochenmittelung: ${fullWeightTrend.weightDelta>0?'+':''}${fmt(fullWeightTrend.weightDelta)} kg`}</p>
           {fullWeightTrend.limited && <p className="of-dim">Einzelne Wochen enthalten nur eine Messung. Ihre Mittelwerte sind besonders unsicher.</p>}
@@ -559,7 +627,10 @@ export default function Nutrition() {
       <section className="card of-week of-analysis">
         <h2>Ernährung und Gewicht gemeinsam</h2>
         <p className="of-dim">Ernährung: Ø {week.daysLogged?fmt(week.average.kcal)+' kcal':'keine Daten'} an {week.daysLogged}/7 Tagen. Gewicht: {fullWeightTrend.weeklyMeans.length} Wochenmittel im gewählten Zeitraum. Unterschiedliche Zeitfenster erlauben keine direkte Ursachenbewertung.</p>
-        <h3>Ø Abweichung vom Tagesziel</h3>
+        <h3>Ernährungstrends ({weightWindow==='all'?'Gesamter Zeitraum':weightWindow+' Tage'})</h3>
+        <NutritionTrendChart data={chartPoints} field="kcal" title="Kalorien" unit="kcal" target={macroGoals.kcal} bars color="#ff443c" minZero/>
+        <NutritionTrendChart data={chartPoints} field="protein" title="Protein" unit="g" target={macroGoals.protein} bars color="#54a6ef" minZero/>
+                <h3>Ø Abweichung vom Tagesziel</h3>
         <div className="of-analysis-targets">{[['kcal','Kalorien','kcal'],['protein','Protein','g'],['carbs','Kohlenhydrate','g'],['fat','Fett','g']].map(([key,label,unit])=><div key={key}><span>{label}</span><strong>{week.averageDeviation[key]===null?'–':`${week.averageDeviation[key]>0?'+':''}${fmt(week.averageDeviation[key])} ${unit}`}</strong></div>)}</div>
         <h3>Größte Kalorienbeiträge der Woche</h3>
         {week.mealContributions.length?<div className="of-analysis-targets">{week.mealContributions.map(item=><div key={item.name}><span>{item.name} ({item.count}×)</span><strong>{fmt(item.kcal)} kcal</strong></div>)}</div>:<p className="of-dim">Noch keine Einträge vorhanden.</p>}
