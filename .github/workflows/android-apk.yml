@@ -67,6 +67,10 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js
 
+      - name: Mikronaehrstoffe und Kreatin-Korrektur testen
+        working-directory: frontend
+        run: npx vitest run src/lib/nutrient-overview.test.js src/lib/supplement-editor.test.js src/lib/creatine-repair.test.js src/lib/omega3-merge.test.js src/lib/fiber-report.test.js src/lib/ai-fiber.test.js src/lib/ai-micros.test.js src/lib/nutrition-analysis.test.js src/lib/nutrition-trend.test.js
+
       - name: Mobile Web-App bauen
         working-directory: frontend
         env:
@@ -141,7 +145,7 @@ jobs:
           pkg=$("$aapt" dump badging "$apk" | grep '^package:' | head -1)
           echo "$pkg"
           echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
-          echo "$pkg" | grep -F "versionName='0.3.7h'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
+          echo "$pkg" | grep -F "versionName='0.4.1a'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
           echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
 
       - name: APK als Artifact hochladen
