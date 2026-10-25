@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, forwardRef, useSyncExternalStore } from 'r
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useStore, DEF, hasData } from '../store/useStore.js'
 import { healthStatus, loadHealth, enableHealth, disableHealth, openHealthConnect, onHealthChange } from '../lib/health-sync.js'
+import { healthStepStatus, healthStepsForDay, healthWalkingSessionsForDay } from '../lib/nutrition-health.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { speedUnitOf } from '../lib/speed.js'
 import { formulaOf, FORMULA_NAMES } from '../lib/onerm.js'
@@ -1520,8 +1521,13 @@ function HealthConnectCard({ S, toast }) {
   const [st, setSt] = useState(null)
   const [h, setH] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [readStatus, setReadStatus] = useState(null)
+  const [lastSync, setLastSync] = useState(null)
+  const [readBusy, setReadBusy] = useState(false)
+  const refreshRead = () => healthStepStatus().then(setReadStatus).catch(() => setReadStatus({status:'error',granted:false}))
   useEffect(() => {
     let gone = false
+    refreshRead()
     Promise.all([healthStatus(), loadHealth()]).then(([s, f]) => { if (!gone) { setSt(s); setH(f) } }).catch(() => {})
     const off = onHealthChange(f => { if (!gone) setH(f) })
     return () => { gone = true; off() }
@@ -1565,9 +1571,28 @@ function HealthConnectCard({ S, toast }) {
     ],
   })
 
+  const askRead = async () => {
+    setReadBusy(true)
+    try {
+      const result = await healthStepsForDay(new Date().toLocaleDateString('sv-SE'), {ask:true})
+      await refreshRead()
+      if(result.ok){setLastSync({time:Date.now(),steps:result.steps}); toast('Health Connect: Schritte gelesen')}
+      else toast(result.reason==='permission'?'Berechtigung nicht erteilt':'Health Connect nicht verfügbar')
+    } catch(e){toast('Schritte konnten nicht gelesen werden')}
+    setReadBusy(false)
+  }
+  const readWalking = async () => {
+    setReadBusy(true)
+    try {
+      const result=await healthWalkingSessionsForDay(new Date().toLocaleDateString('sv-SE'))
+      if(result.ok){setLastSync(x=>({...x,time:Date.now(),walking:result.sessions.length}));toast(result.sessions.length+' Spaziergänge gefunden (nur Vorschau)')}
+      else toast('Berechtigung für Aktivitäten fehlt oder Health Connect nicht verfügbar')
+    } catch(e){toast('Aktivitäten konnten nicht gelesen werden')}
+    setReadBusy(false)
+  }
   return (
-    <Section title={t('Health Connect')}
-      footer={h.on ? t('Workouts and weigh-ins go to Health Connect when you finish or change them. openGym reads nothing back.') : null}>
+    <Section title="Health Connect"
+      footer="Zentrale Verwaltung. Der Schrittimport ist optional; keine automatische Gutschrift von Kalorien.">
       <Row icon="heart" iconTint="var(--red)" title={t('Write to Health Connect')}
         subtitle={t('Finished workouts and weigh-ins, from this phone only.')}>
         <Switch checked={!!h.on} disabled={busy} onChange={v => (v ? turnOn() : askOff())} />
@@ -1576,6 +1601,17 @@ function HealthConnectCard({ S, toast }) {
         title={t('Permission withdrawn. Tap to allow again')} accessory="chevron" onClick={turnOn} />}
       {h.on && <Row icon="list" iconTint="var(--blue)" title={t('Open Health Connect')}
         accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />}
+      <Row icon="figureRun" iconTint="var(--teal)" title="Schritte lesen"
+        subtitle={readStatus?.granted ? 'Freigegeben · Schritte nur als Information' : 'Optional · Zugriff noch nicht freigegeben'}
+        accessory="chevron" onClick={askRead} disabled={readBusy} />
+      <Row icon="heart" iconTint="var(--teal)" title="Spaziergänge prüfen"
+        subtitle={readStatus?.exerciseGranted ? 'Freigegeben · keine automatische Übernahme' : 'Berechtigung für Aktivitäten erforderlich'}
+        accessory="chevron" onClick={readWalking} disabled={readBusy || !readStatus?.exerciseGranted} />
+      <Row icon="list" iconTint="var(--blue)" title="Berechtigungen verwalten"
+        subtitle="Zugriff jederzeit in Health Connect ändern"
+        accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />
+      <Row icon="check" iconTint="var(--green)" title="Letzte Synchronisierung"
+        subtitle={lastSync?.time ? new Date(lastSync.time).toLocaleString('de-AT') + (lastSync.steps!=null?' · '+lastSync.steps+' Schritte':'') : 'In dieser Sitzung noch nicht synchronisiert'} />
     </Section>
   )
 }
