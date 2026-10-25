@@ -233,7 +233,7 @@ export default function Nutrition() {
         <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt, kein Extra-Kalorienbudget</span></div>
       </section>
       <div className="of-macro-cards" aria-label="Makro-Tagesziele">
-        {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}`} key={key}>
+        {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${data.goals[key] != null && totals[key] > data.goals[key] ? " of-over-goal" : ""}`} key={key}>
           <strong><i />{label}</strong><div className="of-mini-track"><span style={{width:`${data.goals[key] == null ? 0 : Math.min(100, 100*totals[key]/Math.max(1,data.goals[key]))}%`}} /></div>
           <span>{data.goals[key] == null ? `${fmt(totals[key])} g erfasst` : `${fmt(totals[key])} / ${fmt(data.goals[key])} g`}</span>
         </div>)}
