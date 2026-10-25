@@ -54,6 +54,9 @@ export default function Nutrition() {
   const [suppName, setSuppName] = useState('')
   const [suppDose, setSuppDose] = useState('')
   const [suppUnit, setSuppUnit] = useState('g')
+  const [suppNutrient, setSuppNutrient] = useState('magnesium')
+  const [suppAmount, setSuppAmount] = useState('')
+  const [editingSupplement, setEditingSupplement] = useState(null)
   const fileInput = useRef(null)
   const backupInput = useRef(null)
   const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
@@ -68,6 +71,7 @@ export default function Nutrition() {
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = weeklyNutrition(data.entries, date, macroGoals)
   const micros = dayMicros(data.entries, date)
+  for (const s of data.supplements) if (s.logs.includes(date)) for (const [key, amount] of Object.entries(s.nutrients || {})) micros[key] = Math.round(((micros[key] || 0) + amount * s.dose) * 100) / 100
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -175,8 +179,11 @@ export default function Nutrition() {
   const addSupplement = e => {
     e.preventDefault()
     if (!suppName.trim() || !(Number(suppDose) > 0)) { setNotice('Name und Dosis prüfen.'); return }
-    const supplement = { id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`, name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, logs: [] }
-    if (update(d => ({ ...d, supplements: [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose('') }
+    const previous = data.supplements.find(s => s.id === editingSupplement)
+    const amount = suppAmount === '' ? null : Number(suppAmount)
+    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Nährstoffmenge prüfen.'); return }
+    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients: amount === null ? {} : { [suppNutrient]: amount }, logs: previous?.logs || [] }
+    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setEditingSupplement(null) }
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
@@ -255,7 +262,8 @@ export default function Nutrition() {
           <div className="of-nutrient-detail">{MICRO_NUTRIENTS.map(({key,label,unit}) => <div key={key}><span>{label}</span><strong>{micros[key] == null ? 'Nicht erfasst' : `${fmt(micros[key])} ${unit}`} <small className="of-dim">/ Richtwert {fmt(MICRO_GUIDES[key])} {unit}</small></strong></div>)}</div>
           <h3>Supplements heute</h3>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
-            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}</small></span></label>
+            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v * s.dose)} ${nutrient.unit} ${nutrient.label}` : '' }).join('')}</small></span></label>
+            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)) }}><Icon name="pencil" /></button>
             <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
           </div>)}
           {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
@@ -263,6 +271,8 @@ export default function Nutrition() {
             <input aria-label="Supplementname" placeholder="z. B. Kreatin" value={suppName} onChange={e => setSuppName(e.target.value)} required />
             <input aria-label="Dosis" type="number" min="0.01" step="any" placeholder="Dosis" value={suppDose} onChange={e => setSuppDose(e.target.value)} required />
             <select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option><option value="piece">Stk.</option></select>
+            <label className="of-supp-content-label">Enthaltener Nährstoff pro {suppUnit === "piece" ? "Stück" : suppUnit}<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
+            <input aria-label="Nährstoffmenge pro Einheit" type="number" min="0" step="any" placeholder={`Menge (${MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || "mg"})`} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} />
             <button type="submit" aria-label="Supplement hinzufügen"><Icon name="plus" /></button>
           </form>
           <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Nährstoffmengen werden ohne Produktangaben nicht automatisch berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
