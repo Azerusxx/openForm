@@ -13,7 +13,7 @@ import { nutrientOverview } from '../lib/nutrient-overview.js'
 import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/creatine-repair.js'
 import { omega3Pairs, mergeOmega3Pair } from '../lib/omega3-merge.js'
 import { dailyFiberReport } from '../lib/fiber-report.js'
-import { nutritionWeekAnalysis, frequentMeals } from '../lib/nutrition-analysis.js'
+import { nutritionWeekAnalysis, frequentMeals, analyzeWeightTrend, similarMealSuggestions } from '../lib/nutrition-analysis.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -79,6 +79,9 @@ export default function Nutrition() {
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = nutritionWeekAnalysis(data.entries, date, macroGoals, gym.bodyweight, gym.unit)
+  const [weightWindow, setWeightWindow] = useState('30')
+  const fullWeightTrend = analyzeWeightTrend(gym.bodyweight, date, weightWindow === 'all' ? 'all' : Number(weightWindow), gym.unit)
+  const suggestedMeals = similarMealSuggestions(data.entries)
   const frequent = frequentMeals(data.entries)
   const nutrientRows = nutrientOverview(data, date)
   const fiberReport = dailyFiberReport(data.entries, date)
@@ -524,6 +527,7 @@ export default function Nutrition() {
         <h2>Ernährungsanalyse · 7 Tage</h2>
         <p className="of-dim">Durchschnitte nur aus Tagen mit Ernährungseinträgen. Nicht erfasste Tage sind keine Null-Tage. Einträge können unvollständig sein.</p>
         <div className="of-analysis-coverage"><strong>{week.daysLogged}/7 Tage erfasst</strong><span>{fmt(week.loggedCoverage)} % Abdeckung</span></div>
+        <p className="of-analysis-quality">{week.quality === 'none' ? 'Noch keine auswertbaren Ernährungstage.' : week.quality === 'insufficient' ? 'Zu wenig Daten für eine Wochentendenz (unter 3 protokollierte Tage).' : week.quality === 'preliminary' ? 'Vorläufige Tendenz: erst 3–4 protokollierte Tage.' : 'Mindestens 5 Tage protokolliert. Vollständigkeit der Mahlzeiten trotzdem prüfen.'}</p>
         <div className="of-analysis-kpis">{[['kcal','Kalorien','kcal'],['protein','Protein','g'],['carbs','Kohlenhydrate','g'],['fat','Fett','g']].map(([key,label,unit]) => <div key={key}><span>Ø {label}</span><strong>{week.daysLogged ? fmt(week.average[key]) : '–'} <small>{unit}</small></strong></div>)}</div>
         <h3>Tag für Tag</h3>
         <div className="of-analysis-days">{week.days.map(d=><div key={d.date} className={'of-analysis-day' + (!d.consumed ? ' of-analysis-empty' : '')}>
@@ -538,16 +542,33 @@ export default function Nutrition() {
       </section>
       <section className="card of-week of-analysis">
         <h2>Gewichtstrend</h2>
-        {week.weights.length ? <>
-          <div className="of-analysis-weights">{week.weights.map((w,i)=><div key={w.date+'-'+i}><span>{w.date.slice(5)}</span><strong>{fmt(w.weight)} kg</strong></div>)}</div>
-          <p>{week.weightDelta == null ? 'Für einen Trend brauchen wir mindestens zwei Messungen innerhalb der sieben Tage.' : `Veränderung zwischen erster und letzter Messung: ${week.weightDelta > 0 ? '+' : ''}${fmt(week.weightDelta)} kg`}</p>
-        </> : <p className="of-dim">Keine Gewichtsmessungen innerhalb dieser sieben Tage gespeichert. Gewicht kannst du in der Körperentwicklung erfassen.</p>}
-        <p className="of-dim">Kurzfristige Schwankungen durch Wasser und Verdauung sind normal. Aus sieben Tagen lässt sich kein zuverlässiger Fettverlust ableiten.</p>
+        <div className="of-analysis-range" role="group" aria-label="Gewicht Zeitfenster">
+          {[['7','7 T.'],['30','30 T.'],['90','90 T.'],['all','Alle']].map(([value,label])=><button key={value} type="button" className={weightWindow===value?'active':''} onClick={()=>setWeightWindow(value)}>{label}</button>)}
+        </div>
+        {fullWeightTrend.weights.length ? <>
+          <p className="of-dim">{fullWeightTrend.weights.length} Wägungen im gewählten Zeitraum · {fullWeightTrend.weeklyMeans.length} Wochen mit Messungen</p>
+          <div className="of-analysis-weights">{fullWeightTrend.weeklyMeans.map(w=><div key={w.date}><span>Woche ab {w.date.slice(5)} · {w.measurements} Messung{w.measurements!==1?'en':''}</span><strong>Ø {fmt(w.mean)} kg</strong></div>)}</div>
+          <p>{fullWeightTrend.weightDelta === null ? 'Für eine Veränderung zwischen Wochenmittelwerten sind mindestens zwei Wochen nötig.' : `Veränderung erster zu letzter Wochenmittelung: ${fullWeightTrend.weightDelta>0?'+':''}${fmt(fullWeightTrend.weightDelta)} kg`}</p>
+          {fullWeightTrend.limited && <p className="of-dim">Einzelne Wochen enthalten nur eine Messung. Ihre Mittelwerte sind besonders unsicher.</p>}
+          <details className="of-analysis-weighins"><summary>Alle Einzelmessungen ({fullWeightTrend.weights.length})</summary>
+            <div className="of-analysis-weights">{fullWeightTrend.weights.map(w=><div key={w.date}><span>{w.date}</span><strong>{fmt(w.weight)} kg</strong></div>)}</div>
+          </details>
+        </> : <p className="of-dim">Für diesen Zeitraum sind keine Gewichtsmessungen gespeichert.</p>}
+        <p className="of-dim">Auch Wochenmittelwerte reagieren auf Wasser und Messzeitpunkte. Das ist keine Fettverlustmessung.</p>
+      </section>
+      <section className="card of-week of-analysis">
+        <h2>Ernährung und Gewicht gemeinsam</h2>
+        <p className="of-dim">Ernährung: Ø {week.daysLogged?fmt(week.average.kcal)+' kcal':'keine Daten'} an {week.daysLogged}/7 Tagen. Gewicht: {fullWeightTrend.weeklyMeans.length} Wochenmittel im gewählten Zeitraum. Unterschiedliche Zeitfenster erlauben keine direkte Ursachenbewertung.</p>
+        <h3>Ø Abweichung vom Tagesziel</h3>
+        <div className="of-analysis-targets">{[['kcal','Kalorien','kcal'],['protein','Protein','g'],['carbs','Kohlenhydrate','g'],['fat','Fett','g']].map(([key,label,unit])=><div key={key}><span>{label}</span><strong>{week.averageDeviation[key]===null?'–':`${week.averageDeviation[key]>0?'+':''}${fmt(week.averageDeviation[key])} ${unit}`}</strong></div>)}</div>
+        <h3>Größte Kalorienbeiträge der Woche</h3>
+        {week.mealContributions.length?<div className="of-analysis-targets">{week.mealContributions.map(item=><div key={item.name}><span>{item.name} ({item.count}×)</span><strong>{fmt(item.kcal)} kcal</strong></div>)}</div>:<p className="of-dim">Noch keine Einträge vorhanden.</p>}
+        <p className="of-dim">Beiträge zeigen konsumierte Kalorien, nicht den Anteil an einer Zielüberschreitung. KH-Ziele sind Richtwerte.</p>
       </section>
       <section className="card of-week of-analysis">
         <h2>Häufige Mahlzeiten</h2>
         <p className="of-dim">Tippen, um die zuletzt verwendete Portion für den ausgewählten Tag erneut einzutragen.</p>
-        {frequent.length ? <div className="of-analysis-frequent">{frequent.map(item=><div key={item.name+item.latest.unit}><span><strong>{item.name}</strong><small>{item.count}× · {fmt(item.energy)} kcal</small></span><button type="button" onClick={()=>log(item.latest,item.latest.mealType||selectedMeal)}>+ Eintragen</button></div>)}</div> : <p>Erfasse zuerst Mahlzeiten, um sie hier wiederholen zu können.</p>}
+        {suggestedMeals.length ? <div className="of-analysis-frequent">{suggestedMeals.map(item=><div key={item.name+item.latest.unit}><span><strong>{item.name}</strong><small>{item.count}× · {fmt(item.energy)} kcal{item.related.length?' · Ähnlich: '+item.related.join(', '):''}</small></span><button type="button" onClick={()=>log(item.latest,item.latest.mealType||selectedMeal)}>+ Eintragen</button></div>)}</div> : <p>Erfasse zuerst Mahlzeiten, um sie hier wiederholen zu können.</p>}
       </section>
     </>}
     {tab === 'backup' && <>
