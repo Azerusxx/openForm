@@ -188,7 +188,7 @@ export default function RestTimer() {
     <div id="timer" className={'rest' + (timer.paused ? ' paused' : '') + (timer.kind === 'switch' ? ' switch' : '') + (timer.ready ? ' ready' : '')}>
       <div className="bar" aria-hidden="true"><i style={{ width: pct + '%' }} /></div>
       <button type="button" className="tclock" onClick={() => setMinimized(false)}
-        aria-label={(timer.ready ? t('Ready') : clock(timer.left)) + '. Kreis-Pausentimer öffnen'>
+        aria-label={(timer.ready ? t('Ready') : clock(timer.left)) + '. Kreis-Pausentimer öffnen'}>
         <span className="t" role={timer.ready ? 'status' : undefined} data-alt={timer.ready ? '0:00' : t('Ready')}>{timer.ready ? t('Ready') : clock(timer.left)}</span>
         <span className="lbl">{label}<Icon name="chevronUp" /></span>
       </button>
