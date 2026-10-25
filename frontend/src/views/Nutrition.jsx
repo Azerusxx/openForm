@@ -606,8 +606,8 @@ export default function Nutrition() {
         </div>
         {fullWeightTrend.weights.length ? <>
           <p className="of-dim">{fullWeightTrend.weights.length} Wägungen im gewählten Zeitraum · {fullWeightTrend.weeklyMeans.length} Wochen mit Messungen</p>
-          <NutritionTrendChart data={chartPoints} field="weight" title="Körpergewicht" unit="kg" target={gym.targetW!=null?Number(gym.targetW)*(gym.unit==='lb'?.45359237:1):null}/>
-          <NutritionTrendChart data={trendData.weekly} field="weight" title="Wochenmittelgewicht" unit="kg" color="#e8ae40"/>
+          <NutritionTrendChart data={chartPoints} field="weight" title="Körpergewicht" unit="kg" connectMissing target={gym.targetW!=null?Number(gym.targetW)*(gym.unit==='lb'?.45359237:1):null}/>
+          <NutritionTrendChart data={trendData.weekly} field="weight" title="Wochenmittelgewicht" unit="kg" connectMissing color="#e8ae40"/>
           <div className="of-analysis-weights">{fullWeightTrend.weeklyMeans.map(w=><div key={w.date}><span>Woche ab {w.date.slice(5)} · {w.measurements} Messung{w.measurements!==1?'en':''}</span><strong>Ø {fmt(w.mean)} kg</strong></div>)}</div>
           <p>{fullWeightTrend.weightDelta === null ? 'Für eine Veränderung zwischen Wochenmittelwerten sind mindestens zwei Wochen nötig.' : `Veränderung erster zu letzter Wochenmittelung: ${fullWeightTrend.weightDelta>0?'+':''}${fmt(fullWeightTrend.weightDelta)} kg`}</p>
           {fullWeightTrend.limited && <p className="of-dim">Einzelne Wochen enthalten nur eine Messung. Ihre Mittelwerte sind besonders unsicher.</p>}
