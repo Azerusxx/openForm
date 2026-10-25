@@ -35,6 +35,7 @@ export default function Nutrition() {
   const [showWater, setShowWater] = useState(false)
   const [showNutritionExtras, setShowNutritionExtras] = useState(false)
   const [showMicros, setShowMicros] = useState(false)
+  const [showSupplements, setShowSupplements] = useState(false)
   const [selectedMeal, setSelectedMeal] = useState('breakfast')
   const [activityName, setActivityName] = useState('')
   const [activityKcal, setActivityKcal] = useState('')
@@ -79,6 +80,7 @@ export default function Nutrition() {
     if (Number.isFinite(value) && value > 0) supplementMicros[key] = (supplementMicros[key] || 0) + value
   }
   const micros = Object.fromEntries(MICRO_NUTRIENTS.map(({key}) => [key, Math.round(((foodMicros[key] || 0) + (supplementMicros[key] || 0)) * 100) / 100]))
+  const hasMicros = MICRO_NUTRIENTS.some(({key}) => Number(micros[key]) > 0)
 
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
@@ -269,7 +271,7 @@ export default function Nutrition() {
           <button type="button" className="of-micros-toggle" aria-expanded={showMicros} onClick={() => setShowMicros(v => !v)}>
             <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{Object.values(micros).filter(v => Number(v) > 0).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
-          {showMicros && <div className="of-micros-content">
+          {(showMicros || (hasMicros && !data.supplements.length)) && <div className="of-micros-content">
             <p className="of-dim">Nur Nährstoffe mit erfasster Menge werden angezeigt. Fehlende Angaben sind unbekannt, nicht null. Richtwerte dienen zur Orientierung.</p>
             {MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).length
               ? <div className="of-micro-cards">{MICRO_NUTRIENTS.filter(({key}) => Number(micros[key]) > 0).map(({key,label,unit}) => {
@@ -283,7 +285,12 @@ export default function Nutrition() {
                 })}</div>
               : <p className="of-dim">Noch keine Mikronährstoffe aus Lebensmitteln oder bestätigten Supplements erfasst.</p>}
           </div>}
-          <h3>Supplements heute</h3>
+          <button type="button" className="of-micros-toggle of-supplements-toggle" aria-expanded={showSupplements} onClick={() => { setShowSupplements(v => !v); setSuppFormOpen(false); setEditingSupplement(null) }}>
+            <span>Supplements heute</span>
+            <span>{data.supplements.filter(s => s.logs.includes(date)).length}/{data.supplements.length} eingenommen <Icon name={showSupplements ? 'chevronUp' : 'chevronDown'} /></span>
+          </button>
+          {!showSupplements && <p className="of-dim of-supp-hint">{data.supplements.length ? 'Hier kannst du deine täglichen Einnahmen abhaken und die hinterlegten Dosierungen bearbeiten.' : 'Hier einmal deine Supplements und Tagesdosen hinterlegen, danach täglich abhaken.'}</p>}
+          {showSupplements && <>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
             <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
@@ -305,6 +312,7 @@ export default function Nutrition() {
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
           </form>}
           <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Wirkstoffmengen werden nur mit hinterlegtem Gehalt berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
+          </>}
         </div>}
       </section>
       <div className="of-plus-zone"><button className="of-big-plus" aria-label="Lebensmittel hinzufügen" aria-expanded={addMenu} onClick={() => setAddMenu(x => !x)}><Icon name={addMenu ? 'xmark' : 'plus'} /></button><p>{meals.length ? 'Mahlzeit hinzufügen' : 'Tippe auf +, um deine erste Mahlzeit zu erfassen'}</p>
