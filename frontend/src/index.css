@@ -47,6 +47,10 @@
   --on-acc:#000000;
   --acc-soft: color-mix(in srgb, var(--acc) 16%, transparent);
   --acc-line: color-mix(in srgb, var(--acc) 38%, transparent);
+  /* Shared appearance palette. Both nutrition and illness follow accent changes. */
+  --food-accent:var(--acc);
+  --food-on-accent:var(--on-acc);
+  --illness-color:#34c5d8; /* fallback until applyAccent computes its opposite hue */
 
   /* geometry */
   --r-sm:8px; --r:12px; --r-lg:16px; --r-xl:22px; --r-card:14px;
@@ -432,7 +436,7 @@ h4.sec{
 #tabbar button.start:active .cir,#tabbar button.food:active .cir{transform:scale(.93)}
 #tabbar button.start .cir .icn,#tabbar button.food .cir .icn{font-size:26px;--icon-stroke:2;color:inherit;opacity:1}
 #tabbar button.start span{color:var(--acc);font-weight:600}
-#tabbar button.food span{color:var(--orange);font-weight:600}
+#tabbar button.food span{color:var(--food-accent);font-weight:600}
 #tabbar button.start .tab-time{font-variant-numeric:tabular-nums}
 /* `.cir` is itself a <span>, so the label rules above and below reach it too and
    outrank the `.cir` block — which is how the running state ended up painting an
@@ -442,10 +446,10 @@ h4.sec{
 /* Two equal-size floating actions. Food keeps the flame, with a warm orange disc;
    Training keeps the green dumbbell disc. Same size and spacing on small screens. */
 #tabbar button.food .cir{
-  background:var(--orange);color:#000;
-  box-shadow:0 6px 18px -4px color-mix(in srgb,var(--orange) 55%,transparent)
+  background:var(--food-accent);color:var(--food-on-accent);
+  box-shadow:0 6px 18px -4px color-mix(in srgb,var(--food-accent) 55%,transparent)
 }
-#tabbar button.food.on .cir{outline:2px solid var(--orange);outline-offset:3px}
+#tabbar button.food.on .cir{outline:2px solid var(--food-accent);outline-offset:3px}
 #tabbar button.start.on .cir{outline:2px solid var(--acc);outline-offset:3px}
 #tabbar button.start.rec .cir{background:var(--orange);color:#000;box-shadow:0 6px 18px -4px color-mix(in srgb,var(--orange) 55%,transparent)}
 #tabbar button.start.rec span{color:var(--orange)}
@@ -2223,7 +2227,7 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .progression-review-actions span{color:var(--label-3);font-size:11px}
 
 /* openForm 0.3.7e: sick days are cyan, complementary to orange training accents. */
-:root{--illness-color:#34c5d8}
+/* --illness-color is recomputed from the selected accent in applyAccent(). */
 .wday .dot.sick,.cal-d i.sick{background:var(--illness-color)}
 .cal-d.illness{box-shadow:inset 0 0 0 2px var(--illness-color);background:color-mix(in srgb,var(--illness-color) 12%,var(--surface))}
 .cal-d.illness.today{box-shadow:inset 0 0 0 2px var(--illness-color),0 0 0 1px var(--acc)}
@@ -2246,3 +2250,14 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .illness-advice{font-size:12px;border-left:3px solid var(--illness-color);padding:8px 10px;background:var(--surface-2);border-radius:6px}
 .illness-advice strong{color:var(--illness-color)}
 .illness-advice p{color:var(--label-2);margin:7px 0}
+
+
+/* 0.3.7f: heatmap illness-only days use the complement, workout days retain
+   their training-volume accent and gain a complementary inset outline. */
+.hm-c.illness:not(.illness-workout){background:var(--illness-color);box-shadow:none}
+.hm-c.illness.illness-workout{box-shadow:inset 0 0 0 2px var(--illness-color)}
+.hm-c.illness.today{box-shadow:inset 0 0 0 2px var(--illness-color),0 0 0 1.5px var(--label)}
+.hm-c.illness.future{opacity:.65}
+.hm-legend{justify-content:flex-end;flex-wrap:wrap;gap:4px 6px}
+.hm-illness-key{display:inline-flex;gap:5px;align-items:center;margin-inline-start:7px;white-space:nowrap}
+.hm-illness-key .hm-c{display:inline-block;width:10px;height:10px}

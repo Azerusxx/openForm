@@ -5,6 +5,7 @@ import { t, tn } from '../lib/i18n.js'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { Segmented } from './ui.jsx'
 import { dayNoteOf, dayNoteLine } from '../lib/day-notes.js'
+import { illnessOnDay } from '../lib/illness.js'
 
 const normalizeMetric = value => value === 'vol' ? 'vol' : 'time'
 
@@ -71,10 +72,20 @@ export default function Heatmap({ S, onDay, metric: selectedMetric, onMetricChan
       // A day off with a note (#261): outlined, its note in the tooltip, and tappable like a
       // trained day so the note can be read (and changed) on a phone too.
       const note = !a && dayNoteOf(S, key)
-      const cls = 'hm-c l' + level(a) + (note ? ' noted' : '') + (key === todayISO() ? ' today' : '') + (day > today ? ' future' : '')
-      cells.push(<div key={d} className={cls}
-        title={key + (a ? ` · ${tn('{0} workout', '{0} workouts', a.n)} · ${t('{0} min', a.min)} · ${fmtVol(a.vol, S.unit)}` : note ? ` · ${dayNoteLine(note, t)}` : '')}
-        {...tappable(a || note ? () => onDay?.(key) : undefined)} />)
+      const sickPeriod = illnessOnDay(S, key, todayISO())
+      // Legacy single-day "sick" notes stay compatible with the new date ranges.
+      const sick = !!sickPeriod || dayNoteOf(S, key)?.tag === 'sick'
+      const cls = 'hm-c l' + level(a) + (sick ? ' illness' : '') +
+        (sick && a ? ' illness-workout' : '') + (note && !sick ? ' noted' : '') +
+        (key === todayISO() ? ' today' : '') + (day > today ? ' future' : '')
+      const details = [
+        key,
+        ...(sick ? ['Krank' + (sickPeriod?.start ? ' seit ' + sickPeriod.start : '')] : []),
+        ...(a ? [tn('{0} workout', '{0} workouts', a.n), t('{0} min', a.min), fmtVol(a.vol, S.unit)] : []),
+        ...(note && !sick ? [dayNoteLine(note, t)] : []),
+      ].join(' · ')
+      cells.push(<div key={d} className={cls} title={details}
+        aria-label={details} {...tappable(a || note || sick ? () => onDay?.(key) : undefined)} />)
     }
     cols.push(<div key={wk} className="hm-col">{cells}</div>)
   }
@@ -89,6 +100,13 @@ export default function Heatmap({ S, onDay, metric: selectedMetric, onMetricChan
         <div className="hm-grid">{cols}</div>
       </div>
     </div>
-    <div className="hm-legend">{t(metric === 'vol' ? 'Less volume' : 'Less time')} <div className="hm-c l0" /><div className="hm-c l1" /><div className="hm-c l2" /><div className="hm-c l3" /><div className="hm-c l4" /> {t(metric === 'vol' ? 'More volume' : 'More time')}</div>
+    <div className="hm-legend">
+      <span>{t(metric === 'vol' ? 'Less volume' : 'Less time')}</span>
+      <div className="hm-c l0" /><div className="hm-c l1" /><div className="hm-c l2" />
+      <div className="hm-c l3" /><div className="hm-c l4" />
+      <span>{t(metric === 'vol' ? 'More volume' : 'More time')}</span>
+      <span className="hm-illness-key"><i className="hm-c illness" aria-hidden="true" /> Krank</span>
+      <span className="hm-illness-key"><i className="hm-c l3 illness illness-workout" aria-hidden="true" /> Training + krank</span>
+    </div>
   </>
 }
