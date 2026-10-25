@@ -45,3 +45,26 @@ export function verifyCompleteSnapshot(original, restored) {
  const lost=Object.keys(one).filter(k=>one[k]!==two[k])
  return {ok:lost.length===0,missing:lost,before:one,after:two}
 }
+
+/** Verify all imported nutrition records without assuming every field is an array.
+ * The existing local values win on identity conflicts. Water is a dated object.
+ */
+export function verifyNutritionRestore(imported, restored) {
+ const n=normalizedNutrition(imported), r=normalizedNutrition(restored)
+ const missing=[]
+ for(const key of ['entries','activities','favorites','recipes','supplements']){
+   const ids=new Set((r[key]||[]).map(x=>x.id))
+   const lost=(n[key]||[]).filter(x=>!ids.has(x.id))
+   if(lost.length)missing.push(key+': '+lost.length)
+ }
+ for(const date of Object.keys(n.water||{})){
+   if(!Object.hasOwn(r.water||{},date))missing.push('water: '+date)
+ }
+ return {ok:!missing.length,missing}
+}
+export function verifyBackupRoundTrip(training,nutrition){
+ const exported=createCompleteBackup(training,nutrition)
+ const parsed=parseCompleteBackup(JSON.stringify(exported))
+ const verified=verifyCompleteSnapshot(exported,createCompleteBackup(parsed.training,parsed.nutrition))
+ return {...verified,manifest:backupManifest(exported)}
+}
