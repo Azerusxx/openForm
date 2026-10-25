@@ -357,7 +357,7 @@ export default function Nutrition() {
       </div>
       <section className="of-calorie-card" aria-label="Kalorienbilanz">
         <div className="of-calorie-meta"><div><span className="of-calorie-symbol of-intake"><Icon name="download" /></span><strong>{fmt(totals.kcal)}</strong><small>zugeführt</small></div>
-          <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>{training.kcal ? 'Aktivität + Training (ca.)' : 'Aktivität'}</small></div></div>
+          <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>{training.kcal ? 'Aktivität + Training (ca. verbrannt)' : 'Aktivität (ca. verbrannt)'}</small></div></div>
         <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={data.goals.kcal} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,data.goals.kcal) * 100))}%` }}>
           <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
         </div>
