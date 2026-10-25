@@ -1,4 +1,5 @@
 name: openForm Android APK
+run-name: ${{ github.event.head_commit.message || github.event.pull_request.title || 'openForm APK manuell erstellen' }}
 
 on:
   push:
