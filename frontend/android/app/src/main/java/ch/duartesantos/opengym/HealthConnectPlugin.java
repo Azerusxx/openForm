@@ -198,7 +198,9 @@ public class HealthConnectPlugin extends Plugin {
         worker.execute(()->{
             try{
                 JSObject out=new JSObject();
-                out.put("granted",granted().contains(READ_STEPS));
+                Set<String> userPermissions=granted();
+                out.put("granted",userPermissions.contains(READ_STEPS));
+                out.put("exerciseGranted",userPermissions.contains(READ_EXERCISE));
                 call.resolve(out);
             }catch(Exception e){call.reject(e.getMessage(),"failed");}
         });
