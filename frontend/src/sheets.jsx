@@ -66,6 +66,7 @@ import { workoutCardModel, layoutWorkoutCard, drawWorkoutCard, viewAspect, CARD_
 import { copyText } from './lib/clipboard.js'
 import { queueRemaining, pinState } from './lib/queue.js'
 import { DAY_NOTE_TAGS, DAY_NOTE_LABEL, DAY_NOTE_ICON, dayNoteOf, dayNoteLine, canNoteDay, withDayNote } from './lib/day-notes.js'
+import { cleanIllness, illnessOnDay, illnessRecords, putIllness, clearIllness, recoveryStatus } from './lib/illness.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -2238,6 +2239,7 @@ function DayOverride({ iso, close }) {
   // A note on a day off (#261, lib/day-notes.js): offered on today and past days with nothing
   // logged, kept in view on any day that already has one. Quiet on purpose: a row, not a button.
   const note = dayNoteOf(st, iso)
+  const illness = illnessOnDay(st, iso, todayISO())
   const canNote = !!note || (canNoteDay(iso) && !workoutsOn(st, iso).length)
   // The coach week's sessions still to do come first, in slot order: picking one here pins it
   // to this day — the same per-date override, read back by queueNext (lib/queue.js). A session
@@ -2263,6 +2265,17 @@ function DayOverride({ iso, close }) {
   return <>
     <h3>{fmtDate(iso, true)}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{t('Weekly plan:')} {weeklyNames.length ? deriveSessionName(weeklyNames) : t('Rest')}{changed && <span style={{ color: 'var(--orange)' }}> · {t('changed for this day')}</span>}<br />{t('Sick, missed a day or want a different session? Pick what to train instead.')}</div>
+    <div className="illness-day-row" style={{ marginBottom: 12 }}>
+      <button type="button" onClick={() => { close(); illnessSheet(iso, illness?.id) }}>
+        <Icon name="cloud" />
+        <span>{illness ? 'Krankheitszeitraum bearbeiten' : 'Krankmeldung eintragen'}</span>
+        <Icon name={illness ? 'pencil' : 'plus'} />
+      </button>
+      {illness && <div className="small">Krank seit {fmtDate(illness.start, true)}{illness.end ? ' · bis ' + fmtDate(illness.end, true) : ' · Ende offen'}</div>}
+    </div>
+    {illness && workoutsOn(st,iso).length > 0 && <div className="list" style={{ marginBottom: 12 }}>
+      {workoutsOn(st,iso).map(w => <WorkoutRow key={w.id} w={w} onClick={() => { close(); workoutDetailSheet(w) }} />)}
+    </div>}
     {missed && <div style={{ marginBottom: 14 }}><Button variant="primary" icon="checkCircle" onClick={logIt}>{t('Log this workout')}</Button></div>}
     {canNote && <div className="day-note" style={{ marginBottom: 14 }}>
       <div className="item day-note-row" {...tappable(() => dayNoteSheet(iso))}>
@@ -2322,6 +2335,69 @@ function DayNote({ iso, close }) {
   </>
 }
 export const dayNoteSheet = iso => ui().openSheet(close => <DayNote iso={iso} close={close} />)
+
+// A connected illness period is a single edit. It does not move the workout schedule,
+// erase logged sessions, or claim a medical clearance from a number of days.
+function IllnessPeriodEditor({ iso, editId, close }) {
+  const state = useStore(s => s.S)
+  const record = illnessRecords(state).find(r => r.id === editId) || illnessOnDay(state, iso, todayISO())
+  const [start, setStart] = useState(record?.start || (iso && iso <= todayISO() ? iso : todayISO()))
+  const [end, setEnd] = useState(record?.end || '')
+  const [plannedReturn, setPlannedReturn] = useState(record?.plannedReturn || '')
+  const [note, setNote] = useState(record?.note || '')
+  const [feverFree, setFeverFree] = useState(record?.feverFree || false)
+  const [improving, setImproving] = useState(record?.improving || false)
+  const [noWarning, setNoWarning] = useState(record?.noWarning || false)
+  const [dailyEnergy, setDailyEnergy] = useState(record?.dailyEnergy || false)
+  const draft = { start, end: end || null, plannedReturn: plannedReturn || null,
+    note, feverFree, improving, noWarning, dailyEnergy }
+  const valid = cleanIllness(draft)
+  const status = recoveryStatus(draft, todayISO())
+  const save = () => {
+    if (!valid || start > todayISO() || (plannedReturn && !end)) {
+      toast('Bitte Datum prüfen: Beginn nicht in der Zukunft, Ende nach Beginn und Wiedereinstieg erst nach Krankheitsende.')
+      return
+    }
+    const id = record?.id || 'ill-' + uid()
+    update(s => { s.illnessPeriods = putIllness(s.illnessPeriods, id, draft) })
+    close()
+    toast('Krankheitszeitraum gespeichert')
+  }
+  const remove = () => confirmSheet({
+    title: 'Krankmeldung löschen?',
+    message: 'Nur dieser Krankheitszeitraum wird entfernt. Trainings und andere Kalendereinträge bleiben erhalten.',
+    confirmText: 'Krankmeldung entfernen', danger: true,
+    onConfirm: () => { update(s => { s.illnessPeriods = clearIllness(s.illnessPeriods,record.id) }); close(); toast('Krankmeldung entfernt') },
+  })
+  return <div className="illness-editor">
+    <h3>Krankmeldung & Wiedereinstieg</h3>
+    <p className="muted small">Krankheitspause im Kalender türkis markieren. Dein Trainingsplan und vorhandene Einträge werden nicht gelöscht.</p>
+    <label className="illness-field">Krank seit<input type="date" className="input" value={start} max={todayISO()} onChange={e=>setStart(e.target.value)} /></label>
+    <label className="illness-field">Letzter Krankheitstag (optional)<input type="date" className="input" min={start} value={end} onChange={e=>{setEnd(e.target.value);setPlannedReturn('')}} /></label>
+    <label className="illness-field">Notiz (optional)<textarea className="input" rows={2} maxLength={300} value={note} onChange={e=>setNote(e.target.value)} placeholder="z. B. Erkältung. Keine Diagnose nötig." /></label>
+    <h4>Wiedereinstieg prüfen</h4>
+    <p className="muted small">Kein automatisches Gesundschreiben. Erst bei deutlicher Erholung an leichte Belastung denken.</p>
+    <div className="illness-checks">
+      <label><input type="checkbox" checked={feverFree} onChange={e=>setFeverFree(e.target.checked)} /> Mindestens 24 Stunden fieberfrei ohne fiebersenkende Medikamente</label>
+      <label><input type="checkbox" checked={improving} onChange={e=>setImproving(e.target.checked)} /> Symptome deutlich gebessert</label>
+      <label><input type="checkbox" checked={dailyEnergy} onChange={e=>setDailyEnergy(e.target.checked)} /> Alltag wieder gut belastbar</label>
+      <label><input type="checkbox" checked={noWarning} onChange={e=>setNoWarning(e.target.checked)} /> Keine Warnzeichen wie Brustschmerz, Herzrasen oder ungewöhnliche Atemnot</label>
+    </div>
+    <label className="illness-field">Geplanter erster leichter Trainingstag (optional)
+      <input type="date" className="input" min={end || undefined} disabled={!end} value={plannedReturn} onChange={e=>setPlannedReturn(e.target.value)} />
+    </label>
+    <div className="illness-advice">
+      <strong>{status.label}</strong>
+      <p>Bei Fieber oder deutlichem Krankheitsgefühl nicht trainieren. Bei Brustschmerz, Herzrasen, Atemnot oder anhaltender Schwäche ärztlich abklären. Das geplante Datum ist keine medizinische Freigabe.</p>
+      <p>Beim Wiedereinstieg zunächst kürzer und leichter trainieren, Belastung nur schrittweise steigern. Bei erneut auftretenden Symptomen abbrechen.</p>
+    </div>
+    <Button variant="primary" onClick={save}>Krankmeldung speichern</Button>
+    {record && <><div style={{height:8}} /><Button variant="ghost" icon="trash" onClick={remove}>Krankmeldung löschen</Button></>}
+  </div>
+}
+export const illnessSheet = (iso = todayISO(), editId = null) =>
+  ui().openSheet(close => <IllnessPeriodEditor iso={iso} editId={editId} close={close} />)
+
 
 // Plan → Schedule → a weekday. One sheet for the whole day: tap routines to put them on it or
 // take them off (two or more make a combined day, docs/dev/COMBINE_ROUTINES.md), in the order
@@ -2711,10 +2787,11 @@ function Calendar({ start, close }) {
     // A day off with a note on it (#261) shows the note's dot instead of the plan's, and its
     // note as the tooltip; tapping it opens the day sheet, where the note is.
     const note = !ws && dayNoteOf(st, iso)
-    const dotCls = ws ? 'done' : note ? 'noted' : ovr && planned ? 'ovr' : planned ? 'plan' : ''
-    cells.push(<button key={d} className={'cal-d' + (ws ? ' has' : '') + (note ? ' noted' : '') + (iso === todayISO() ? ' today' : '')}
-      title={note ? dayNoteLine(note, t) : undefined} onClick={() => {
-      if (!ws) { close(); dayOverrideSheet(iso); return }
+    const sickness = illnessOnDay(st, iso, todayISO())
+    const dotCls = sickness ? 'sick' : ws ? 'done' : note ? 'noted' : ovr && planned ? 'ovr' : planned ? 'plan' : ''
+    cells.push(<button key={d} className={'cal-d' + (ws ? ' has' : '') + (sickness ? ' illness' : '') + (note ? ' noted' : '') + (iso === todayISO() ? ' today' : '')}
+      title={sickness ? 'Krank seit ' + fmtDate(sickness.start, true) : note ? dayNoteLine(note, t) : undefined} onClick={() => {
+      if (sickness || !ws) { close(); dayOverrideSheet(iso); return }
       if (ws.length === 1) { close(); workoutDetailSheet(ws[0]); return }
       close(); ui().openSheet(c2 => <><h3>{fmtDate(iso, true)}</h3><div className="list">{ws.map(w => <WorkoutRow key={w.id} w={w} onClick={() => { c2(); workoutDetailSheet(w) }} />)}</div></>)
     }}><span>{d}</span><i className={dotCls} /></button>)
@@ -2731,6 +2808,7 @@ function Calendar({ start, close }) {
       <span><i style={{ background: 'var(--acc)' }} />{t('Trained')}</span>
       <span><i style={{ background: 'var(--label-3)' }} />{t('Planned')}</span>
       <span><i style={{ background: 'var(--orange)' }} />{t('Rescheduled')}</span>
+      <span><i style={{ background: 'var(--illness-color)' }} />Krank</span>
       {Object.keys(st.dayNotes || {}).some(k => k.startsWith(y + '-' + String(mo + 1).padStart(2, '0')) && dayNoteOf(st, k)) &&
         <span><i style={{ background: 'var(--indigo)' }} />{t('Day note')}</span>}
     </div>

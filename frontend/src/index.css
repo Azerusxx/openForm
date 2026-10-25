@@ -2221,3 +2221,28 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .progression-review-actions button{border:0;border-radius:10px;background:var(--acc);color:var(--on-acc,#111);padding:10px 12px;font-size:12px;font-weight:700}
 .progression-review-actions button.secondary{background:var(--surface-2);border:1px solid var(--sep);color:var(--label)}
 .progression-review-actions span{color:var(--label-3);font-size:11px}
+
+/* openForm 0.3.7e: sick days are cyan, complementary to orange training accents. */
+:root{--illness-color:#34c5d8}
+.wday .dot.sick,.cal-d i.sick{background:var(--illness-color)}
+.cal-d.illness{box-shadow:inset 0 0 0 2px var(--illness-color);background:color-mix(in srgb,var(--illness-color) 12%,var(--surface))}
+.cal-d.illness.today{box-shadow:inset 0 0 0 2px var(--illness-color),0 0 0 1px var(--acc)}
+.illness-day-row,.illness-home-card{border:1px solid color-mix(in srgb,var(--illness-color) 55%,var(--sep));background:color-mix(in srgb,var(--illness-color) 10%,var(--surface));border-radius:14px;padding:12px}
+.illness-day-row button{display:flex;align-items:center;width:100%;gap:10px;color:var(--label);background:none;border:0;min-height:32px;font-size:14px;font-weight:650;text-align:left}
+.illness-day-row button span{flex:1}
+.illness-home-card{margin-bottom:12px}
+.illness-home-card strong{display:flex;gap:8px;align-items:center;color:var(--illness-color)}
+.illness-home-card p{font-size:13px;margin:8px 0 0;line-height:1.45}
+.illness-start-action{margin-top:14px}
+.illness-start-action button{color:var(--illness-color)}
+.illness-editor{display:flex;flex-direction:column;gap:10px;padding-bottom:var(--sab)}
+.illness-editor h3{margin:0}
+.illness-editor h4{margin:10px 0 0}
+.illness-editor .illness-field{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13px}
+.illness-editor .input{width:100%;max-width:100%;min-height:42px}
+.illness-checks{display:grid;gap:10px;background:var(--surface-2);padding:12px;border-radius:12px}
+.illness-checks label{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.4}
+.illness-checks input{flex-shrink:0;margin-top:3px;accent-color:var(--illness-color)}
+.illness-advice{font-size:12px;border-left:3px solid var(--illness-color);padding:8px 10px;background:var(--surface-2);border-radius:6px}
+.illness-advice strong{color:var(--illness-color)}
+.illness-advice p{color:var(--label-2);margin:7px 0}
