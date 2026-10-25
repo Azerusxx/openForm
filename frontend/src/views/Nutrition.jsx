@@ -10,6 +10,7 @@ import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
 import { trainingEnergyForDay } from '../lib/training-energy.js'
 import { nutrientOverview } from '../lib/nutrient-overview.js'
+import { isMisattributedCreatine, repairMisattributedCreatine } from '../lib/creatine-repair.js'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -204,6 +205,13 @@ export default function Nutrition() {
     setSuppUnit('piece'); setSuppNutrient('')
     setSuppAmount(''); setSuppNutrients({}); setSuppFormOpen(false)
   }
+  const repairCreatine = supplement => {
+    if (!isMisattributedCreatine(supplement)) return
+    if (!window.confirm('Dieser Kreatin-Eintrag enthält offenbar eine falsche Magnesium-Zuordnung. Soll Magnesium entfernt und Kreatin mit 1 g pro Gramm Produkt erfasst werden? Die gespeicherten Einnahmetage und deine Tagesmenge bleiben erhalten.')) return
+    if (update(d => ({ ...d, supplements: d.supplements.map(s =>
+      s.id === supplement.id ? (repairMisattributedCreatine(s) || s) : s
+    ) }))) setNotice('Kreatin-Eintrag korrigiert. Magnesium wird dafür nicht mehr mitgerechnet.')
+  }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
 
@@ -312,6 +320,7 @@ export default function Nutrition() {
           {showSupplements && <>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
+            {isMisattributedCreatine(s) && <button type="button" className="of-creatine-repair" onClick={() => repairCreatine(s)} aria-label="Kreatin-Zuordnung korrigieren">Kreatin korrigieren</button>}
             <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => selectSupplementForEdit(s)}><Icon name="pencil" /></button>
             <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
           </div>)}
