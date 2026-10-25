@@ -7,6 +7,7 @@ import { scanCode, importCodeFromImage } from '../lib/scan.js'
 import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
   dayTotals, dayMicros, MICRO_NUTRIENTS, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
+import { trainingEnergyForDay } from '../lib/training-energy.js'
 import './Nutrition.css'
 
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
@@ -55,6 +56,8 @@ export default function Nutrition() {
   const totals = dayTotals(data.entries, date)
   const drank = data.water?.[date] || 0
   const burned = (data.activities || []).filter(a => a.date === date).reduce((total, a) => total + Number(a.kcal || 0), 0)
+  const training = trainingEnergyForDay(gym.workouts, date, weight, gym.unit)
+  const displayedBurned = burned + training.kcal
   const remaining = Math.round((data.goals.kcal || 0) - totals.kcal + burned)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
@@ -215,11 +218,11 @@ export default function Nutrition() {
       </div>
       <section className="of-calorie-card" aria-label="Kalorienbilanz">
         <div className="of-calorie-meta"><div><span className="of-calorie-symbol of-intake"><Icon name="download" /></span><strong>{fmt(totals.kcal)}</strong><small>zugeführt</small></div>
-          <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{fmt(burned)}</strong><small>verbrannt*</small></div></div>
+          <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>verbrannt*</small></div></div>
         <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={data.goals.kcal} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,data.goals.kcal) * 100))}%` }}>
           <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
         </div>
-        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*nur erfasste Aktivitäten</span></div>
+        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt; nicht zum Kalorienbudget addiert</span></div>
       </section>
       <div className="of-macro-cards" aria-label="Makro-Tagesziele">
         {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}`} key={key}>
@@ -258,6 +261,7 @@ export default function Nutrition() {
       <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} />
       <div className="of-day-groups">
         <section className="of-meal-section of-activity-section"><h2><span className="of-section-icon"><Icon name="figureRun" /></span>Aktivität <button className="of-section-more" onClick={() => setShowActivity(v => !v)} aria-label="Aktivität hinzufügen"><Icon name="plus" /></button></h2>
+          {training.sessions.map(w => <div className="of-logged-row" key={`gym-${w.id}`}><span><strong>{w.name}</strong><small>≈ {w.kcal} kcal · {w.minutes} Min. · aus Trainingsdauer und Gewicht geschätzt</small></span></div>)}
           {(data.activities || []).filter(a => a.date === date).map(a => <div className="of-logged-row" key={a.id}><span>{a.name} <small>{a.kcal} kcal verbrannt</small></span><button aria-label="Aktivität löschen" onClick={() => update(d => ({ ...d, activities: d.activities.filter(x => x.id !== a.id) }))}><Icon name="trash" /></button></div>)}
           {showActivity && <form className="of-activity-form" onSubmit={saveActivity}><input aria-label="Aktivität" placeholder="z. B. Spazierengehen" value={activityName} onChange={e => setActivityName(e.target.value)} required /><input aria-label="Verbrannte kcal" type="number" min="1" max="10000" placeholder="kcal" value={activityKcal} onChange={e => setActivityKcal(e.target.value)} required /><button type="submit">Speichern</button></form>}
           {!showActivity && <button className="of-meal-add" onClick={() => setShowActivity(true)} aria-label="Aktivität erfassen"><Icon name="plus" /></button>}
