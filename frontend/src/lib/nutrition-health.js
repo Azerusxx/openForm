@@ -15,7 +15,7 @@ export async function healthStepStatus(){
  const st=await p.status()
  if(st.status!=='available')return {status:st.status,granted:false}
  const perms=await p.stepPermission()
- return {status:'available',granted:!!perms.granted}
+ return {status:'available',granted:!!perms.granted,exerciseGranted:!!perms.exerciseGranted}
 }
 export async function healthStepsForDay(date,{ask=false}={}){
  const p=await api()
@@ -27,4 +27,14 @@ export async function healthStepsForDay(date,{ask=false}={}){
  if(!granted)return {ok:false,reason:'permission'}
  const res=await p.readSteps({date})
  return {ok:true,date,steps:Number(res.steps)||0,source:'health_connect_aggregated'}
+}
+
+export async function healthWalkingSessionsForDay(date){
+ const p=await api()
+ if(!p)return {ok:false,reason:'unsupported'}
+ const current=await healthStepStatus()
+ if(current.status!=='available'||!current.exerciseGranted)return {ok:false,reason:'permission'}
+ const res=await p.readWalkingSessions({date})
+ return {ok:true,date,sessions:Array.isArray(res.sessions)?res.sessions:[],
+   more:!!res.more,source:'health_connect'}
 }
