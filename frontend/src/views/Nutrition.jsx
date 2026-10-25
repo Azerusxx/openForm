@@ -11,12 +11,13 @@ import './Nutrition.css'
 const fmt = n => Math.round((Number(n) || 0) * 10) / 10
 const EMPTY = () => ({ name: '', quantity: '100', unit: 'g', basis: 'g', pieceSize: '', date: dateLocal(),
   per100: { kcal: '', protein: '', carbs: '', fat: '' }, barcode: null, source: 'manual' })
-const TABS = [['today', 'Heute'], ['food', 'Lebensmittel'], ['recipes', 'Rezepte'], ['analysis', 'Analyse'], ['supplements', 'Supplements']]
+const MORE_TABS = [['recipes', 'Rezepte'], ['analysis', 'Analyse'], ['supplements', 'Supplements']]
 
 export default function Nutrition() {
   const nav = useNavigate()
   const [data, setData] = useState(loadNutrition)
   const [tab, setTab] = useState('today')
+  const [showMore, setShowMore] = useState(false)
   const [date, setDate] = useState(dateLocal)
   const [form, setForm] = useState(EMPTY)
   const [editing, setEditing] = useState(null)
@@ -152,14 +153,22 @@ export default function Nutrition() {
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
 
   return <div className="narrow of-nutrition">
-    <div className="hdr"><div><h1>Essen</h1><div className="sub">openForm · Ernährung</div></div>
+    <div className="hdr"><div><h1>Essen</h1><div className="sub">Dein Ernährungstagebuch</div></div>
       <button className="iconbtn" onClick={() => nav('/settings/nutrition-profile')} aria-label="Ernährungsprofil"><Icon name="gear" /></button></div>
-    <div className="of-tabs" role="tablist" aria-label="Ernährungsbereiche">{TABS.map(([id, label]) =>
-      <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'selected' : ''}
-        onClick={() => { setTab(id); setShowForm(false); setNotice('') }}>{label}</button>)}</div>
-    <div className="of-date"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
+    <div className="of-tabs" role="tablist" aria-label="Ernährungsbereiche">
+      <button type="button" role="tab" aria-selected={tab === 'today'} className={tab === 'today' ? 'selected' : ''}
+        onClick={() => { setTab('today'); setShowMore(false); setShowForm(false); setNotice('') }}>Heute</button>
+      <button type="button" role="tab" aria-selected={tab === 'food'} className={tab === 'food' ? 'selected' : ''}
+        onClick={() => { setTab('food'); setShowMore(false); setNotice('') }}>Lebensmittel</button>
+      <button type="button" aria-expanded={showMore} aria-controls="of-more-menu" className={MORE_TABS.some(([id]) => id === tab) ? 'selected' : ''}
+        onClick={() => setShowMore(v => !v)}>{MORE_TABS.find(([id]) => id === tab)?.[1] || 'Mehr'} <Icon name="chevronDown" /></button>
+    </div>
+    {showMore && <div id="of-more-menu" className="of-more-menu" aria-label="Weitere Ernährungsbereiche">
+      {MORE_TABS.map(([id,label]) => <button key={id} className={tab === id ? 'selected' : ''} onClick={() => { setTab(id); setShowMore(false); setShowForm(false); setNotice('') }}>{label}</button>)}
+    </div>}
+    {(tab === 'today' || tab === 'supplements') && <div className="of-date"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
       <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
-      <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>
+      <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
     {notice && <div className="of-notice" role="status">{notice}</div>}
     {tab === 'today' && <>
       <div className="card of-summary">
@@ -169,11 +178,18 @@ export default function Nutrition() {
         <div className="of-macro-sub"><span>Kohlenhydrate <b>{fmt(totals.carbs)} g{data.goals.carbs != null && ` / ${fmt(data.goals.carbs)} g`}</b></span><span>Fett <b>{fmt(totals.fat)} g{data.goals.fat != null && ` / ${fmt(data.goals.fat)} g`}</b></span></div>
         <div className="of-remaining">Noch {fmt(Math.max(0, data.goals.kcal - totals.kcal))} kcal und {fmt(Math.max(0, data.goals.protein - totals.protein))} g Protein bis zum Ziel.</div>
       </div>
-      <div className="of-actions"><button onClick={startNew}><Icon name="plus" /> Mahlzeit hinzufügen</button><button onClick={() => setTab('food')}><Icon name="qr" /> Lebensmittel</button></div>
+      <div className="of-quick-heading">Schnell erfassen <span>Ohne Umwege</span></div>
+      <div className="of-quick-actions">
+        <button onClick={() => { setTab('food'); scan() }}><Icon name="qr" /> <span>Barcode</span></button>
+        <button onClick={() => { setTab('food'); setShowMore(false) }}><Icon name="magnifier" /> <span>Suchen</span></button>
+        <button onClick={startNew}><Icon name="plus" /> <span>Manuell</span></button>
+        <button onClick={() => fileInput.current?.click()}><Icon name="image" /> <span>Foto-EAN</span></button>
+      </div>
+      <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} />
       {!!data.favorites.length && <div className="card of-reusable"><h2>Favoriten <small>Schnell eintragen</small></h2>
         {data.favorites.map(f => <div className="of-reuse-row" key={f.id}><span>{f.food.name}</span><button onClick={() => log(f.food)} aria-label={`${f.food.name} erneut eintragen`}><Icon name="plus" /> Eintragen</button></div>)}
       </div>}
-      <div className="of-list-head"><h2>Ernährungstagebuch</h2><span>{meals.length} Einträge</span></div>
+      <div className="of-list-head"><h2>Deine Mahlzeiten</h2><span>{meals.length} Einträge</span></div>
       {meals.length ? meals.map(m => { const t = entryTotals(m); return <div className="card of-meal" key={m.id}>
         <div><strong>{m.name}</strong>{m.recipeName && <div className="of-dim">Aus Rezept: {m.recipeName}</div>}
           <div className="sub">{fmt(m.quantity)} {m.unit === 'piece' ? 'Stk.' : m.unit} · {fmt(t.kcal)} kcal · {fmt(t.protein)} g Protein</div></div>

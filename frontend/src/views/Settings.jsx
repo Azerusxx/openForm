@@ -39,6 +39,7 @@ import Icon from '../components/Icon.jsx'
 import NutritionGoalsSettings from './NutritionGoalsSettings.jsx'
 import { loadNutrition, saveNutrition, mergeNutrition } from '../lib/nutrition.js'
 import { createCompleteBackup, parseCompleteBackup } from '../lib/openform-backup.js'
+import { backupCounts, backupHasEntries, backupCountLabel, verifyRestoredBackup, verifyPersistedBackup } from '../lib/backup-review.js'
 import { durationSheet } from '../components/DurationWheel.jsx'
 import { showsConnection, showsLocalLine } from '../components/SyncBanner.jsx'
 import BackupFolderRow, { useBackupFolder, autoBackupSubtitle } from '../components/BackupFolderRow.jsx'
@@ -291,12 +292,14 @@ export default function Settings({ page = null, find = null, via = null }) {
     catch (e) { toast(e?.message || 'Importdatei ungültig'); return }
     const restore = mergeWith => {
       try {
-        // The nutrition merge preserves locally recorded meals and supplements.
-        // The gym import follows its established server-conflict handling.
+        // Import training first and verify the visible store BEFORE changing nutrition.
+        importBackup(backup.training, { mergeWith })
+        const proof = verifyRestoredBackup(backup.training, useStore.getState().S)
+        const durable = verifyPersistedBackup(backup.training, localStorage.getItem('gym_state_v1'))
+        if (!proof.ok || !durable.ok) throw new Error('Training nicht zuverlässig gespeichert. Bitte App nicht deinstallieren und das Backup behalten.')
         const mergedFood = mergeNutrition(loadNutrition(), backup.nutrition)
         saveNutrition(mergedFood)
-        importBackup(backup.training, { mergeWith })
-        toast('Training und Ernährung importiert. Bestehende Mahlzeiten bleiben erhalten.')
+        toast(`Importiert: ${backupCountLabel(useStore.getState().S)} · ${mergedFood.entries.length} Mahlzeiten.`)
       } catch (e) { toast(e?.message || 'Wiederherstellung fehlgeschlagen') }
     }
     let conflict
@@ -340,8 +343,9 @@ export default function Settings({ page = null, find = null, via = null }) {
   // files go into the local store only once the import is confirmed, each checked against its
   // name first; the state's media refs and links pass the usual gates (lib/backup-media.js).
   const doImport = async ev => {
-    const f = ev.target.files[0]; if (!f) return
+    const f = ev.target.files?.[0]
     ev.target.value = ''
+    if (!f) return
     let read
     try {
       const { readBackupFile } = await import('../lib/backup-media.js')
@@ -350,39 +354,54 @@ export default function Settings({ page = null, find = null, via = null }) {
       const { backupImportError } = await import('../lib/backup-media.js')
       toast(backupImportError(e)); return
     }
-    const apply = async mergeWith => {
-      if (read.files.length) {
-        const { storeBackupMedia } = await import('../lib/backup-media.js')
-        await storeBackupMedia(read.files, { limits: limitsFrom(useStore.getState().config) })
-      }
-      importBackup(read.state, { mergeWith })
-      // The photos it brought are pending here and maybe gone from the server (a reset): sent now,
-      // not after the ten-minute dedupe of the run before the reset.
-      if (read.files.length) syncMedia({ force: true })
-      toast(t('Backup imported'))
+    const old = backupCounts(useStore.getState().S)
+    const incoming = backupCounts(read.state)
+    const preview = backupCountLabel(read.state)
+    // An empty-but-valid JSON with arrays must never quietly overwrite existing data.
+    if (!backupHasEntries(read.state)) {
+      toast('Dieses Backup enthält keine Trainings, Pläne, Gewichtseinträge oder Körpermessungen. Nichts verändert.')
+      return
     }
-    // Signed in, the server is asked first: a workout logged since the backup was made, or on
-    // another device meanwhile, would be deleted from the profile by the replace — said, with the
-    // choice to merge those in instead (useStore importConflict / importBackup).
+    const apply = async mergeWith => {
+      try {
+        if (read.files.length) {
+          const { storeBackupMedia } = await import('../lib/backup-media.js')
+          await storeBackupMedia(read.files, { limits: limitsFrom(useStore.getState().config) })
+        }
+        importBackup(read.state, { mergeWith })
+        const proof = verifyRestoredBackup(read.state, useStore.getState().S)
+        const durable = verifyPersistedBackup(read.state, localStorage.getItem('gym_state_v1'))
+        if (!proof.ok || !durable.ok) {
+          toast(`Import nicht bestätigt: ${durable.reason || 'Trainingsdaten fehlen im Speicher'}. Backup behalten, nicht deinstallieren!`)
+          return
+        }
+        if (read.files.length) syncMedia({ force: true })
+        toast(`Import geprüft: ${backupCountLabel(useStore.getState().S)}`)
+        // Also detect a later reload/sync replacing the just restored copy.
+        if (incoming.workouts) window.setTimeout(() => {
+          const after = useStore.getState().S
+          if (backupCounts(after).workouts < incoming.workouts)
+            toast('Warnung: Trainings sind nach dem Import wieder verschwunden. Bitte Backup aufbewahren, nicht deinstallieren!')
+        }, 1800)
+      } catch (e) { toast(`Import fehlgeschlagen: ${e?.message || 'unbekannter Fehler'}`) }
+    }
     const conflict = await importConflict(read.state)
     if (conflict) {
-      const n = conflict.workouts
       menuSheet({
-        title: t('Import backup?'),
-        subtitle: t(n === 1
-          ? 'The server has 1 workout that is not in this backup, logged since it was made or on another device. Replacing deletes it.'
-          : 'The server has {0} workouts that are not in this backup, logged since it was made or on another device. Replacing deletes them.', n),
+        title: 'openGym-Backup prüfen',
+        subtitle: `Datei: ${f.name}\n${preview}\nServer hat ${conflict.workouts} zusätzliche Trainings. Bitte zum Schutz zusammenführen.`,
         items: [
-          { icon: 'trash', label: t('Replace anyway'), danger: true, onClick: () => apply(null) },
-          { icon: 'merge', label: t('Merge them in'), onClick: () => apply(conflict) },
-          { icon: 'xmark', label: t('Cancel'), onClick: () => {} },
+          { icon: 'merge', label: 'Mit vorhandenen Trainings zusammenführen', onClick: () => apply(conflict) },
+          { icon: 'trash', label: 'Training ersetzen', danger: true, onClick: () => apply(null) },
+          { icon: 'xmark', label: 'Abbrechen', onClick: () => {} },
         ],
       })
       return
     }
     confirmSheet({
-      title: t('Import backup?'), message: t('This replaces all current data with the backup file.'), confirmText: t('Import'), danger: true,
-      onConfirm: () => apply(null)
+      title: 'openGym-Backup importieren?',
+      message: `Datei: ${f.name}\nEnthalten: ${preview}\nAktuell: ${old.workouts} Trainings, ${old.routines} Pläne.\nBei Ersetzen werden lokale Trainingsdaten überschrieben. Backup aufbewahren.`,
+      confirmText: 'Importieren', danger: true, onConfirm: () => apply(null),
     })
   }
   // Whether any custom exercise has a photo or video: the rows about them only show then.
@@ -846,7 +865,7 @@ export default function Settings({ page = null, find = null, via = null }) {
         <input ref={completeRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doCompleteImport} />
       </Section>
       <Section title={t('Bring data in')}>
-        <Row icon="download" iconTint="var(--teal)" title={t('Import backup')} accessory="chevron" onClick={() => fileRef.current.click()} />
+        <Row icon="download" iconTint="var(--teal)" title="Altes openGym-Backup importieren" subtitle="JSON oder ZIP · mit Vorschau und Importprüfung" accessory="chevron" onClick={() => fileRef.current.click()} />
         <Row icon="download" iconTint="var(--teal)" title={t('Import from another app')}
           subtitle={t('FitNotes, Strong, Hevy, or body weight from Apple Health')}
           accessory="chevron" onClick={() => importRef.current.click()} />
