@@ -44,8 +44,8 @@ export default function TabBar({ onStart }) {
 
   return (
     <nav id="tabbar">
-      <Tab active={on('home')} icon="house" label={t('Home')} dot={trouble} onClick={() => nav('/home')} />
-      <Tab active={on('plan')} icon="calendar" label={t('Plan')} onClick={() => nav('/plan')} />
+      <Tab active={on('home')} icon="house" label="Start" dot={trouble} onClick={() => nav('/home')} />
+      <Tab active={on('plan')} icon="calendar" label="Plan" onClick={() => nav('/plan')} />
       {/* Nutrition is a second primary action next to Start. Keep the flame glyph and
           the same 52px round touch target; selection still navigates to Nutrition. */}
       <button className={'food' + (on('nutrition') ? ' on' : '')} onClick={() => nav('/nutrition')} aria-label="Essen">
@@ -59,13 +59,13 @@ export default function TabBar({ onStart }) {
           button still named Resume; a past workout being edited or logged after the fact has no
           clock to run. */}
       <button className={'start' + (S.active ? ' rec' : '') + (S.active && cur === 'workout' ? ' on' : '')} onClick={startWorkout}
-        aria-label={running ? t('Resume') : undefined}>
+        aria-label={running ? 'Training fortsetzen' : 'Training starten'}>
         <span className="cir"><Icon name="dumbbell" /></span>
         {running ? <span className="tab-time"><Elapsed start={S.active.start} /></span>
-          : <span>{S.active ? (cur === 'workout' ? t('Workout') : S.active.editingWorkoutId ? t('Edit workout') : t('Resume')) : t('Start')}</span>}
+          : <span>{S.active ? (cur === 'workout' ? 'Training' : S.active.editingWorkoutId ? 'Bearbeiten' : 'Weiter') : 'Training'}</span>}
       </button>
-      <Tab active={on('stats')} icon="chart" label={t('Stats')} onClick={() => nav('/stats')} />
-      <Tab active={on('library')} icon="dumbbell" label={t('Exercises')} onClick={() => nav('/library')} />
+      <Tab active={on('stats')} icon="chart" label="Statistik" onClick={() => nav('/stats')} />
+      <Tab active={on('library')} icon="dumbbell" label="Übungen" onClick={() => nav('/library')} />
     </nav>
   )
 }

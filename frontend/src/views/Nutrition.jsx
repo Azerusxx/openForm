@@ -58,7 +58,8 @@ export default function Nutrition() {
   const burned = (data.activities || []).filter(a => a.date === date).reduce((total, a) => total + Number(a.kcal || 0), 0)
   const training = trainingEnergyForDay(gym.workouts, date, weight, gym.unit)
   const displayedBurned = burned + training.kcal
-  const remaining = Math.round((data.goals.kcal || 0) - totals.kcal + burned)
+  // Recorded and estimated exercise is displayed, but does not increase the deficit budget.
+  const remaining = Math.round((data.goals.kcal || 0) - totals.kcal)
   const meals = data.entries.filter(e => e.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   const unique = [...new Map([...data.entries].reverse().map(e => [`${e.name.toLowerCase()}-${e.unit}`, e])).values()].reverse().slice(0, 70)
   const week = weeklyNutrition(data.entries, date, data.goals)
@@ -216,18 +217,24 @@ export default function Nutrition() {
           {showWater && <div className="of-water-menu" aria-label="Wasser erfassen"><b>Wasser trinken</b><div><button onClick={() => addWater(150)}>+150 ml</button><button onClick={() => addWater(250)}>+250 ml</button><button onClick={() => addWater(500)}>+500 ml</button><button onClick={() => addWater(-250)}>−250 ml</button></div><button className="of-water-close" onClick={() => setShowWater(false)}>Schließen</button></div>}
         </div>
       </div>
+      <div className="of-water-fast" aria-label="Wasser schnell erfassen">
+        <span>Wasser</span>
+        <div className="of-water-meter" role="progressbar" aria-label="Wasser getrunken" aria-valuenow={drank} aria-valuemin="0" aria-valuemax={data.profile?.waterGoal || 1900}><span style={{ width: `${Math.min(100, 100 * drank / Math.max(1, data.profile?.waterGoal || 1900))}%` }}/></div>
+        <button type="button" onClick={() => addWater(250)}>+250 ml</button>
+        <button type="button" onClick={() => addWater(500)}>+500 ml</button>
+      </div>
       <section className="of-calorie-card" aria-label="Kalorienbilanz">
         <div className="of-calorie-meta"><div><span className="of-calorie-symbol of-intake"><Icon name="download" /></span><strong>{fmt(totals.kcal)}</strong><small>zugeführt</small></div>
-          <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>verbrannt*</small></div></div>
+          <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>{training.kcal ? 'Aktivität + Training (ca.)' : 'Aktivität'}</small></div></div>
         <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={data.goals.kcal} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,data.goals.kcal) * 100))}%` }}>
           <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
         </div>
-        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt; nicht zum Kalorienbudget addiert</span></div>
+        <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt, kein Extra-Kalorienbudget</span></div>
       </section>
       <div className="of-macro-cards" aria-label="Makro-Tagesziele">
         {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}`} key={key}>
           <strong><i />{label}</strong><div className="of-mini-track"><span style={{width:`${data.goals[key] == null ? 0 : Math.min(100, 100*totals[key]/Math.max(1,data.goals[key]))}%`}} /></div>
-          <span>{fmt(totals[key])} / {data.goals[key] == null ? '–' : fmt(data.goals[key])} g</span>
+          <span>{data.goals[key] == null ? `${fmt(totals[key])} g erfasst` : `${fmt(totals[key])} / ${fmt(data.goals[key])} g`}</span>
         </div>)}
       </div>
       <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
@@ -284,6 +291,11 @@ export default function Nutrition() {
     </div>}
     {tab === 'favorites' && <div className="card of-reusable"><h2>Favoriten</h2>{data.favorites.length ? data.favorites.map(f => <div className="of-reuse-row" key={f.id}><span>{f.food.name}</span><button onClick={() => { log(f.food, selectedMeal); goSection('today') }}>Eintragen</button></div>) : <p>Markiere Lebensmittel im Tagebuch mit dem Stern, um sie hier schnell wiederzufinden.</p>}</div>}
     {tab === 'food' && <>
+      <div className="of-meal-context">Eintragen für <strong>{MEAL_GROUPS.find(g => g.id === selectedMeal)?.title || 'Snacks'}</strong></div>
+      {!showForm && (data.favorites.length > 0 || unique.length > 0) && <section className="of-food-shortcuts" aria-label="Schnell eintragen">
+        {!!data.favorites.length && <><h3><Icon name="star" /> Favoriten</h3><div className="of-quick-food-list">{data.favorites.slice(0,6).map(f => <button type="button" key={f.id} onClick={() => log(f.food)}><strong>{f.food.name}</strong><small>{fmt(entryTotals(f.food).kcal)} kcal · {fmt(entryTotals(f.food).protein)} g Protein</small><span>+</span></button>)}</div></>}
+        {!!unique.length && <><h3><Icon name="repeat" /> Zuletzt gegessen</h3><div className="of-quick-food-list">{unique.filter(e => !isFavorite(data,e)).slice(0,5).map(e => <button type="button" key={e.id} onClick={() => log(e)}><strong>{e.name}</strong><small>{fmt(entryTotals(e).kcal)} kcal</small><span>+</span></button>)}</div></>}
+      </section>}
       <div className="of-actions"><button onClick={() => startNew()}><Icon name="plus" /> Manuell</button><button onClick={scan}><Icon name="qr" /> Scannen</button>
         <button onClick={() => fileInput.current?.click()}><Icon name="image" /> Galerie</button>
         <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} /></div>
@@ -316,7 +328,7 @@ export default function Nutrition() {
         <div className="of-macro-sub">Portion: {fmt(entryTotals(form).kcal)} kcal · {fmt(entryTotals(form).protein)} g Protein</div>
         <div className="of-form-buttons"><button type="button" onClick={() => setShowForm(false)}>Abbrechen</button><button type="submit">{editing ? 'Aktualisieren' : 'Eintragen'}</button></div>
       </form>}
-      {!!data.favorites.length && <div className="card of-reusable"><h2>Favoriten</h2>{data.favorites.map(f => <div className="of-reuse-row" key={f.id}><span>{f.food.name}</span><button onClick={() => log(f.food)}>Eintragen</button></div>)}</div>}
+      {!!data.favorites.length && <div className="of-dim">Favoriten findest du jetzt oben in der Lebensmittelsuche.</div>}
     </>}
     {tab === 'recipes' && <>
       <div className="card of-form"><h2>Meine Rezepte</h2><p className="of-dim">Rezepte aus bereits erfassten Lebensmitteln zusammenstellen. Die Mengen bilden das ganze Rezept, Portionen teilen es auf.</p>
