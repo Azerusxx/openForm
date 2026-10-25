@@ -529,9 +529,8 @@ export function nextPrescription(S, cfg, routine) {
   // Users can still edit the session's working weight before lifting.
   const daysSinceLast = S.progressionScope === 'exercise' ? elapsedDays(last.d) : null
   if (daysSinceLast != null && daysSinceLast > LONG_EXERCISE_BREAK_DAYS) {
-    const heldWeight = cfg.weight > 0 && last.planned &&
-      (last.planned.weight ?? null) !== cfg.weight ? cfg.weight :
-      last.weight > 0 ? last.weight : cfg.weight
+    const heldWeight = cfg.weight > 0 && !compatibleExerciseSession(last, cfg)
+      ? cfg.weight : last.weight > 0 ? last.weight : cfg.weight
     return { policy, kind: 'hold', ...(heldWeight > 0 ? { weight: heldWeight } : {}),
       ...(mode === 'time' ? { sec: cfg.sec || last.goal || undefined } : { reps: cfg.reps || undefined }),
       why: ['Last exercise session was {0} days ago. Review your starting weight before progressing.', daysSinceLast] }
@@ -554,7 +553,11 @@ export function nextPrescription(S, cfg, routine) {
     // session was built from: the same edit that turned 3 × 5 @ 100 into 3 × 10 @ 70 set 70,
     // and 102.5 × 10 is a load never lifted for those reps. A routine whose weight nobody
     // touched still carries the one it was created with, so there the history decides.
-    const set = cfg.weight > 0 && last.planned && (last.planned.weight ?? null) !== cfg.weight ? { weight: cfg.weight } : null
+    const set = cfg.weight > 0 && (
+      (last.planned && (last.planned.weight ?? null) !== cfg.weight) ||
+      (!last.planned && borrowed && S.progressionScope === 'exercise' &&
+        !compatibleExerciseSession(last, cfg))
+    ) ? { weight: cfg.weight } : null
     if (mode === 'time') return { policy, kind: 'hold', ...set, sec: cfg.sec || last.goal || undefined, why }
     if (!set && last.weight <= 0 && climbsReps(cfg)) return { policy, kind: 'hold', weight: 0, reps: cfg.reps || undefined, why }
     // A loaded lift logged at 0 had no weight typed in (see below): the plan's, if it has one.
