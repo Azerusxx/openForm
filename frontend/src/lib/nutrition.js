@@ -89,7 +89,8 @@ export function normalizedNutrition(data) {
   const d = NEW_NUTRITION()
   if (!data || typeof data !== 'object' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) return d
   d.profile = { activity: ['low', 'light', 'moderate', 'high'].includes(data.profile?.activity) ? data.profile.activity : 'moderate',
-    waterGoal: positive(data.profile?.waterGoal) ? Math.min(10000, n(data.profile.waterGoal)) : 1900 }
+    waterGoal: positive(data.profile?.waterGoal) ? Math.min(10000, n(data.profile.waterGoal)) : 1900,
+    includeActivityCalories: data.profile?.includeActivityCalories === true }
   d.water = Object.fromEntries(Object.entries(data.water && typeof data.water === 'object' && !Array.isArray(data.water) ? data.water : {}).filter(([day, amount]) => validDate(day) && Number.isFinite(Number(amount)) && Number(amount) >= 0).map(([day, amount]) => [day, Math.min(30000, n(amount))]))
   d.activities = (Array.isArray(data.activities) ? data.activities : []).map(normalizeActivity).filter(Boolean)
   d.goals = {
