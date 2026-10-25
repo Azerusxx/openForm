@@ -302,3 +302,14 @@
 
 .of-032 .of-supp-open{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;margin:14px 0 8px;background:var(--acc);color:var(--on-acc);border-radius:10px;font-weight:650}
 .of-032 .of-inline-supp-form>.of-supp-cancel{background:transparent;color:var(--label-2);border:1px solid var(--sep)}
+
+/* Micronutrient daily totals from food and checked supplements. */
+.of-032 .of-micro-cards{display:flex;flex-direction:column;gap:15px;padding:10px 0}
+.of-032 .of-micro-card{display:flex;flex-direction:column;gap:7px;padding-bottom:12px;border-bottom:1px solid var(--sep)}
+.of-032 .of-micro-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px}
+.of-032 .of-micro-heading>span{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.of-032 .of-micro-track{height:7px;background:var(--sep);border-radius:10px;overflow:hidden}
+.of-032 .of-micro-track>span{display:block;height:100%;border-radius:10px;background:var(--acc);transition:width .2s}
+.of-032 .of-micro-track>.of-micro-over-fill{background:#ef4444}
+.of-032 .of-micro-heading .of-micro-over{color:#ef4444}
+.of-032 .of-micro-card>small{font-size:11px;line-height:1.5}
