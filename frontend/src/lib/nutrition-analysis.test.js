@@ -18,7 +18,7 @@ describe('0.4.1 nutrition analysis',()=>{
    const one=nutritionWeekAnalysis([], '2026-10-25',goals,[{d:'2026-10-23',w:76.4}])
    expect(one.weightDelta).toBeNull()
    const two=nutritionWeekAnalysis([], '2026-10-25',goals,[{d:'2026-10-19',w:76.5},{d:'2026-10-25',w:75.9}])
-   expect(two.weightDelta).toBe(-0.6)
+   expect(two.weightDelta).toBeNull() // Two weigh-ins within one ISO week do not establish a weekly trend.
  })
  it('repeats the most recent portion and preserves AI micronutrient provenance',()=>{
    const first=food('2026-10-22','Toast',150), last={...food('2026-10-25','Toast',250),quantity:125}
