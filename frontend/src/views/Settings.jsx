@@ -38,8 +38,8 @@ import { REST_MAX, REST_PAUSE_MIN, REST_PAUSE_MAX, fmtRest, fmtDuration } from '
 import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, dumbbellInventorySheet, menuSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import NutritionGoalsSettings from './NutritionGoalsSettings.jsx'
-import { loadNutrition, saveNutrition, mergeNutrition } from '../lib/nutrition.js'
-import { createCompleteBackup, parseCompleteBackup, backupManifest, verifyCompleteSnapshot } from '../lib/openform-backup.js'
+import { loadNutrition, saveNutrition, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
+import { createCompleteBackup, parseCompleteBackup, backupManifest, verifyCompleteSnapshot, verifyNutritionRestore, verifyBackupRoundTrip } from '../lib/openform-backup.js'
 import { backupCounts, backupHasEntries, backupCountLabel, verifyRestoredBackup, verifyPersistedBackup } from '../lib/backup-review.js'
 import { durationSheet } from '../components/DurationWheel.jsx'
 import { showsConnection, showsLocalLine } from '../components/SyncBanner.jsx'
@@ -104,6 +104,7 @@ export default function Settings({ page = null, find = null, via = null }) {
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
   const completeRef = useRef(null)
+  const nutritionImportRef=useRef(null)
   const importRef = useRef(null)
   const body = useRef(null)
   const wakeOK = wakeLockSupported()
@@ -296,6 +297,10 @@ export default function Settings({ page = null, find = null, via = null }) {
     const preview=backupManifest({kind:'openform-complete',training:backup.training,nutrition:backup.nutrition})
     const restore = mergeWith => {
       try {
+        // Snapshot the current local state before any replace operation.
+        const before=JSON.stringify(createCompleteBackup(useStore.getState().S,loadNutrition()))
+        try {localStorage.setItem('openform_pre_restore_v1',before)}
+        catch {throw new Error('Sicherheitskopie vor Import konnte nicht gespeichert werden. Import abgebrochen.')}
         // Import training first and verify the visible store BEFORE changing nutrition.
         importBackup(backup.training, { mergeWith })
         const proof = verifyRestoredBackup(backup.training, useStore.getState().S)
@@ -304,8 +309,8 @@ export default function Settings({ page = null, find = null, via = null }) {
         const mergedFood = mergeNutrition(loadNutrition(), backup.nutrition)
         saveNutrition(mergedFood)
         const checked=loadNutrition()
-        const lost=['entries','water','activities','favorites','recipes','supplements'].filter(key=>!backup.nutrition[key]?.every(item=>checked[key]?.some(x=>x.id===item.id)))
-        if(lost.length)throw new Error('Ernährungsimport nicht vollständig: '+lost.join(', '))
+        const verifiedFood=verifyNutritionRestore(backup.nutrition,checked)
+        if(!verifiedFood.ok)throw new Error('Ernährungsimport nicht vollständig: '+verifiedFood.missing.join(', '))
         toast(`Importiert: ${backupCountLabel(useStore.getState().S)} · ${mergedFood.entries.length} Mahlzeiten.`)
       } catch (e) { toast(e?.message || 'Wiederherstellung fehlgeschlagen') }
     }
@@ -857,6 +862,11 @@ export default function Settings({ page = null, find = null, via = null }) {
     data: () => <>
       <Section title={t('Back up')}>
         <Row icon="share" iconTint="var(--green)" title="openForm Komplettbackup (JSON)" subtitle="Training + Ernährung, ohne Fotos/Videos" accessory="chevron" onClick={doCompleteExport} />
+        <Row icon="share" iconTint="var(--teal)" title="Nur Ernährung exportieren (JSON)"
+          subtitle="Mahlzeiten, Supplements, Rezepte und Ziele" accessory="chevron" onClick={async()=>{
+            try {await shareExport(nutritionBackup(loadNutrition()),'openform-ernaehrung-'+todayISO()+'.json');toast('Ernährungsbackup exportiert')}
+            catch(e){toast(e?.message||'Export fehlgeschlagen')}
+          }} />
         <Row icon="share" iconTint="var(--blue)" title="Nur Training exportieren (alt)" subtitle="Kompatibel mit alten openGym-Backups" accessory="chevron" onClick={doExport} />
 
         {hasMedia && <Row icon="share" iconTint="var(--blue)" title={t('Export with photos & videos (.zip)')} accessory="chevron" onClick={doExportZip} />}
@@ -871,6 +881,23 @@ export default function Settings({ page = null, find = null, via = null }) {
       </Section>
       {MOBILE && android && <HealthConnectCard S={S} toast={toast} />}
       <Section title="openForm komplett wiederherstellen">
+        <Row icon="download" iconTint="var(--teal)" title="Nur Ernährung importieren"
+          subtitle="Bestehende Einträge behalten; neue Datensätze ergänzen" accessory="chevron" onClick={()=>nutritionImportRef.current?.click()} />
+        <input ref={nutritionImportRef} type="file" accept=".json,application/json" style={{display:'none'}} onChange={async e=>{
+          const file=e.target.files?.[0];e.target.value='';if(!file)return
+          try {
+            const incoming=readNutritionBackup(await file.text())
+            const current=loadNutrition(),merged=mergeNutrition(current,incoming)
+            const report=verifyNutritionRestore(incoming,merged)
+            if(!report.ok)throw new Error('Importdaten unvollständig: '+report.missing.join(', '))
+            confirmSheet({title:'Ernährung ergänzen?',message:'Bestehende Mahlzeiten bleiben erhalten. Neue Einträge und Supplements aus der gewählten Datei werden hinzugefügt.',
+              confirmText:'Zusammenführen',onConfirm:()=>{
+                try {saveNutrition(merged);const check=verifyNutritionRestore(incoming,loadNutrition())
+                toast(check.ok?'Ernährungsdaten importiert':'Speicherprüfung fehlgeschlagen: '+check.missing.join(', '))}
+                catch(err){toast(err?.message||'Import fehlgeschlagen')}
+              }})
+          }catch(err){toast(err?.message||'Ungültiges Ernährungsbackup')}
+        }} />
         <Row icon="download" iconTint="var(--green)" title="Komplettbackup importieren" subtitle="Training + Ernährung aus einer JSON-Datei" accessory="chevron" onClick={() => completeRef.current?.click()} />
         <div className="dim small" style={{ padding: '4px 16px 12px' }}>Automatische Geräte-Backups und Server-Sync enthalten derzeit nur Trainingsdaten. Für beides dieses Komplettbackup verwenden.</div>
         <input ref={completeRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doCompleteImport} />
