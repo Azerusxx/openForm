@@ -84,7 +84,7 @@ export default function Nutrition() {
   const activitySummary = activityDaySummary(data.activities || [],date,training.sessions.map(x=>({date})))
   const burned = activitySummary.net
   const displayedBurned = burned + training.kcal
-  const activeBonus = data.profile?.includeActivityCalories ? burned : 0
+  const activeBonus = data.profile?.includeActivityCalories ? activitySummary.sessions.filter(a=>a.source==='met_estimate').reduce((sum,a)=>sum+Number(a.kcalNet||0),0) : 0
   const inferredWeight=latestWeightKg(gym.bodyweight,date,gym.unit,weight)
   const activityWeight=Number(activityWeightOverride)>0?Number(activityWeightOverride):inferredWeight
   const activityEstimate=activityEnergy({type:activityTypeId,level:activityLevel,minutes:activityMinutes,
