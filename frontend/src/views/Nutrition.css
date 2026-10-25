@@ -279,3 +279,8 @@
 .of-032 .of-macro-tile.of-over-goal strong i,
 .of-032 .of-macro-tile.of-over-goal .of-mini-track>span{background:#ef4444}
 .of-032 .of-macro-tile.of-over-goal>span{color:#ef4444}
+
+/* Global appearance accent, including calorie ring, water and nutrient progress. */
+.of-032 .of-calorie-ring{background:conic-gradient(var(--acc) var(--of-ring-pct),var(--sep) var(--of-ring-pct))}
+.of-032 .of-calorie-ring[aria-valuenow]:not([aria-valuenow="0"]){transition:background .2s}
+.of-032 .of-nutrient-detail strong small{display:block;font-weight:400;font-size:11px;text-align:right}
