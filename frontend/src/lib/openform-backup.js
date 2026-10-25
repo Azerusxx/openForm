@@ -36,7 +36,7 @@ export function backupManifest(backup) {
  const t=b.training,n=b.nutrition
  return {workouts:t.workouts?.length||0,bodyweight:t.bodyweight?.length||0,routines:t.routines?.length||0,
    bodyMeasurements:(t.bodyMeasurements||t.measurements||[]).length||0,
-   entries:n.entries.length,water:n.water?.length||0,activities:n.activities?.length||0,
+   entries:n.entries.length,water:Object.keys(n.water||{}).length,activities:n.activities?.length||0,
    favorites:n.favorites?.length||0,recipes:n.recipes?.length||0,supplements:n.supplements?.length||0,
    goals:!!n.goals,profile:!!n.profile}
 }
