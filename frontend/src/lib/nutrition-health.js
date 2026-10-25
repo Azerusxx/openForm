@@ -38,3 +38,21 @@ export async function healthWalkingSessionsForDay(date){
  return {ok:true,date,sessions:Array.isArray(res.sessions)?res.sessions:[],
    more:!!res.more,source:'health_connect'}
 }
+
+export async function requestHealthExercisePermission(){
+ const p=await api()
+ if(!p)return {ok:false,reason:'unsupported'}
+ try {
+  const result=await p.requestExercisePermission()
+  return {ok:!!result.exerciseGranted,reason:result.exerciseGranted?'granted':'permission'}
+ }catch(e){return {ok:false,reason:e?.message||'failed'}}
+}
+export async function healthConnectDiagnostic(date){
+ const status=await healthStepStatus()
+ if(status.status!=='available')return {...status,steps:null,error:status.status}
+ if(!status.granted)return {...status,steps:null,error:'READ_STEPS nicht freigegeben'}
+ try {
+  const steps=await healthStepsForDay(date)
+  return {...status,steps:steps.ok?steps.steps:null,error:steps.ok?null:steps.reason}
+ }catch(e){return {...status,steps:null,error:e?.message||'Unbekannter Fehler'}}
+}
