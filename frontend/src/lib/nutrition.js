@@ -12,6 +12,16 @@ export const MICRO_NUTRIENTS = [
   { key: 'potassium', label: 'Kalium', unit: 'mg', off: 'potassium_100g', factor: 1000 },
   { key: 'vitaminC', label: 'Vitamin C', unit: 'mg', off: 'vitamin-c_100g', factor: 1000 },
   { key: 'vitaminD', label: 'Vitamin D', unit: 'µg', off: 'vitamin-d_100g', factor: 1e6 },
+  { key: 'vitaminA', label: 'Vitamin A', unit: 'µg', off: 'vitamin-a_100g', factor: 1e6 },
+  { key: 'vitaminE', label: 'Vitamin E', unit: 'mg', off: 'vitamin-e_100g', factor: 1000 },
+  { key: 'vitaminB1', label: 'Vitamin B1', unit: 'mg', off: 'vitamin-b1_100g', factor: 1000 },
+  { key: 'vitaminB2', label: 'Vitamin B2', unit: 'mg', off: 'vitamin-b2_100g', factor: 1000 },
+  { key: 'vitaminB6', label: 'Vitamin B6', unit: 'mg', off: 'vitamin-b6_100g', factor: 1000 },
+  { key: 'vitaminB12', label: 'Vitamin B12', unit: 'µg', off: 'vitamin-b12_100g', factor: 1e6 },
+  { key: 'folate', label: 'Folat', unit: 'µg', off: 'vitamin-b9_100g', factor: 1e6 },
+  { key: 'zinc', label: 'Zink', unit: 'mg', off: 'zinc_100g', factor: 1000 },
+  { key: 'iodine', label: 'Jod', unit: 'µg', off: 'iodine_100g', factor: 1e6 },
+  { key: 'selenium', label: 'Selen', unit: 'µg', off: 'selenium_100g', factor: 1e6 },
 ]
 export function cleanMicros(source) {
   if (!source || typeof source !== 'object') return {}
