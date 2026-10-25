@@ -370,7 +370,7 @@ export default function Nutrition() {
           <span className="of-accordion-summary">{data.supplements.filter(x => x.logs.includes(date)).length}/{data.supplements.length} eingenommen <Icon name={showNutritionExtras ? 'chevronUp' : 'chevronDown'} /></span>
         </button>
         {showNutritionExtras && <div id="of-nutrition-details" className="of-accordion-body">
-          <h3>Makronährstoffe</h3>
+          <details className="of-macro-details"><summary>Makronährstoffe im Detail</summary><h3>Makronährstoffe</h3>
           <div className="of-nutrient-detail">{[['protein','Protein'],['carbs','Kohlenhydrate'],['fat','Fett']].map(([key,label]) => <div key={key}><span>{label}</span><strong>{fmt(totals[key])} g {macroGoals[key] == null ? '' : `von ${fmt(macroGoals[key])} g`}</strong></div>)}</div>
           <button type="button" className="of-micros-toggle" aria-expanded={showMicros} onClick={() => setShowMicros(v => !v)}>
             <span>Mikronährstoffe &amp; Ballaststoffe</span><span>{nutrientRows.filter(n => n.known).length} erfasst <Icon name={showMicros ? 'chevronUp' : 'chevronDown'} /></span>
@@ -637,8 +637,9 @@ export default function Nutrition() {
       </section>
     </>}
     {tab === 'backup' && <>
-      <div className="card of-backup"><h2>Ernährungsbackup</h2><p>Dieser Export sichert ausschließlich Ernährung, inklusive Wasser, Aktivitäten, Mahlzeiten und Ziele. Das gemeinsame Training-und-Ernährung-Backup findest du in den allgemeinen openForm-Einstellungen.</p>
-        <div className="of-actions"><button onClick={exportBackup}><Icon name="share" /> Export</button><button onClick={() => backupInput.current?.click()}><Icon name="download" /> Import</button>
+      <div className="card of-backup"><h2>Datensicherung zentral verwalten</h2><p>Vollständige Sicherungen mit Training, Ernährung, Gewicht und Supplements findest du unter Einstellungen → Daten & Backup. Die spezialisierten Ernährungsimporte bleiben hier verfügbar.</p>
+        <button type="button" onClick={()=>window.location.assign('/settings/data')}>Zu Daten & Backup</button>
+        <div className="of-actions"><button onClick={exportBackup}><Icon name="share" /> Nur Ernährung exportieren</button><button onClick={() => backupInput.current?.click()}><Icon name="download" /> Nur Ernährung importieren</button>
           <input hidden type="file" ref={backupInput} accept=".json,application/json" onChange={async e => { await importBackup(e.target.files?.[0]); e.target.value = '' }} /></div>
       </div>
     </>}
