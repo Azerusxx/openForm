@@ -145,7 +145,7 @@ jobs:
           pkg=$("$aapt" dump badging "$apk" | grep '^package:' | head -1)
           echo "$pkg"
           echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
-          echo "$pkg" | grep -F "versionName='0.4.0h'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
+          echo "$pkg" | grep -F "versionName='0.4.0i'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
           echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
 
       - name: APK als Artifact hochladen
