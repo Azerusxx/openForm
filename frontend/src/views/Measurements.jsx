@@ -9,6 +9,7 @@ import {
   toMeasurementDisplay, normalizeMeasurementsState,
 } from '../lib/measurements.js'
 import { fmtDate, fmtNum, todayISO, uid } from '../lib/format.js'
+import { circumferenceForecast } from '../lib/body-development.js'
 import { t } from '../lib/i18n.js'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
@@ -176,6 +177,9 @@ export default function Measurements() {
   const latest = all.at(-1)
   const previous = all.at(-2)
   const delta = latest && previous ? Math.round((latest.y - previous.y) * 10) / 10 : null
+  const selectedTrend = useMemo(() =>
+    circumferenceForecast(S.measurements, key, todayISO(), {unit: S.unit === 'lb' ? 'in' : 'cm'}),
+    [S.measurements, key, S.unit])
   const recent = [...S.measurements].reverse()
 
   const remove = entry => confirmSheet({
@@ -208,6 +212,17 @@ export default function Measurements() {
       <Segmented className="seg-range" value={range} onChange={setRange}
         options={[{ value: 30, label: '1M' }, { value: 90, label: '3M' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
       <div className="chart"><LineChart points={points} h={170} unit={unit} color="var(--teal)" /></div>
+      {(key === 'waist' || key === 'abdomen') && <div className="measure-trend">
+        <strong>{selectedTrend.status === 'ready' ?
+          selectedTrend.stable ? 'Etwa stabil' : `${selectedTrend.perWeek>0?'+':''}${fmtNum(selectedTrend.perWeek)} ${unit}/Woche` :
+          'Noch keine verlässliche Prognose'}</strong>
+        <p className="muted small">{selectedTrend.status === 'ready' ?
+          `In 4 Wochen rechnerisch etwa ${fmtNum(selectedTrend.projected.y)} ${unit} (grobe Spanne ${fmtNum(selectedTrend.projected.lower)}–${fmtNum(selectedTrend.projected.upper)} ${unit}).` :
+          selectedTrend.status === 'stale' ? 'Bitte erneut messen. Der letzte Wert liegt zu lange zurück.' :
+          selectedTrend.status === 'volatile' ? 'Zu starke Schwankungen für eine sinnvolle Fortschreibung.' :
+          'Für einen Trend brauchst du mindestens drei Messungen über vier Wochen.'}</p>
+        <p className="muted small">Nur ein rechnerischer Umfangstrend, kein Nachweis von Fettverlust oder Muskelaufbau.</p>
+      </div>}
     </div>
 
     {!available.length && <div className="card">
@@ -235,3 +250,5 @@ export default function Measurements() {
     })}</div> : <div className="empty small">{t('No measurements yet')}</div>}
   </div>
 }
+
+/* 0.3.7h: interpret the selected circumference history conservatively */

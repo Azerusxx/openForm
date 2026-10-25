@@ -20,3 +20,7 @@
 .body-development-metrics small{font-size:11px;color:var(--label-2);line-height:1.35}
 .body-development-disclaimer{font-size:11px;line-height:1.45;color:var(--label-3);margin:13px 0 0}
 @media(max-width:375px){.body-development-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.body-development-cards>div:last-child{grid-column:1/3}}
+
+.measure-trend{margin-top:12px;padding:12px;border-radius:12px;background:var(--surface-2);border-left:3px solid var(--teal)}
+.measure-trend strong{font-size:14px}
+.measure-trend p{line-height:1.5;margin:6px 0 0}

@@ -22,7 +22,7 @@ export default function BodyDevelopment({ S }) {
  const hasPrediction=weight.status==='ready'
  return <section className="card body-development" aria-label="Körperentwicklung und Prognose">
    <div className="row between body-development-title">
-     <div><h2><Icon name="trendingUp" /> Körperentwicklung & Prognose</h2>
+     <div><h2><Icon name="chartLine" /> Körperentwicklung & Prognose</h2>
        <p className="muted small">Gewicht als Wochenmittel, Taille und Bauch aus deinen Körpermessungen.</p></div>
      <button type="button" className="body-development-link" onClick={()=>nav('/measurements')}>Messungen <Icon name="chevronRight" /></button>
    </div>
