@@ -17,7 +17,7 @@ describe('0.4.1 nutrition analysis',()=>{
  it('does not infer a trend from one weight measurement',()=>{
    const one=nutritionWeekAnalysis([], '2026-10-25',goals,[{d:'2026-10-23',w:76.4}])
    expect(one.weightDelta).toBeNull()
-   const two=nutritionWeekAnalysis([], '2026-10-25',goals,[{d:'2026-10-20',w:76.5},{d:'2026-10-25',w:75.9}])
+   const two=nutritionWeekAnalysis([], '2026-10-25',goals,[{d:'2026-10-19',w:76.5},{d:'2026-10-25',w:75.9}])
    expect(two.weightDelta).toBe(-0.6)
  })
  it('repeats the most recent portion and preserves AI micronutrient provenance',()=>{
