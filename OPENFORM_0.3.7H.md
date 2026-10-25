@@ -1,0 +1,9 @@
+# openForm 0.3.7h: Körperentwicklung & Prognose
+
+**Was neu ist:** In **Statistik** erscheint eine eigenständige Karte mit dem Verlauf der Gewichts-Wochenmittel, dem geschätzten Wochentrend, einer groben **4-Wochen-Spanne** und bei passender Datenlage einer rechnerischen Annäherung an das bereits eingetragene Gewichtsziel. Die Körpermessungen-Seite zeigt für Taille und Bauch die jeweiligen Veränderungen sowie eine vorsichtige Kurzfristfortschreibung. Die Körpermessungen werden weiterhin in cm gespeichert; ein Pfundprofil zeigt sie korrekt in Zoll an.
+
+**Datenqualität:** Die Gewichtsschätzung benötigt mindestens vier unterschiedliche Messwochen, mindestens 28 Tage Abstand zwischen erster und letzter Messwoche und einen aktuellen Messwert aus den letzten 21 Tagen. Die Körperumfänge benötigen mindestens drei Check-ins über 28 Tage, letzter Wert höchstens 45 Tage alt. Unplausible Werte, extreme Schwankungen und fehlende Daten führen ausdrücklich zu **keiner** Prognose. Nicht auf 6- oder 12-Monats-Ziele extrapolieren; das Ziel-Datum wird nur für eine rechnerische Frist von höchstens 26 Wochen gezeigt, wenn sich die Trendrichtung zum Ziel bewegt.
+
+**Transparenz:** Das sind einfache Trendfortschreibungen mit grober Szenariospanne, **keine statistischen Konfidenzintervalle** und keine Garantie. Gewicht ist von Wasser und Tagesform abhängig; eine schrumpfende Taille beweist keinen bestimmten Körperfettanteil. Keine automatische Berechnung von Sixpack, Bodyfat-Prozenten, oder Muskelaufbau ohne direkte Messung.
+
+**Datensicherheit:** Reine Lesefunktion über die vorhandenen `bodyweight`, `measurements`, `targetW`, `unit` Felder. Keine neue Speicherung, Migration oder Änderung an Training, Ernährung, Kalender, Krankheitseinträgen oder Backups. Vor APK-Updates trotzdem vollständiges Backup exportieren.

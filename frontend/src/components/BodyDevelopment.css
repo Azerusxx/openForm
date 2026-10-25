@@ -1,0 +1,26 @@
+.body-development{margin:12px 0 18px}
+.body-development-title{align-items:start;gap:12px;margin-bottom:12px}
+.body-development-title h2{margin:0;font-size:19px;display:flex;align-items:center;gap:8px}
+.body-development-title h2 .icn{color:var(--teal)}
+.body-development-title p{margin:5px 0 0;line-height:1.4}
+.body-development-link{display:flex;align-items:center;gap:3px;border:1px solid var(--sep);background:var(--surface-2);border-radius:10px;padding:9px 10px;font-size:12px;color:var(--label);white-space:nowrap}
+.body-development-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.body-development-cards>div{min-width:0;padding:10px 8px;background:var(--surface-2);border:1px solid var(--sep);border-radius:12px;display:flex;flex-direction:column;gap:6px}
+.body-development-cards span,.body-development-metrics span{color:var(--label-2);font-size:11px;line-height:1.3}
+.body-development-cards strong{font-size:14px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.body-development-plot{margin-top:12px}
+.body-development-target{display:flex;gap:7px;align-items:start;font-size:12px;line-height:1.45;padding:10px 12px;background:var(--surface-2);border-left:3px solid var(--teal);border-radius:7px}
+.body-development-target .icn{flex:none;color:var(--teal)}
+.body-development-unavailable{display:flex;align-items:center;gap:12px;background:var(--surface-2);border-radius:11px;padding:14px}
+.body-development-unavailable .icn{flex:none;color:var(--teal);font-size:24px}
+.body-development-unavailable p{color:var(--label-2);font-size:12px;line-height:1.5;margin:0}
+.body-development-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.body-development-metrics>div{display:flex;flex-direction:column;gap:5px;padding:11px 12px;background:var(--surface-2);border-radius:12px;min-width:0}
+.body-development-metrics strong{font-size:18px;font-variant-numeric:tabular-nums}
+.body-development-metrics small{font-size:11px;color:var(--label-2);line-height:1.35}
+.body-development-disclaimer{font-size:11px;line-height:1.45;color:var(--label-3);margin:13px 0 0}
+@media(max-width:375px){.body-development-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.body-development-cards>div:last-child{grid-column:1/3}}
+
+.measure-trend{margin-top:12px;padding:12px;border-radius:12px;background:var(--surface-2);border-left:3px solid var(--teal)}
+.measure-trend strong{font-size:14px}
+.measure-trend p{line-height:1.5;margin:6px 0 0}
