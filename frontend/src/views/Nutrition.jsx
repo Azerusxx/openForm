@@ -1,3 +1,4 @@
+import { hybridFoodSearch } from '../lib/nutrition-hybrid.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
@@ -101,7 +102,7 @@ export default function Nutrition() {
     } catch (err) { setNotice(err.message) }
   }
   const setProduct = p => {
-    setForm({ ...EMPTY(), name: p.name, quantity: '100', basis: p.basis, unit: p.basis,
+    setForm({ ...EMPTY(), name: p.name, quantity: String(p.estimatedGrams || 100), basis: p.basis, unit: p.basis,
       source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, date, mealType: selectedMeal })
     setEditing(null); setShowForm(true); setTab('food'); setNotice('Produkt gefunden. Nährwerte und Portion vor dem Speichern prüfen.')
   }
@@ -114,9 +115,9 @@ export default function Nutrition() {
   const findFood = async e => {
     e.preventDefault(); setBusy(true); setResults([]); setNotice('')
     try {
-      const foods = await searchFoodByName(search)
-      setResults(foods)
-      if (!foods.length) setNotice('Keine vollständigen Nährwertdaten gefunden. Du kannst das Lebensmittel selbst eintragen.')
+      const found = await hybridFoodSearch(search)
+      setResults(found.foods)
+      if (found.estimated) setNotice('KI-Schätzung, keine verifizierten Herstellerwerte. Menge und Nährwerte vor dem Speichern prüfen.')
     } catch (err) { setNotice(err.message || 'Suche fehlgeschlagen.') }
     finally { setBusy(false) }
   }
@@ -304,11 +305,11 @@ export default function Nutrition() {
         <div><input id="food-barcode" inputMode="numeric" placeholder="EAN eingeben" value={barcode} onChange={e => setBarcode(e.target.value)} />
         <button type="submit" disabled={busy}>{busy ? 'Suche…' : 'Suchen'}</button></div>
       </form>
-      <form className="card of-lookup" onSubmit={findFood}><label htmlFor="food-name">Lebensmittel suchen (Open Food Facts)</label>
-        <div><input id="food-name" placeholder="z. B. Skyr" value={search} onChange={e => setSearch(e.target.value)} />
+      <form className="card of-lookup" onSubmit={findFood}><label htmlFor="food-name">Lebensmittel suchen (Datenbank + KI)</label>
+        <div><input id="food-name" placeholder="z. B. Big Mac Menü oder 2 Semmeln" value={search} onChange={e => setSearch(e.target.value)} />
           <button type="submit" disabled={busy}>Suchen</button></div></form>
       {!!results.length && <div className="card of-reusable"><h2>Suchergebnisse</h2>{results.map((p,i) => <div className="of-reuse-row" key={`${p.barcode}-${i}`}>
-        <span>{p.name}<small>{fmt(p.per100.kcal)} kcal · {fmt(p.per100.protein)} g Protein / 100g</small></span>
+        <span>{p.name}<small>{fmt(p.per100.kcal)} kcal · {fmt(p.per100.protein)} g Protein / 100g{p.source === 'ai_estimate' ? ' · KI-Schätzung' : ''}</small></span>
         <button onClick={() => setProduct(p)}>Übernehmen</button></div>)}</div>}
       {camera && <FoodCameraScan onFound={async code => { setCamera(false); await lookup(code) }} onClose={() => setCamera(false)} />}
       {showForm && <form className="card of-form" onSubmit={saveMeal}>
