@@ -34,6 +34,13 @@ export function cleanMicros(source) {
     return v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) || Number(v) < 0 ? [] : [[key, Number(v)]]
   }))
 }
+export function cleanMicrosSources(source, micros) {
+  if (!source || typeof source !== 'object') return {}
+  return Object.fromEntries(Object.entries(source).filter(([key,value]) =>
+    Object.hasOwn(micros || {}, key) &&
+    ['ai_estimate','database','manual'].includes(value) &&
+    MICRO_NUTRIENTS.some(n => n.key === key)))
+}
 export function entryMicros(entry) {
   const size = entry.unit === 'piece' ? Number(entry.pieceSize) : 1
   const qty = Number(entry.quantity)
@@ -94,6 +101,7 @@ export function normalizedNutrition(data) {
     ...e, name: e.name.slice(0, 160), date: e.date, quantity: n(e.quantity),
     mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(e.mealType) ? e.mealType : 'other',
     unitPer100: n(e.unitPer100 || 100), per100: nutrients(e.per100), per100Micros: cleanMicros(e.per100Micros),
+    microsSources: cleanMicrosSources(e.microsSources, cleanMicros(e.per100Micros)),
     pieceSize: positive(e.pieceSize) ? n(e.pieceSize) : null,
     source: typeof e.source === 'string' ? e.source : 'manual',
     fiberSource: ['ai_estimate','database','manual'].includes(e.fiberSource) ? e.fiberSource : null
@@ -136,14 +144,14 @@ export function dayTotals(entries, date) {
     return sum
   }, nutrients({}))
 }
-export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other', per100Micros = {}, fiberSource = null }) {
+export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other', per100Micros = {}, fiberSource = null, microsSources = {} }) {
   const cleanName = String(name || '').trim()
   if (!cleanName || !positive(quantity) || !validDate(date) || !['g', 'ml', 'piece'].includes(unit)) throw new Error('Bitte Name und gültige Portion eingeben.')
   if (!['g', 'ml'].includes(basis) || (unit !== 'piece' && basis !== unit) || (unit === 'piece' && !positive(pieceSize))) throw new Error('Einheit und Nährwertbasis passen nicht zusammen.')
   const uid = id || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
   return { id: uid, date, name: cleanName.slice(0, 160), quantity: n(quantity), unit, basis,
     unitPer100: 100, pieceSize: unit === 'piece' ? n(pieceSize) : null,
-    per100: nutrients(per100), per100Micros: cleanMicros(per100Micros), fiberSource: ['ai_estimate','database','manual'].includes(fiberSource) ? fiberSource : null, source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
+    per100: nutrients(per100), per100Micros: cleanMicros(per100Micros), microsSources: cleanMicrosSources(microsSources, cleanMicros(per100Micros)), fiberSource: ['ai_estimate','database','manual'].includes(fiberSource) ? fiberSource : null, source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
 }
 export function mergeNutrition(existing, imported) {
   const old = normalizedNutrition(existing), incoming = normalizedNutrition(imported)
