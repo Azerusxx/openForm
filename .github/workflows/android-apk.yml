@@ -61,11 +61,15 @@ jobs:
 
       - name: Ernaehrung, Backup und Navigation testen
         working-directory: frontend
-        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs src/lib/nutrition-micros.test.mjs src/lib/coach-nutrition.test.mjs src/lib/training-energy.test.mjs src/lib/openform-recovery.test.mjs src/lib/nutrition-035.test.mjs src/lib/smart-rest.test.mjs src/lib/rest-circle.test.mjs src/lib/progression-review.test.mjs src/lib/illness.test.mjs src/lib/illness-sync.test.mjs src/lib/illness-ui.test.mjs src/lib/appearance-illness.test.mjs src/lib/illness-burden.test.mjs src/lib/body-development.test.mjs src/lib/body-development-ui.test.mjs
+        run: node --test src/lib/nutrition.test.mjs src/lib/nutrition-extra.test.mjs src/components/TabBar.openform.test.mjs src/lib/openform-backup.test.mjs src/lib/openform-integrated-ui.test.mjs src/lib/backup-review.test.mjs src/lib/nutrition-navigation.test.mjs src/lib/nutrition-032.test.mjs src/lib/nutrition-micros.test.mjs src/lib/coach-nutrition.test.mjs src/lib/training-energy.test.mjs src/lib/openform-recovery.test.mjs src/lib/nutrition-035.test.mjs src/lib/supplement-day-rollover.test.mjs src/lib/smart-rest.test.mjs src/lib/rest-circle.test.mjs src/lib/progression-review.test.mjs src/lib/illness.test.mjs src/lib/illness-sync.test.mjs src/lib/illness-ui.test.mjs src/lib/appearance-illness.test.mjs src/lib/illness-burden.test.mjs src/lib/body-development.test.mjs src/lib/body-development-ui.test.mjs
 
       - name: Hybrid-Ernährungssuche testen
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js
+
+      - name: Mikronaehrstoffe und Kreatin-Korrektur testen
+        working-directory: frontend
+        run: npx vitest run src/lib/nutrient-overview.test.js src/lib/supplement-editor.test.js src/lib/creatine-repair.test.js src/lib/omega3-merge.test.js src/lib/fiber-report.test.js src/lib/ai-fiber.test.js src/lib/ai-micros.test.js src/lib/nutrition-analysis.test.js src/lib/nutrition-trend.test.js src/lib/activity-trends.test.jsx src/lib/openform-stabilization.test.js
 
       - name: Mobile Web-App bauen
         working-directory: frontend
@@ -141,13 +145,13 @@ jobs:
           pkg=$("$aapt" dump badging "$apk" | grep '^package:' | head -1)
           echo "$pkg"
           echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
-          echo "$pkg" | grep -F "versionName='0.3.7h'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
+          echo "$pkg" | grep -F "versionName='0.4.3'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
           echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: openForm-0.3.7h-debug
+          name: openForm-0.4.3-debug
           path: frontend/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
