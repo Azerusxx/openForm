@@ -1,0 +1,28 @@
+/* All four rings derive from the chosen appearance accent, including custom hex.
+   No fixed orange values. Keep gaps between strokes at all display sizes. */
+.of-032 .of-macro-ring-block{
+  --macro-track:var(--sep);
+  --macro-kcal:var(--food-accent,var(--acc));
+  --macro-protein:color-mix(in srgb,var(--food-accent,var(--acc)) 72%,white);
+  --macro-fat:color-mix(in srgb,var(--food-accent,var(--acc)) 80%,#d7ad62);
+  --macro-carbs:color-mix(in srgb,var(--food-accent,var(--acc)) 76%,#273949);
+  --macro-excess:#ef6a68;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  width:100%; margin:6px 0 4px;
+}
+.of-032 .of-macro-rings{position:relative;width:min(246px,100%);aspect-ratio:1}
+.of-032 .of-macro-rings svg{width:100%;height:100%;display:block;overflow:visible}
+.of-032 .of-macro-rings circle{transition:stroke-dashoffset 220ms ease}
+.of-032 .of-macro-ring-center{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;flex-direction:column;pointer-events:none}
+.of-032 .of-macro-ring-center strong{font-size:29px;font-weight:750;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.of-032 .of-macro-ring-center span{font-size:11px;color:var(--label-3);margin-top:3px}
+.of-032 .of-macro-ring-center .is-over,.of-032 .of-macro-legend-row .is-over{color:var(--macro-excess)}
+.of-032 .of-macro-ring-legend{width:100%;display:grid;gap:7px;margin-bottom:8px}
+.of-032 .of-macro-legend-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;min-height:28px}
+.of-032 .of-macro-legend-name{display:flex;align-items:center;gap:8px}
+.of-032 .of-macro-legend-name i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.of-032 .of-macro-legend-row strong{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.of-032 .of-macro-ring-details{border-top:1px solid var(--sep);font-size:11px;color:var(--label-3);padding:8px 0 0}
+.of-032 .of-macro-ring-details summary{cursor:pointer;font-weight:600;padding:5px 0}
+.of-032 .of-macro-ring-details>div{display:flex;justify-content:space-between;gap:9px;padding:5px 0;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){.of-032 .of-macro-rings circle{transition:none}}
