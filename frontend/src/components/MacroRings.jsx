@@ -40,7 +40,7 @@ export default function MacroRings({totals={},goals={},remaining=0}) {
     <div className="of-macro-ring-legend" aria-label="Makro-Tagesziele">
       {rings.map(r=><div key={r.key} className="of-macro-legend-row">
         <span className="of-macro-legend-name"><i style={{background:`var(${r.css})`}}/>{r.label}</span>
-        <strong className={r.excess?'is-over':''}>{number(r.value)} / {r.goal==null?'–':number(r.goal)} g</strong>
+        <strong className={r.excess?'is-over':''}>{r.goal==null?`${number(r.value)} g erfasst`:`${number(r.value)} / ${number(r.goal)} g`}</strong>
       </div>)}
     </div>
   </div>
