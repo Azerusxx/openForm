@@ -17,6 +17,7 @@ import { nutritionWeekAnalysis, frequentMeals, analyzeWeightTrend, similarMealSu
 import { ACTIVITY_CATALOG, activityEnergy, latestWeightKg, activityDaySummary } from '../lib/activity-energy.js'
 import { healthStepStatus, healthStepsForDay } from '../lib/nutrition-health.js'
 import NutritionTrendChart, { trendSeries } from '../lib/nutrition-trends.jsx'
+import MacroRings from '../components/MacroRings.jsx'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -368,9 +369,11 @@ export default function Nutrition() {
       <section className="of-calorie-card" aria-label="Kalorienbilanz">
         <div className="of-calorie-meta"><div><span className="of-calorie-symbol of-intake"><Icon name="download" /></span><strong>{fmt(totals.kcal)}</strong><small>zugeführt</small></div>
           <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>{training.kcal ? 'Aktivität + Training (ca. verbrannt)' : 'Aktivität (ca. verbrannt)'}</small></div></div>
-        <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={(data.goals.kcal||0)+activeBonus} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,(data.goals.kcal||0)+activeBonus) * 100))}%` }}>
-          <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
-        </div>
+        <MacroRings
+          totals={{ ...totals, kcal:totals.kcal }}
+          goals={{ ...macroGoals, kcal:(data.goals.kcal||0)+activeBonus }}
+          remaining={remaining}
+        />
         <div className="of-calorie-foot of-calorie-breakdown">
           <div><span>Grundziel</span><strong>{fmt(data.goals.kcal)} kcal</strong></div>
           <div><span>Aktivitätsbonus {data.profile?.includeActivityCalories?'aktiv':'aus'}</span><strong>+ {fmt(activeBonus)} kcal</strong></div>
@@ -378,12 +381,6 @@ export default function Nutrition() {
           <span>*Training und Schritte nicht automatisch gutgeschrieben; Verbrauch ist geschätzt.</span>
         </div>
       </section>
-      <div className="of-macro-cards" aria-label="Makro-Tagesziele">
-        {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${macroGoals[key] != null && totals[key] > macroGoals[key] ? " of-over-goal" : ""}`} key={key}>
-          <strong><i />{label}</strong><div className="of-mini-track"><span style={{width:`${macroGoals[key] == null ? 0 : Math.min(100, 100*totals[key]/Math.max(1,macroGoals[key]))}%`}} /></div>
-          <span>{macroGoals[key] == null ? `${fmt(totals[key])} g erfasst` : `${fmt(totals[key])} / ${fmt(macroGoals[key])} g`}</span>
-        </div>)}
-      </div>
       <p className="of-dim" style={{margin:"6px 0 12px"}}>Kohlenhydrate und Fett: automatisch aus Kalorienziel und Protein berechnet, sofern kein eigenes Ziel gespeichert ist.</p>
       <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
         <button className="of-accordion-toggle" type="button" aria-expanded={showNutritionExtras} aria-controls="of-nutrition-details" onClick={() => setShowNutritionExtras(v => !v)}>
