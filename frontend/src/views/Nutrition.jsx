@@ -266,7 +266,7 @@ export default function Nutrition() {
               <span>{Math.round(percentage)}<small>%</small></span>
             </div>
             <strong>{label}</strong>
-            <span className="of-macro-ring-value">{fmt(current)} / {fmt(goal)} g</span>
+            <span className="of-macro-ring-value">{goal > 0 ? `${fmt(current)} / ${fmt(goal)} g` : `${fmt(current)} g erfasst`}</span>
           </div>
         })}
       </div>
