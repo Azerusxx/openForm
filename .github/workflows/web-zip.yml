@@ -1,0 +1,50 @@
+name: openForm Web ZIP
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Web-Modus ohne Demo-Beispieldaten
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          f = Path("frontend/src/store/useStore.js")
+          s = f.read_text()
+          s, n = re.subn(r"        if \(!localStorage\.getItem\(DEMO_SEEDED\)\) \{\s*localStorage\.setItem\(DEMO_SEEDED, '1'\)\s*await get\(\)\.resetDemo\(\)\s*\}", "        // openForm Web: Browserprofil ohne Demo-Daten", s, count=1)
+          if n != 1:
+              raise SystemExit("Demo-Bootstrap geändert: Build gestoppt")
+          f.write_text(s)
+          PY
+      - name: Abhängigkeiten installieren
+        working-directory: frontend
+        run: npm ci
+      - name: Echte openForm-Web-App bauen
+        working-directory: frontend
+        env:
+          VITE_DEMO: '1'
+        run: npm run build
+      - name: ZIP vorbereiten
+        shell: bash
+        run: |
+          test -s frontend/dist/index.html
+          touch frontend/dist/.nojekyll
+          cd frontend/dist
+          zip -q -r "$GITHUB_WORKSPACE/openForm-Web-Pages.zip" . -x '*.map'
+      - name: Fertige Web-App als ZIP bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: openForm-Web-Pages
+          path: openForm-Web-Pages.zip
+          if-no-files-found: error
+          retention-days: 14
