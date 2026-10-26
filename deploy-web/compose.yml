@@ -1,0 +1,46 @@
+services:
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      DATA_DIR: /data
+      ORIGIN: https://${APP_DOMAIN}
+      RP_ID: ${APP_DOMAIN}
+      RP_NAME: openForm
+      PASSWORD_LOGIN: "1"
+      FIRST_USER_ADMIN: "1"
+      INVITE_ONLY: "0"
+      ALLOW_GUEST: "0"
+      DEFAULT_LANG: de
+      TRUST_PROXY: "1"
+    volumes:
+      - openform_data:/data
+    networks:
+      - internal
+  web:
+    build:
+      context: ..
+      dockerfile: deploy-web/Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal
+volumes:
+  openform_data:
+  caddy_data:
+  caddy_config:
+networks:
+  internal:
