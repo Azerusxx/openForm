@@ -12,15 +12,18 @@ describe('accent-matched nested macro rings',()=>{
   expect(ringPercent(60,0)).toBe(0)
   expect(ringPercent('bad',150)).toBe(0)
  })
- it('has four concentric rings and does not mislabel unknown targets',()=>{
-  expect((jsx.match(/key:'(?:carbs|fat|protein|kcal)'/g)||[])).toHaveLength(4)
-  expect(jsx).toContain('kein Ziel')
+ it('has exactly three rings, preserving an accessible kcal center',()=>{
+  expect((jsx.match(/key:'(?:carbs|fat|protein|kcal)'/g)||[])).toHaveLength(3)
+  expect(jsx).not.toContain("key:'kcal'")
+  expect(jsx).toContain('of-macro-ring-center')
+  expect(jsx).toContain('unbekannt')
   expect(jsx).toContain("remaining<0")
   expect(jsx).toContain('strokeDashoffset')
  })
  it('gets colors from live theme accent, never hard-coded orange for macro progress',()=>{
-  expect(css).toContain('var(--food-accent,var(--acc))')
+  expect(css).toContain('var(--acc)')
   expect(css).toContain('color-mix(')
+  expect(view).toContain('Kalorienbudget und Berechnung')
   expect(view).toContain('<MacroRings')
   expect(view).not.toContain('className="of-macro-cards"')
   expect(view).toContain('goals={{ ...macroGoals, kcal:(data.goals.kcal||0)+activeBonus }}')
