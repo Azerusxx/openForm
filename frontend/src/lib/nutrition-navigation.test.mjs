@@ -14,6 +14,6 @@ test('nutrition landing mirrors daily journal without duplicating global navigat
   assert.match(view, /of-nutrients-accordion/)
   assert.match(view, /of-inline-supp-form/)
   assert.doesNotMatch(view, /showMore && <div id="of-more-menu"/)
-  assert.match(css, /\.of-032 \.of-calorie-ring/)
-  assert.match(css, /\.of-032 \.of-macro-cards/)
+  assert.match(view, /<MacroRings/)
+  assert.doesNotMatch(view, /className="of-macro-cards"/)
 })

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, forwardRef, useSyncExternalStore } from 'r
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useStore, DEF, hasData } from '../store/useStore.js'
 import { healthStatus, loadHealth, enableHealth, disableHealth, openHealthConnect, onHealthChange } from '../lib/health-sync.js'
+import { healthStepStatus, healthStepsForDay, healthWalkingSessionsForDay, requestHealthExercisePermission, healthConnectDiagnostic } from '../lib/nutrition-health.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { speedUnitOf } from '../lib/speed.js'
 import { formulaOf, FORMULA_NAMES } from '../lib/onerm.js'
@@ -37,8 +38,8 @@ import { REST_MAX, REST_PAUSE_MIN, REST_PAUSE_MAX, fmtRest, fmtDuration } from '
 import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, dumbbellInventorySheet, menuSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import NutritionGoalsSettings from './NutritionGoalsSettings.jsx'
-import { loadNutrition, saveNutrition, mergeNutrition } from '../lib/nutrition.js'
-import { createCompleteBackup, parseCompleteBackup } from '../lib/openform-backup.js'
+import { loadNutrition, saveNutrition, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
+import { createCompleteBackup, parseCompleteBackup, backupManifest, verifyCompleteSnapshot, verifyNutritionRestore, verifyBackupRoundTrip } from '../lib/openform-backup.js'
 import { backupCounts, backupHasEntries, backupCountLabel, verifyRestoredBackup, verifyPersistedBackup } from '../lib/backup-review.js'
 import { durationSheet } from '../components/DurationWheel.jsx'
 import { showsConnection, showsLocalLine } from '../components/SyncBanner.jsx'
@@ -103,6 +104,7 @@ export default function Settings({ page = null, find = null, via = null }) {
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
   const completeRef = useRef(null)
+  const nutritionImportRef=useRef(null)
   const importRef = useRef(null)
   const body = useRef(null)
   const wakeOK = wakeLockSupported()
@@ -274,13 +276,15 @@ export default function Settings({ page = null, find = null, via = null }) {
   const doCompleteExport = async () => {
     try {
       const backup = createCompleteBackup(useStore.getState().S, loadNutrition())
+      const verified=verifyBackupRoundTrip(useStore.getState().S,loadNutrition())
+      if(!verified.ok)throw new Error('Backup-Vollständigkeitsprüfung fehlgeschlagen: '+verified.missing.join(', '))
       const json = JSON.stringify(backup, null, 2)
       const name = 'openform-komplett-' + todayISO() + '.json'
       if (MOBILE) { await shareExport(json, name); toast('Komplettbackup exportiert'); return }
       const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
       const a = document.createElement('a'); a.href = url; a.download = name; a.click()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-      toast('Komplettbackup exportiert')
+      toast('Komplettbackup exportiert: '+JSON.stringify(backupManifest(backup)))
     } catch (e) { toast(e?.message || 'Komplettbackup fehlgeschlagen') }
   }
   const doCompleteImport = async ev => {
@@ -290,8 +294,13 @@ export default function Settings({ page = null, find = null, via = null }) {
     let backup
     try { backup = parseCompleteBackup(await file.text()) }
     catch (e) { toast(e?.message || 'Importdatei ungültig'); return }
+    const preview=backupManifest({kind:'openform-complete',training:backup.training,nutrition:backup.nutrition})
     const restore = mergeWith => {
       try {
+        // Snapshot the current local state before any replace operation.
+        const before=JSON.stringify(createCompleteBackup(useStore.getState().S,loadNutrition()))
+        try {localStorage.setItem('openform_pre_restore_v1',before)}
+        catch {throw new Error('Sicherheitskopie vor Import konnte nicht gespeichert werden. Import abgebrochen.')}
         // Import training first and verify the visible store BEFORE changing nutrition.
         importBackup(backup.training, { mergeWith })
         const proof = verifyRestoredBackup(backup.training, useStore.getState().S)
@@ -299,6 +308,9 @@ export default function Settings({ page = null, find = null, via = null }) {
         if (!proof.ok || !durable.ok) throw new Error('Training nicht zuverlässig gespeichert. Bitte App nicht deinstallieren und das Backup behalten.')
         const mergedFood = mergeNutrition(loadNutrition(), backup.nutrition)
         saveNutrition(mergedFood)
+        const checked=loadNutrition()
+        const verifiedFood=verifyNutritionRestore(backup.nutrition,checked)
+        if(!verifiedFood.ok)throw new Error('Ernährungsimport nicht vollständig: '+verifiedFood.missing.join(', '))
         toast(`Importiert: ${backupCountLabel(useStore.getState().S)} · ${mergedFood.entries.length} Mahlzeiten.`)
       } catch (e) { toast(e?.message || 'Wiederherstellung fehlgeschlagen') }
     }
@@ -307,7 +319,7 @@ export default function Settings({ page = null, find = null, via = null }) {
     catch (e) { toast('Serverprüfung fehlgeschlagen. Import nicht gestartet.'); return }
     if (conflict) {
       menuSheet({ title: 'openForm-Komplettbackup importieren?',
-        subtitle: `${conflict.workouts} neuere Trainings könnten beim Ersetzen verloren gehen. Ernährung wird mit den vorhandenen Einträgen zusammengeführt.`,
+        subtitle: `${conflict.workouts} neuere Trainings könnten beim Ersetzen verloren gehen. Enthalten: ${preview.workouts} Trainings, ${preview.bodyweight} Wägungen, ${preview.entries} Mahlzeiten, ${preview.supplements} Supplements. Ernährung wird zusammengeführt.`,
         items: [
           { icon: 'merge', label: 'Mit Server-Trainings zusammenführen', onClick: () => restore(conflict) },
           { icon: 'trash', label: 'Training trotzdem ersetzen', danger: true, onClick: () => restore(null) },
@@ -316,7 +328,7 @@ export default function Settings({ page = null, find = null, via = null }) {
       return
     }
     confirmSheet({ title: 'openForm-Komplettbackup importieren?',
-      message: 'Trainingsdaten werden durch den Backup-Stand ersetzt, laufende Mahlzeiten und Ernährungseinträge bleiben durch Zusammenführen erhalten. Bitte vorher ein aktuelles Komplettbackup erstellen.',
+      message: `Enthalten: ${preview.workouts} Trainings, ${preview.bodyweight} Wägungen, ${preview.entries} Mahlzeiten, ${preview.supplements} Supplements. Training wird ersetzt, Ernährung zusammengeführt. Bitte vorab ein aktuelles Backup erstellen.`,
       confirmText: 'Importieren', danger: true, onConfirm: () => restore(null) })
   }
   // "Export with photos & videos": the same JSON plus every file the state refers to, in a zip
@@ -850,6 +862,11 @@ export default function Settings({ page = null, find = null, via = null }) {
     data: () => <>
       <Section title={t('Back up')}>
         <Row icon="share" iconTint="var(--green)" title="openForm Komplettbackup (JSON)" subtitle="Training + Ernährung, ohne Fotos/Videos" accessory="chevron" onClick={doCompleteExport} />
+        <Row icon="share" iconTint="var(--teal)" title="Nur Ernährung exportieren (JSON)"
+          subtitle="Mahlzeiten, Supplements, Rezepte und Ziele" accessory="chevron" onClick={async()=>{
+            try {await shareExport(nutritionBackup(loadNutrition()),'openform-ernaehrung-'+todayISO()+'.json');toast('Ernährungsbackup exportiert')}
+            catch(e){toast(e?.message||'Export fehlgeschlagen')}
+          }} />
         <Row icon="share" iconTint="var(--blue)" title="Nur Training exportieren (alt)" subtitle="Kompatibel mit alten openGym-Backups" accessory="chevron" onClick={doExport} />
 
         {hasMedia && <Row icon="share" iconTint="var(--blue)" title={t('Export with photos & videos (.zip)')} accessory="chevron" onClick={doExportZip} />}
@@ -864,6 +881,23 @@ export default function Settings({ page = null, find = null, via = null }) {
       </Section>
       {MOBILE && android && <HealthConnectCard S={S} toast={toast} />}
       <Section title="openForm komplett wiederherstellen">
+        <Row icon="download" iconTint="var(--teal)" title="Nur Ernährung importieren"
+          subtitle="Bestehende Einträge behalten; neue Datensätze ergänzen" accessory="chevron" onClick={()=>nutritionImportRef.current?.click()} />
+        <input ref={nutritionImportRef} type="file" accept=".json,application/json" style={{display:'none'}} onChange={async e=>{
+          const file=e.target.files?.[0];e.target.value='';if(!file)return
+          try {
+            const incoming=readNutritionBackup(await file.text())
+            const current=loadNutrition(),merged=mergeNutrition(current,incoming)
+            const report=verifyNutritionRestore(incoming,merged)
+            if(!report.ok)throw new Error('Importdaten unvollständig: '+report.missing.join(', '))
+            confirmSheet({title:'Ernährung ergänzen?',message:'Bestehende Mahlzeiten bleiben erhalten. Neue Einträge und Supplements aus der gewählten Datei werden hinzugefügt.',
+              confirmText:'Zusammenführen',onConfirm:()=>{
+                try {saveNutrition(merged);const check=verifyNutritionRestore(incoming,loadNutrition())
+                toast(check.ok?'Ernährungsdaten importiert':'Speicherprüfung fehlgeschlagen: '+check.missing.join(', '))}
+                catch(err){toast(err?.message||'Import fehlgeschlagen')}
+              }})
+          }catch(err){toast(err?.message||'Ungültiges Ernährungsbackup')}
+        }} />
         <Row icon="download" iconTint="var(--green)" title="Komplettbackup importieren" subtitle="Training + Ernährung aus einer JSON-Datei" accessory="chevron" onClick={() => completeRef.current?.click()} />
         <div className="dim small" style={{ padding: '4px 16px 12px' }}>Automatische Geräte-Backups und Server-Sync enthalten derzeit nur Trainingsdaten. Für beides dieses Komplettbackup verwenden.</div>
         <input ref={completeRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doCompleteImport} />
@@ -1520,8 +1554,14 @@ function HealthConnectCard({ S, toast }) {
   const [st, setSt] = useState(null)
   const [h, setH] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [readStatus, setReadStatus] = useState(null)
+  const [lastSync, setLastSync] = useState(null)
+  const [readBusy, setReadBusy] = useState(false)
+  const [diagnostic,setDiagnostic] = useState(null)
+  const refreshRead = () => healthStepStatus().then(setReadStatus).catch(() => setReadStatus({status:'error',granted:false}))
   useEffect(() => {
     let gone = false
+    refreshRead()
     Promise.all([healthStatus(), loadHealth()]).then(([s, f]) => { if (!gone) { setSt(s); setH(f) } }).catch(() => {})
     const off = onHealthChange(f => { if (!gone) setH(f) })
     return () => { gone = true; off() }
@@ -1565,9 +1605,31 @@ function HealthConnectCard({ S, toast }) {
     ],
   })
 
+  const askRead = async () => {
+    setReadBusy(true)
+    try {
+      const result = await healthStepsForDay(new Date().toLocaleDateString('sv-SE'), {ask:true})
+      await refreshRead()
+      if(result.ok){setLastSync({time:Date.now(),steps:result.steps}); toast('Health Connect: Schritte gelesen')}
+      else toast(describeHealthFailure(result))
+    } catch(e){toast(describeHealthFailure(e))}
+    setReadBusy(false)
+  }
+  const readWalking = async () => {
+    setReadBusy(true)
+    try {
+      const permission=await requestHealthExercisePermission()
+      await refreshRead()
+      if(!permission.ok){toast('Aktivitätszugriff: '+permission.reason);setReadBusy(false);return}
+      const result=await healthWalkingSessionsForDay(new Date().toLocaleDateString('sv-SE'),{ask:true})
+      if(result.ok){setLastSync(x=>({...x,time:Date.now(),walking:result.sessions.length}));toast(result.sessions.length+' Spaziergänge gefunden (nur Vorschau)')}
+      else toast(describeHealthFailure(result))
+    } catch(e){toast(describeHealthFailure(e))}
+    setReadBusy(false)
+  }
   return (
-    <Section title={t('Health Connect')}
-      footer={h.on ? t('Workouts and weigh-ins go to Health Connect when you finish or change them. openGym reads nothing back.') : null}>
+    <Section title="Health Connect"
+      footer="Zentrale Verwaltung. Der Schrittimport ist optional; keine automatische Gutschrift von Kalorien.">
       <Row icon="heart" iconTint="var(--red)" title={t('Write to Health Connect')}
         subtitle={t('Finished workouts and weigh-ins, from this phone only.')}>
         <Switch checked={!!h.on} disabled={busy} onChange={v => (v ? turnOn() : askOff())} />
@@ -1576,6 +1638,26 @@ function HealthConnectCard({ S, toast }) {
         title={t('Permission withdrawn. Tap to allow again')} accessory="chevron" onClick={turnOn} />}
       {h.on && <Row icon="list" iconTint="var(--blue)" title={t('Open Health Connect')}
         accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />}
+      <Row icon="figureRun" iconTint="var(--teal)" title="Schritte lesen"
+        subtitle={readStatus?.granted ? 'Freigegeben · Schritte nur als Information' : 'Optional · Zugriff noch nicht freigegeben'}
+        accessory="chevron" onClick={askRead} disabled={readBusy} />
+      <Row icon="heart" iconTint="var(--teal)" title="Spaziergänge prüfen"
+        subtitle={readStatus?.exerciseGranted ? 'Freigegeben · keine automatische Übernahme' : 'Berechtigung für Aktivitäten erforderlich'}
+        accessory="chevron" onClick={readWalking} disabled={readBusy} />
+      <Row icon="info" iconTint="var(--blue)" title="Verbindung diagnostizieren"
+        subtitle={diagnostic ? ('Schritte: '+(diagnostic.steps??'unbekannt')+' · '+(diagnostic.error||'Abruf erfolgreich')) : 'Status, Berechtigung und Datenabruf prüfen'}
+        accessory="chevron" disabled={readBusy} onClick={async()=>{
+          setReadBusy(true)
+          try {const d=await healthConnectDiagnostic(new Date().toLocaleDateString('sv-SE'));setDiagnostic(d);toast(d.error?'Diagnose: '+d.error:'Health Connect: Datenabruf erfolgreich')}
+          catch(e){setDiagnostic({error:e?.message||'Unbekannter Fehler'});toast('Diagnose fehlgeschlagen')}
+          finally{setReadBusy(false)}
+        }} />
+      <Row icon="info" iconTint="var(--blue)" title="Verbindungsdiagnose" subtitle={readStatus ? `Status: ${readStatus.status} · Schritte: ${readStatus.granted ? 'frei' : 'gesperrt'} · Aktivitäten: ${readStatus.exerciseGranted ? 'frei' : 'gesperrt'}` : 'Status wird geprüft'} accessory="chevron" onClick={async()=>{try{await refreshRead();toast('Health Connect Status aktualisiert')}catch(e){toast(describeHealthFailure(e))}}} />
+      <Row icon="list" iconTint="var(--blue)" title="Berechtigungen verwalten"
+        subtitle="Zugriff jederzeit in Health Connect ändern"
+        accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />
+      <Row icon="check" iconTint="var(--green)" title="Letzte Synchronisierung"
+        subtitle={lastSync?.time ? new Date(lastSync.time).toLocaleString('de-AT') + (lastSync.steps!=null?' · '+lastSync.steps+' Schritte':'') : 'In dieser Sitzung noch nicht synchronisiert'} />
     </Section>
   )
 }

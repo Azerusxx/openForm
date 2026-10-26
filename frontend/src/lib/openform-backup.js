@@ -30,3 +30,41 @@ export function parseCompleteBackup(raw) {
   }
   return { training: data.training, nutrition: normalizedNutrition(data.nutrition), exportedAt: data.exportedAt }
 }
+
+export function backupManifest(backup) {
+ const b = backup?.kind === COMPLETE_KIND ? backup : createCompleteBackup(backup.training, backup.nutrition)
+ const t=b.training,n=b.nutrition
+ return {workouts:t.workouts?.length||0,bodyweight:t.bodyweight?.length||0,routines:t.routines?.length||0,
+   bodyMeasurements:(t.bodyMeasurements||t.measurements||[]).length||0,
+   entries:n.entries.length,water:Object.keys(n.water||{}).length,activities:n.activities?.length||0,
+   favorites:n.favorites?.length||0,recipes:n.recipes?.length||0,supplements:n.supplements?.length||0,
+   goals:!!n.goals,profile:!!n.profile}
+}
+export function verifyCompleteSnapshot(original, restored) {
+ const one=backupManifest(original),two=backupManifest(restored)
+ const lost=Object.keys(one).filter(k=>one[k]!==two[k])
+ return {ok:lost.length===0,missing:lost,before:one,after:two}
+}
+
+/** Verify all imported nutrition records without assuming every field is an array.
+ * The existing local values win on identity conflicts. Water is a dated object.
+ */
+export function verifyNutritionRestore(imported, restored) {
+ const n=normalizedNutrition(imported), r=normalizedNutrition(restored)
+ const missing=[]
+ for(const key of ['entries','activities','favorites','recipes','supplements']){
+   const ids=new Set((r[key]||[]).map(x=>x.id))
+   const lost=(n[key]||[]).filter(x=>!ids.has(x.id))
+   if(lost.length)missing.push(key+': '+lost.length)
+ }
+ for(const date of Object.keys(n.water||{})){
+   if(!Object.hasOwn(r.water||{},date))missing.push('water: '+date)
+ }
+ return {ok:!missing.length,missing}
+}
+export function verifyBackupRoundTrip(training,nutrition){
+ const exported=createCompleteBackup(training,nutrition)
+ const parsed=parseCompleteBackup(JSON.stringify(exported))
+ const verified=verifyCompleteSnapshot(exported,createCompleteBackup(parsed.training,parsed.nutrition))
+ return {...verified,manifest:backupManifest(exported)}
+}

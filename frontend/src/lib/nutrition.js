@@ -1,9 +1,11 @@
+import { normalizeActivity } from './activity-energy.js'
 import { cleanFavorites, cleanRecipes, cleanSupplements } from './nutrition-extra.js'
 // openForm nutrition v0.1: intentionally separate from gym_state_v1 until sync/merge
 // and complete-backup support have been implemented and tested.
 // Nutrients are optional. An absent value means UNKNOWN, not zero.
 // Stored units: fiber g; sodium/calcium/iron/magnesium/potassium/vitaminC mg; vitaminD µg.
 export const MICRO_NUTRIENTS = [
+  { key: 'creatine', label: 'Kreatin', unit: 'g', supplementOnly: true },
   { key: 'omega3', label: 'Omega-3 gesamt', unit: 'mg' },
   { key: 'epa', label: 'EPA (Omega-3)', unit: 'mg' },
   { key: 'dha', label: 'DHA (Omega-3)', unit: 'mg' },
@@ -32,6 +34,13 @@ export function cleanMicros(source) {
     const v = source[key]
     return v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) || Number(v) < 0 ? [] : [[key, Number(v)]]
   }))
+}
+export function cleanMicrosSources(source, micros) {
+  if (!source || typeof source !== 'object') return {}
+  return Object.fromEntries(Object.entries(source).filter(([key,value]) =>
+    Object.hasOwn(micros || {}, key) &&
+    ['ai_estimate','database','manual'].includes(value) &&
+    MICRO_NUTRIENTS.some(n => n.key === key)))
 }
 export function entryMicros(entry) {
   const size = entry.unit === 'piece' ? Number(entry.pieceSize) : 1
@@ -80,9 +89,10 @@ export function normalizedNutrition(data) {
   const d = NEW_NUTRITION()
   if (!data || typeof data !== 'object' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) return d
   d.profile = { activity: ['low', 'light', 'moderate', 'high'].includes(data.profile?.activity) ? data.profile.activity : 'moderate',
-    waterGoal: positive(data.profile?.waterGoal) ? Math.min(10000, n(data.profile.waterGoal)) : 1900 }
+    waterGoal: positive(data.profile?.waterGoal) ? Math.min(10000, n(data.profile.waterGoal)) : 1900,
+    includeActivityCalories: data.profile?.includeActivityCalories === true }
   d.water = Object.fromEntries(Object.entries(data.water && typeof data.water === 'object' && !Array.isArray(data.water) ? data.water : {}).filter(([day, amount]) => validDate(day) && Number.isFinite(Number(amount)) && Number(amount) >= 0).map(([day, amount]) => [day, Math.min(30000, n(amount))]))
-  d.activities = (Array.isArray(data.activities) ? data.activities : []).filter(a => a && typeof a.id === 'string' && validDate(a.date) && typeof a.name === 'string' && a.name.trim() && positive(a.kcal)).map(a => ({ id: a.id, date: a.date, name: a.name.trim().slice(0, 120), kcal: Math.min(10000, n(a.kcal)), createdAt: a.createdAt || 0 }))
+  d.activities = (Array.isArray(data.activities) ? data.activities : []).map(normalizeActivity).filter(Boolean)
   d.goals = {
     kcal: positive(data.goals?.kcal) ? n(data.goals.kcal) : 2200,
     protein: positive(data.goals?.protein) ? n(data.goals.protein) : 150,
@@ -93,8 +103,10 @@ export function normalizedNutrition(data) {
     ...e, name: e.name.slice(0, 160), date: e.date, quantity: n(e.quantity),
     mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(e.mealType) ? e.mealType : 'other',
     unitPer100: n(e.unitPer100 || 100), per100: nutrients(e.per100), per100Micros: cleanMicros(e.per100Micros),
+    microsSources: cleanMicrosSources(e.microsSources, cleanMicros(e.per100Micros)),
     pieceSize: positive(e.pieceSize) ? n(e.pieceSize) : null,
-    source: typeof e.source === 'string' ? e.source : 'manual'
+    source: typeof e.source === 'string' ? e.source : 'manual',
+    fiberSource: ['ai_estimate','database','manual'].includes(e.fiberSource) ? e.fiberSource : null
   })).filter(e => e.unit !== 'piece' || positive(e.pieceSize))
   // Old alpha backups kept favorites as entry IDs; resolve them to snapshots when possible.
   const oldFavoriteIds = Array.isArray(data.favorites) ? data.favorites.filter(x => typeof x === 'string') : []
@@ -134,14 +146,14 @@ export function dayTotals(entries, date) {
     return sum
   }, nutrients({}))
 }
-export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other', per100Micros = {} }) {
+export function createEntry({ name, quantity, unit = 'g', date = dateLocal(), per100, pieceSize = null, basis = 'g', source = 'manual', barcode = null, id = null, mealType = 'other', per100Micros = {}, fiberSource = null, microsSources = {} }) {
   const cleanName = String(name || '').trim()
   if (!cleanName || !positive(quantity) || !validDate(date) || !['g', 'ml', 'piece'].includes(unit)) throw new Error('Bitte Name und gültige Portion eingeben.')
   if (!['g', 'ml'].includes(basis) || (unit !== 'piece' && basis !== unit) || (unit === 'piece' && !positive(pieceSize))) throw new Error('Einheit und Nährwertbasis passen nicht zusammen.')
   const uid = id || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
   return { id: uid, date, name: cleanName.slice(0, 160), quantity: n(quantity), unit, basis,
     unitPer100: 100, pieceSize: unit === 'piece' ? n(pieceSize) : null,
-    per100: nutrients(per100), per100Micros: cleanMicros(per100Micros), source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
+    per100: nutrients(per100), per100Micros: cleanMicros(per100Micros), microsSources: cleanMicrosSources(microsSources, cleanMicros(per100Micros)), fiberSource: ['ai_estimate','database','manual'].includes(fiberSource) ? fiberSource : null, source, barcode, mealType: ['breakfast', 'lunch', 'dinner', 'snack', 'other'].includes(mealType) ? mealType : 'other', createdAt: Date.now() }
 }
 export function mergeNutrition(existing, imported) {
   const old = normalizedNutrition(existing), incoming = normalizedNutrition(imported)
