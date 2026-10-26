@@ -252,11 +252,23 @@ export default function Nutrition() {
         </div>
         <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt, kein Extra-Kalorienbudget</span></div>
       </section>
-      <div className="of-macro-cards" aria-label="Makro-Tagesziele">
-        {[['carbs','Kohlenhydrate','carbs'],['fat','Fett','fat'],['protein','Protein','protein']].map(([key,label,color]) => <div className={`of-macro-tile of-${color}${macroGoals[key] != null && totals[key] > macroGoals[key] ? " of-over-goal" : ""}`} key={key}>
-          <strong><i />{label}</strong><div className="of-mini-track"><span style={{width:`${macroGoals[key] == null ? 0 : Math.min(100, 100*totals[key]/Math.max(1,macroGoals[key]))}%`}} /></div>
-          <span>{macroGoals[key] == null ? `${fmt(totals[key])} g erfasst` : `${fmt(totals[key])} / ${fmt(macroGoals[key])} g`}</span>
-        </div>)}
+      <div className="of-macro-rings" aria-label="Makro-Tagesziele">
+        {[
+          ['carbs','Kohlenhydrate','carbs'],
+          ['fat','Fett','fat'],
+          ['protein','Protein','protein'],
+        ].map(([key,label,color]) => {
+          const goal = Number(macroGoals[key]) || 0
+          const current = Number(totals[key]) || 0
+          const percentage = goal > 0 ? Math.min(100, current / goal * 100) : 0
+          return <div className={`of-macro-ring-card of-${color}${goal > 0 && current > goal ? ' of-over-goal' : ''}`} key={key}>
+            <div className="of-macro-ring" role="progressbar" aria-label={label} aria-valuemin="0" aria-valuenow={Math.round(current)} aria-valuemax={goal} style={{'--of-macro-pct': `${percentage}%`}}>
+              <span>{Math.round(percentage)}<small>%</small></span>
+            </div>
+            <strong>{label}</strong>
+            <span className="of-macro-ring-value">{fmt(current)} / {fmt(goal)} g</span>
+          </div>
+        })}
       </div>
       <p className="of-dim" style={{margin:"6px 0 12px"}}>Kohlenhydrate und Fett: automatisch aus Kalorienziel und Protein berechnet, sofern kein eigenes Ziel gespeichert ist.</p>
       <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
