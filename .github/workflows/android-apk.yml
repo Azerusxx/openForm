@@ -77,6 +77,11 @@ jobs:
           VITE_MOBILE: '1'
         run: npm run build
 
+      - name: OpenGym Übungsbilder und Animationen in die App übernehmen
+        run: |
+          node scripts/catalogue/stage-media.mjs frontend/dist
+          node scripts/catalogue/verify-media.mjs frontend/dist
+
       - name: Capacitor Android synchronisieren
         working-directory: frontend
         run: |
