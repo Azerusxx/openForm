@@ -11,7 +11,7 @@ test('calorie deficit uses activity net only after explicit opt in',()=>{
 })
 test('water and favorites have one-touch shortcuts and unknown macro goals are explicit',()=>{
  const src=read('../views/Nutrition.jsx')
- for(const term of ['of-water-fast','addWater(250)','addWater(500)','of-food-shortcuts','Zuletzt gegessen','g erfasst']) assert.ok(src.includes(term),term)
+ for(const term of ['of-water-fast','addWater(250)','addWater(500)','of-food-shortcuts','Zuletzt gegessen','<MacroRings']) assert.ok(src.includes(term),term)
 })
 test('bottom navigation remains routed correctly with German labels',()=>{
  const src=read('../components/TabBar.jsx')
