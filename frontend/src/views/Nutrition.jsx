@@ -374,14 +374,18 @@ export default function Nutrition() {
           goals={{ ...macroGoals, kcal:(data.goals.kcal||0)+activeBonus }}
           remaining={remaining}
         />
-        <div className="of-calorie-foot of-calorie-breakdown">
-          <div><span>Grundziel</span><strong>{fmt(data.goals.kcal)} kcal</strong></div>
-          <div><span>Aktivitätsbonus {data.profile?.includeActivityCalories?'aktiv':'aus'}</span><strong>+ {fmt(activeBonus)} kcal</strong></div>
-          <div><span>Wirksames Budget</span><strong>{fmt((data.goals.kcal||0)+activeBonus)} kcal</strong></div>
-          <span>*Training und Schritte nicht automatisch gutgeschrieben; Verbrauch ist geschätzt.</span>
-        </div>
+        <details className="of-calorie-details">
+          <summary>Kalorienbudget und Berechnung</summary>
+          <div className="of-calorie-foot of-calorie-breakdown">
+            <div><span>Grundziel</span><strong>{fmt(data.goals.kcal)} kcal</strong></div>
+            <div><span>Aktivitätsbonus {data.profile?.includeActivityCalories?'aktiv':'aus'}</span><strong>+ {fmt(activeBonus)} kcal</strong></div>
+            <div><span>Wirksames Budget</span><strong>{fmt((data.goals.kcal||0)+activeBonus)} kcal</strong></div>
+            <div><span>Gegessen</span><strong>{fmt(totals.kcal)} kcal</strong></div>
+            <span>*Training und Schritte nicht automatisch gutgeschrieben; Verbrauch ist geschätzt.</span>
+          </div>
+          <p>Kohlenhydrate und Fett werden aus Kalorienziel und Protein berechnet, sofern kein eigenes Ziel gespeichert ist.</p>
+        </details>
       </section>
-      <p className="of-dim" style={{margin:"6px 0 12px"}}>Kohlenhydrate und Fett: automatisch aus Kalorienziel und Protein berechnet, sofern kein eigenes Ziel gespeichert ist.</p>
       <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
         <button className="of-accordion-toggle" type="button" aria-expanded={showNutritionExtras} aria-controls="of-nutrition-details" onClick={() => setShowNutritionExtras(v => !v)}>
           <span><Icon name="clipboard" /> Nährstoffe &amp; Supplements</span>
