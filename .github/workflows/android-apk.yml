@@ -69,7 +69,7 @@ jobs:
 
       - name: Mikronaehrstoffe und Kreatin-Korrektur testen
         working-directory: frontend
-        run: npx vitest run src/lib/nutrient-overview.test.js src/lib/supplement-editor.test.js src/lib/creatine-repair.test.js src/lib/omega3-merge.test.js src/lib/fiber-report.test.js src/lib/ai-fiber.test.js src/lib/ai-micros.test.js src/lib/nutrition-analysis.test.js src/lib/nutrition-trend.test.js src/lib/activity-trends.test.jsx src/lib/openform-stabilization.test.js
+        run: npx vitest run src/lib/nutrient-overview.test.js src/lib/supplement-editor.test.js src/lib/creatine-repair.test.js src/lib/omega3-merge.test.js src/lib/fiber-report.test.js src/lib/ai-fiber.test.js src/lib/ai-micros.test.js src/lib/nutrition-analysis.test.js src/lib/nutrition-trend.test.js src/lib/activity-trends.test.jsx src/lib/macro-rings.test.jsx src/lib/openform-stabilization.test.js
 
       - name: Mobile Web-App bauen
         working-directory: frontend
