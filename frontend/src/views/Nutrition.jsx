@@ -33,7 +33,7 @@ export default function Nutrition() {
   const [drawer, setDrawer] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
   const [showWater, setShowWater] = useState(false)
-  const [showNutritionExtras, setShowNutritionExtras] = useState(true)
+  const [showNutritionExtras, setShowNutritionExtras] = useState(false)
   const [showMicros, setShowMicros] = useState(true)
   const [showSupplements, setShowSupplements] = useState(false)
   const [selectedMeal, setSelectedMeal] = useState('breakfast')
