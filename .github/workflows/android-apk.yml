@@ -73,16 +73,26 @@ jobs:
           VITE_MOBILE: '1'
         run: npm run build
 
-      - name: Optionale lizenzierte Gym-Medien einbinden
+      # Nichtkommerzielle openGym-Forks: nur unveraenderte 180px-Medien
+      # mit originalem Lizenzhinweis; niemals groessere, extrahierte Medien.
+      - name: Originale 180px openGym-Medien laden
+        uses: actions/checkout@v4
+        with:
+          repository: DuarteSantos8/openGym
+          ref: 08eabf4f480f43fd789592577463cca1b504976e
+          path: upstream-openGym
+          sparse-checkout: catalogue/media
+          persist-credentials: false
+
+      - name: Gym-Medien und Lizenzhinweis bereitstellen
         shell: bash
         run: |
           set -euo pipefail
-          if [ -d catalogue/media/still ] && [ -d catalogue/media/clip ] && [ -f catalogue/media/NOTICE.md ]; then
-            node scripts/catalogue/stage-media.mjs frontend/dist
-            echo "Vorhandene Gym-Medien in das App-Bundle kopiert."
-          else
-            echo "::warning::Keine lizenzierten Gym-Medien vorhanden. APK wird ohne Gym-Bilder gebaut."
-          fi
+          test -s upstream-openGym/catalogue/media/NOTICE.md
+          mkdir -p catalogue/media
+          cp -a upstream-openGym/catalogue/media/. catalogue/media/
+          node scripts/catalogue/stage-media.mjs frontend/dist
+          node scripts/catalogue/verify-media.mjs frontend/dist
 
       - name: Capacitor Android synchronisieren
         working-directory: frontend
@@ -133,26 +143,6 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
-
-      - name: Optionale Gym-Medien in APK pruefen
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
-          if [ -d frontend/dist/exercise-media/still ]; then
-            expected=$(find frontend/dist/exercise-media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
-          else
-            expected=0
-          fi
-          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/still/[^/]+[.]webp$' || true)
-          echo "Gym-Bilder im APK: $actual von $expected"
-          if [ "$actual" -ne "$expected" ]; then
-            echo "::error::Vorhandene Gym-Bilder wurden nicht vollstaendig ins APK gepackt."
-            exit 1
-          fi
-          if [ "$expected" -eq 0 ]; then
-            echo "::warning::APK enthaelt keine Gym-Bilder; Medien muessen separat und rechtmaessig bereitgestellt werden."
-          fi
 
       - name: APK-Signatur und Paket-Identität prüfen
         shell: bash
