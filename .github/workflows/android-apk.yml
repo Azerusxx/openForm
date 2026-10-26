@@ -77,6 +77,26 @@ jobs:
           VITE_MOBILE: '1'
         run: npm run build
 
+      # The fork contains catalogue text but not the original 180px media.
+      # The upstream openGym NOTICE allows unchanged media in non-commercial forks;
+      # these files are fetched transiently for this private Android APK only.
+      - name: Originale openGym-Übungsmedien beziehen
+        uses: actions/checkout@v4
+        with:
+          repository: DuarteSantos8/openGym
+          ref: 08eabf4f480f43fd789592577463cca1b504976e
+          path: upstream-openGym
+          sparse-checkout: catalogue/media
+          persist-credentials: false
+
+      - name: Lizenzierte 180px-Medien für privaten Fork bereitstellen
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s upstream-openGym/catalogue/media/NOTICE.md
+          mkdir -p catalogue/media
+          cp -a upstream-openGym/catalogue/media/. catalogue/media/
+
       - name: OpenGym Übungsbilder und Animationen in die App übernehmen
         run: |
           node scripts/catalogue/stage-media.mjs frontend/dist
