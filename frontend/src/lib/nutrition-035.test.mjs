@@ -9,7 +9,9 @@ test('calorie deficit target never includes exercise calories',()=>{
 })
 test('water and favorites have one-touch shortcuts and unknown macro goals are explicit',()=>{
  const src=read('../views/Nutrition.jsx')
- for(const term of ['of-water-fast','addWater(250)','addWater(500)','of-food-shortcuts','Zuletzt gegessen','g erfasst']) assert.ok(src.includes(term),term)
+ for(const term of ['of-water-fast','addWater(250)','addWater(500)','of-food-shortcuts','Zuletzt gegessen']) assert.ok(src.includes(term),term)
+ const rings=read('../components/MacroRings.jsx')
+ assert.ok(rings.includes('g erfasst'), 'missing-macro-goal message must be visible in MacroRings')
 })
 test('bottom navigation remains routed correctly with German labels',()=>{
  const src=read('../components/TabBar.jsx')
