@@ -1,0 +1,15 @@
+FROM node:22-alpine AS builder
+WORKDIR /workspace
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm ci
+COPY api/coach ./api/coach
+COPY frontend ./frontend
+COPY catalogue ./catalogue
+ENV VITE_MOBILE=0
+ENV VITE_DEMO=0
+RUN cd frontend && npm run build
+
+FROM caddy:2-alpine
+COPY deploy-web/Caddyfile /etc/caddy/Caddyfile
+COPY --from=builder /workspace/frontend/dist /srv/openform
+EXPOSE 80 443
