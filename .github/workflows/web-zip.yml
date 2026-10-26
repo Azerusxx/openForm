@@ -1,5 +1,9 @@
 name: openForm Web ZIP
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/web-zip.yml'
   workflow_dispatch:
 permissions:
   contents: read
