@@ -56,8 +56,6 @@ export default function Nutrition() {
   // The page may stay mounted overnight on Android. Keep "today" moving while
   // leaving explicitly browsed historical days untouched.
   const currentLocalDay = useRef(dateLocal())
-  const selectedDay = useRef(dateLocal())
-  useEffect(() => { selectedDay.current = date }, [date])
   useEffect(() => {
     const onResume = () => {
       const now = dateLocal()
@@ -352,7 +350,7 @@ export default function Nutrition() {
     {tab !== 'today' && <div className="of-subview-head"><button type="button" onClick={() => goSection('today')} aria-label="Zurück zur Ernährung"><Icon name="chevronLeft" /></button><h2>{tab === 'food' ? (showForm ? 'Mahlzeit erfassen' : 'Lebensmittel') : SECTIONS.find(([id]) => id === tab)?.[1]}</h2></div>}
     {(tab === 'today' || tab === 'diary') && <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
       <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
-      <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
+      <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button>{date !== dateLocal() && <button type="button" className="of-return-today" onClick={() => setDate(dateLocal())}>Heute</button>}</div>}
     {notice && <div className="of-notice" role="status">{notice}</div>}
     {tab === 'today' && <>
       <div className="of-health-chips">
