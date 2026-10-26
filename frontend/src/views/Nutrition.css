@@ -313,3 +313,18 @@
 .of-032 .of-micro-track>.of-micro-over-fill{background:#ef4444}
 .of-032 .of-micro-heading .of-micro-over{color:#ef4444}
 .of-032 .of-micro-card>small{font-size:11px;line-height:1.5}
+
+
+/* Compact accent-tinted circular macro goals, 3 across, respects the global accent. */
+.of-032 .of-macro-rings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:0 0 14px}
+.of-032 .of-macro-ring-card{--macro-color:var(--acc);--macro-tone:color-mix(in srgb,var(--acc) 72%,var(--bg-el));display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;padding:13px 5px 12px;background:var(--bg-el);border:1px solid var(--sep);border-radius:17px;text-align:center}
+.of-032 .of-macro-ring-card.of-fat{--macro-color:color-mix(in srgb,var(--acc) 79%,#f5b9d4)}
+.of-032 .of-macro-ring-card.of-protein{--macro-color:color-mix(in srgb,var(--acc) 84%,#a9e8d0)}
+.of-032 .of-macro-ring-card.of-over-goal{--macro-color:#ef4444}
+.of-032 .of-macro-ring{width:min(22vw,82px);height:min(22vw,82px);max-width:82px;max-height:82px;border-radius:50%;display:grid;place-items:center;position:relative;background:conic-gradient(var(--macro-color) var(--of-macro-pct),var(--sep) var(--of-macro-pct))}
+.of-032 .of-macro-ring::before{content:"";position:absolute;inset:9px;background:var(--bg-el);border-radius:50%}
+.of-032 .of-macro-ring>span{position:relative;font-size:18px;font-weight:750;line-height:1;font-variant-numeric:tabular-nums;color:var(--label)}
+.of-032 .of-macro-ring>span small{font-size:10px}
+.of-032 .of-macro-ring-card>strong{font-size:12px;line-height:1.25}
+.of-032 .of-macro-ring-value{font-size:12px;color:var(--label-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(max-width:370px){.of-032 .of-macro-rings{gap:5px}.of-032 .of-macro-ring-card>strong,.of-032 .of-macro-ring-value{font-size:10px}.of-032 .of-macro-ring{width:66px;height:66px}}
