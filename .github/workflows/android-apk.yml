@@ -73,26 +73,23 @@ jobs:
           VITE_MOBILE: '1'
         run: npm run build
 
-      - name: Gym-Bilder und Animationen einbinden
+      - name: Gym-Medien einbinden
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -d catalogue/media/still ] || [ ! -f catalogue/media/NOTICE.md ]; then
-            echo "::error::Gym-Medien fehlen: catalogue/media/still oder catalogue/media/NOTICE.md nicht vorhanden. Rechtmäßig nutzbare Bilddateien bereitstellen; ein APK ohne Übungsbilder wird nicht veröffentlicht."
+          if [ ! -d catalogue/media/still ] || [ ! -d catalogue/media/clip ] || [ ! -f catalogue/media/NOTICE.md ]; then
+            echo "::error::Gym-Medien fehlen im Repository; keine unvollständige APK erzeugen."
             exit 1
           fi
           count=$(find catalogue/media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
           if [ "$count" -eq 0 ]; then
-            echo "::error::Keine Übungsbilder (*.webp) unter catalogue/media/still vorhanden."
+            echo "::error::Keine Gym-Bilder in catalogue/media/still."
             exit 1
           fi
           node scripts/catalogue/stage-media.mjs frontend/dist
           copied=$(find frontend/dist/exercise-media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
-          if [ "$copied" -ne "$count" ]; then
-            echo "::error::Gym-Bilder unvollständig kopiert: $copied von $count."
-            exit 1
-          fi
-          echo "Gym-Medien für Android vorbereitet: $copied Bilder."
+          test "$copied" -eq "$count" || { echo "::error::Gym-Bilder unvollständig kopiert"; exit 1; }
+          echo "Gym-Bilder vorbereitet: $copied"
 
       - name: Capacitor Android synchronisieren
         working-directory: frontend
@@ -144,43 +141,16 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Gym-Bilder in APK verifizieren
+      - name: Gym-Bilder im APK pruefen
         shell: bash
         run: |
           set -euo pipefail
           apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
           expected=$(find frontend/dist/exercise-media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
-          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/still/[^/]+\.webp        shell: bash
-        run: |
-          set -euo pipefail
-          apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$apk"
-          sdk="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          apksigner="$sdk/build-tools/35.0.0/apksigner"
-          aapt="$sdk/build-tools/35.0.0/aapt"
-          "$apksigner" verify --verbose --print-certs "$apk"
-          actual=$("$apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
-          expected=$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | sed -n 's/^.*SHA256: //p' | head -1 | tr -d ':' | tr '[:upper:]' '[:lower:]')
-          echo "APK Zertifikat SHA-256: ${actual:-nicht gefunden}"
-          echo "Keystore Zertifikat SHA-256: ${expected:-nicht gefunden}"
-          test -n "$actual" && test -n "$expected" && test "$actual" = "$expected" || { echo "::error::APK ist nicht mit dem hinterlegten Debug-Keystore signiert"; exit 1; }
-          pkg=$("$aapt" dump badging "$apk" | grep '^package:' | head -1)
-          echo "$pkg"
-          echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
-          echo "$pkg" | grep -F "versionName='0.3.7h'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
-          echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
-
-      - name: APK als Artifact hochladen
-        uses: actions/upload-artifact@v4
-        with:
-          name: openForm-0.3.7h-debug
-          path: frontend/android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
- || true)
-          echo "Gym-Bilder im APK: $actual / $expected"
+          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/still/[^/]+[.]webp$' || true)
+          echo "Gym-Bilder im APK: $actual von $expected"
           if [ "$expected" -eq 0 ] || [ "$actual" -ne "$expected" ]; then
-            echo "::error::APK enthält nicht alle Übungsbilder; Upload wird gestoppt."
+            echo "::error::APK enthaelt nicht alle Gym-Bilder."
             exit 1
           fi
 
