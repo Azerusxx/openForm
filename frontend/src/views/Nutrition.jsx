@@ -53,6 +53,29 @@ export default function Nutrition() {
   const [stepInfo,setStepInfo] = useState(null)
   const [showActivity, setShowActivity] = useState(false)
   const [date, setDate] = useState(dateLocal)
+  // The page may stay mounted overnight on Android. Keep "today" moving while
+  // leaving explicitly browsed historical days untouched.
+  const currentLocalDay = useRef(dateLocal())
+  const selectedDay = useRef(dateLocal())
+  useEffect(() => { selectedDay.current = date }, [date])
+  useEffect(() => {
+    const onResume = () => {
+      const now = dateLocal()
+      const previous = currentLocalDay.current
+      if (now === previous) return
+      currentLocalDay.current = now
+      setDate(chosen => chosen === previous ? now : chosen)
+    }
+    const onVisibility = () => { if (!document.hidden) onResume() }
+    const timer = window.setInterval(onResume, 60_000)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onResume)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onResume)
+    }
+  }, [])
   const [form, setForm] = useState(EMPTY)
   const [editing, setEditing] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -421,7 +444,7 @@ export default function Nutrition() {
             </div>
           </div>}
           <button type="button" className="of-micros-toggle of-supplements-toggle" aria-expanded={showSupplements} onClick={() => { setShowSupplements(v => !v); setSuppFormOpen(false); setEditingSupplement(null) }}>
-            <span>Supplements heute</span>
+            <span>Supplements {date === dateLocal() ? 'heute' : 'am ' + date.split('-').reverse().join('.')}</span>
             <span>{data.supplements.filter(s => s.logs.includes(date)).length}/{data.supplements.length} eingenommen <Icon name={showSupplements ? 'chevronUp' : 'chevronDown'} /></span>
           </button>
           {!showSupplements && <p className="of-dim of-supp-hint">{data.supplements.length ? 'Hier kannst du deine täglichen Einnahmen abhaken und die hinterlegten Dosierungen bearbeiten.' : 'Hier einmal deine Supplements und Tagesdosen hinterlegen, danach täglich abhaken.'}</p>}
