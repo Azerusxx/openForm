@@ -8,11 +8,11 @@ test('openForm branding never points update checks to upstream openGym', () => {
   const settings = read('../views/Settings.jsx')
   const login = read('../views/Login.jsx')
   const intro = read('../views/MobileOnboarding.jsx')
-  assert.match(update, /UPDATE_REPO = 'Azerusxx\\/openForm'/)
-  assert.doesNotMatch(update, /const REPO = 'DuarteSantos8\\/openGym'/)
-  assert.match(settings, /openForm v\\{__APP_VERSION__\\}/)
-  assert.match(login, />openForm<\\/h1>/)
-  assert.match(intro, />openForm<\\/h1>/)
+  assert.ok(update.includes("UPDATE_REPO = 'Azerusxx/openForm'"))
+  assert.ok(!update.includes("const REPO = 'DuarteSantos8/openGym'"))
+  assert.ok(settings.includes('openForm v{__APP_VERSION__}'))
+  assert.ok(login.includes('>openForm</h1>'))
+  assert.ok(intro.includes('>openForm</h1>'))
 })
 
 test('legacy storage keys are not renamed without migration', () => {
