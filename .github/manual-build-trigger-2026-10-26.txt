@@ -1,0 +1,2 @@
+Trigger des openForm Android APK Workflows nach der Medien-Validierung (Commit 3176f59).
+Keine Änderung am App-Code.
