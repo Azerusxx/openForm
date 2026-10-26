@@ -19,7 +19,7 @@ export default function MacroRings({totals={},goals={},remaining=0}) {
     return {...spec,value,goal,pct:ringPercent(value,goal),excess:Number(goal)>0&&value>Number(goal)}
   })
   return <div className="of-macro-ring-block">
-    <div className="of-macro-rings">
+    <div className="of-nested-macro-rings">
       <svg viewBox="0 0 220 220" role="img" aria-label={rings.map(r=>r.label+': '+number(r.value)+' von '+(r.goal==null?'unbekannt':number(r.goal))+' Gramm').join(', ')}>
         {rings.map(r=>{
           const length=2*Math.PI*r.r
