@@ -199,7 +199,11 @@ export const imgSrc = (ex, figure) => REPDB_IMAGE_MAP[ex?.id]
   ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id]
   : IMG_BASE + (drawing(ex, figure) ? drawing(ex, figure) + '.webp' : ex.img)
 const clipFile = f => (CLIP_EXT !== '.mp4' && f.endsWith('.mp4') ? f.slice(0, -4) + CLIP_EXT : f)
-export const gifSrc = (ex, figure) => GIF_BASE + clipFile(drawing(ex, figure) ? drawing(ex, figure) + '.mp4' : ex.gif)
+// The detail sheet primarily requests gifSrc. When a licensed animation is absent,
+// reuse the free RepDB still image instead of requesting a nonexistent MP4.
+export const gifSrc = (ex, figure) => REPDB_IMAGE_MAP[ex?.id]
+  ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id]
+  : GIF_BASE + clipFile(drawing(ex, figure) ? drawing(ex, figure) + '.mp4' : ex.gif)
 // The catalogue's animations are short MP4 loops; a fork's or an older build's may still be GIFs.
 export const isVideoSrc = src => /\.(mp4|webm)(\?|$)/i.test(src || '')
 
