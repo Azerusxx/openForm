@@ -39,7 +39,14 @@ const unmatched = []
 const ambiguous = []
 for (const exercise of EXDB) {
   const key = normalize(exercise.n)
-  const possible = new Set([...(byName.get(key) || []), ...(byName.get(nameTokens(key)) || [])])
+  // Curated synonym: a 45-degree hyperextension on a bodyweight bench is
+  // a back extension; do NOT apply this alias to the seated weight-stack machine.
+  const alias = (/45 degree hyperextension|45 grad hyperextension|hyperextension in 45 grad/.test(key)
+    && ['bodyweight', 'body weight', ''].includes(normalize(exercise.eq))) ? 'back extension' : ''
+  const possible = new Set([
+    ...(byName.get(key) || []), ...(byName.get(nameTokens(key)) || []),
+    ...(alias ? (byName.get(alias) || []) : [])
+  ])
   const matches = [...possible].filter(entry => {
     const a = equipment(exercise.eq)
     const b = equipment(entry.equipment)
