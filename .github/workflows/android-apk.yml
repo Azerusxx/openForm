@@ -67,6 +67,14 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js
 
+      - name: Kostenlose RepDB Uebungsbilder fuer APK laden
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/RepDB/exercise-dataset.git "$RUNNER_TEMP/repdb"
+          node scripts/catalogue/stage-repdb.mjs "$RUNNER_TEMP/repdb"
+          test "$(find frontend/public/exercise-media/repdb -name '*.webp' | wc -l)" -ge 10
+
       - name: Mobile Web-App bauen
         working-directory: frontend
         env:
@@ -174,6 +182,23 @@ jobs:
           echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
           echo "$pkg" | grep -F "versionName='0.3.7h'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
           echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
+
+      - name: RepDB Bilder im APK pruefen
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
+          expected=$(find frontend/public/exercise-media/repdb -type f -name '*.webp' | wc -l)
+          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/repdb/[^/]+[.]webp        uses: actions/upload-artifact@v4
+        with:
+          name: openForm-0.3.7h-debug
+          path: frontend/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+ || true)
+          echo "RepDB Stills: $actual / $expected"
+          test "$expected" -ge 10
+          test "$expected" -eq "$actual" || { echo "::error::RepDB images missing in APK"; exit 1; }
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
