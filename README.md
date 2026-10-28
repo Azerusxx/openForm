@@ -29,3 +29,9 @@ Das neue Ernährungsmodul verwendet separate lokale Daten; es ist noch nicht Tei
 ## Herkunft und Lizenzen
 
 Technische Grundlage: openGym (AGPL-3.0-or-later); `LICENSE`, `NOTICE.md` und Urheberrechtshinweise bleiben bestehen. OpenNutriTracker-Dart-Code wurde nicht kopiert. Die Nutrition-Funktionen sind eine neue React-Implementierung.
+
+## Lizenzhinweis: kostenlose RepDB-Übungsbilder
+
+Die Android-Beta lädt beim Build passende statische WebP-Illustrationen aus dem kostenlosen RepDB-Datensatz. Nur eindeutig nach Übungsname und Gerät zuordenbare Bilder werden eingebaut; Trainingsdaten und IDs bleiben unverändert. Die Bilder sind nicht Teil dieses GitHub-Repositories und die RepDB-Lizenz erlaubt keine Weiterveröffentlichung als eigenständiger Datensatz. Der Import enthält keine bezahlten Animations-Samples.
+
+**Exercise data by [RepDB (repdb.co)](https://repdb.co).** Lizenz: https://github.com/RepDB/exercise-dataset/blob/main/LICENSE-DATA.md
