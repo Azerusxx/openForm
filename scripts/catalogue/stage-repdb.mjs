@@ -103,7 +103,7 @@ for (const exercise of EXDB) {
   const files=[illustration?.start,illustration?.peak,illustration?.main].filter(Boolean)
   const images=[]
   for (const file of files) {
-    if (!/^images\\/flat\\/[a-z0-9_-]+\\.webp$/i.test(file)) continue
+    if (!(file.startsWith('images/flat/') && file.endsWith('.webp') && !file.includes('..') && /^[a-z0-9_-]+[.]webp$/i.test(path.basename(file)))) continue
     const from=path.resolve(source,file)
     if (!from.startsWith(source+path.sep)||!fs.existsSync(from)) throw Error('Missing RepDB image: '+file)
     const filename=path.basename(file)
