@@ -1,6 +1,7 @@
 import { EXDB, EXALIAS } from './exercises-data.js'
 import MUSCLE_MAP from './exercise-muscle-map.json' with { type: 'json' }
 import V13_IDS from './catalogue-v13-ids.json' with { type: 'json' }
+import REPDB_IMAGE_MAP from './repdb-image-map.json' with { type: 'json' }
 import { t, getVersion, exerciseNameSearchText } from './i18n-core.js'
 
 export { EXDB }
@@ -194,7 +195,9 @@ export const figureOf = S => (S?.exFigure === 'female' || S?.exFigure === 'male'
   ? S.exFigure
   : (S?.body === 'female' ? 'female' : 'male')
 const drawing = (ex, figure) => (figure === 'female' ? ex.fv : figure === 'male' ? ex.mv : null) || null
-export const imgSrc = (ex, figure) => IMG_BASE + (drawing(ex, figure) ? drawing(ex, figure) + '.webp' : ex.img)
+export const imgSrc = (ex, figure) => REPDB_IMAGE_MAP[ex?.id]
+  ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id]
+  : IMG_BASE + (drawing(ex, figure) ? drawing(ex, figure) + '.webp' : ex.img)
 const clipFile = f => (CLIP_EXT !== '.mp4' && f.endsWith('.mp4') ? f.slice(0, -4) + CLIP_EXT : f)
 export const gifSrc = (ex, figure) => GIF_BASE + clipFile(drawing(ex, figure) ? drawing(ex, figure) + '.mp4' : ex.gif)
 // The catalogue's animations are short MP4 loops; a fork's or an older build's may still be GIFs.
