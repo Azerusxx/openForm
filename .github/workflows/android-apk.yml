@@ -75,6 +75,14 @@ jobs:
           node scripts/catalogue/stage-repdb.mjs "$RUNNER_TEMP/repdb"
           test "$(find frontend/public/exercise-media/repdb -name '*.webp' | wc -l)" -ge 10
 
+      - name: RepDB Zuordnungsbericht hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repdb-coverage
+          path: repdb-coverage.json
+          if-no-files-found: warn
+
       - name: Mobile Web-App bauen
         working-directory: frontend
         env:
