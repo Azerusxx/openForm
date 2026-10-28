@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Build-time only: free RepDB illustrations, never commit third-party image collection.
-// Usage: node scripts/catalogue/stage-repdb.mjs /tmp/repdb-exercise-dataset
+// Stage RepDB free-tier stills into the Android app during CI, not into git.
+// Never change openForm exercise IDs or silently guess ambiguous exercise variants.
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,37 +8,67 @@ import { EXDB } from '../../frontend/src/lib/exercises-data.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const source = path.resolve(process.argv[2] || '')
-const data = JSON.parse(fs.readFileSync(path.join(source, 'exercises.json'), 'utf8'))
-const normal = s => String(s || '').toLowerCase().normalize('NFKD')
+const json = JSON.parse(fs.readFileSync(path.join(source, 'exercises.json'), 'utf8'))
+const normalize = s => String(s ?? '').toLowerCase().normalize('NFKD')
   .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+const equipmentAlias = {
+  'body weight': 'bodyweight', 'bodyweight': 'bodyweight',
+  'leverage machine': 'machine', 'sled machine': 'machine',
+  'smith machine': 'smith machine', 'cable': 'cable',
+  'ez barbell': 'barbell', 'olympic barbell': 'barbell',
+}
+const equipment = x => equipmentAlias[normalize(x)] || normalize(x)
+const nameTokens = s => normalize(s).split(' ').filter(Boolean).sort().join(' ')
+const catalog = Array.isArray(json.exercises) ? json.exercises : []
 const byName = new Map()
-for (const item of data.exercises || []) {
-  const key = normal(item.name_en)
-  if (!key) continue
-  const list = byName.get(key) || []
-  list.push(item)
-  byName.set(key, list)
+for (const entry of catalog) {
+  for (const name of [entry.name_en, entry.name_de]) {
+    for (const key of [normalize(name), nameTokens(name)]) {
+      if (!key) continue
+      const set = byName.get(key) || new Set()
+      set.add(entry)
+      byName.set(key, set)
+    }
+  }
 }
-const outDir = path.join(ROOT, 'frontend/public/exercise-media/repdb')
-fs.mkdirSync(outDir, { recursive: true })
+const mediaDir = path.join(ROOT, 'frontend/public/exercise-media/repdb')
+fs.mkdirSync(mediaDir, { recursive: true })
 const mapping = {}
-const used = new Set()
-let ambiguous = 0
-for (const ex of EXDB) {
-  const matches = byName.get(normal(ex.n)) || []
-  // Never guess for competing variants; a wrong exercise picture is unsafe.
-  const candidates = matches.filter(x => !ex.eq || !x.equipment || normal(x.equipment) === normal(ex.eq))
-  if (candidates.length !== 1) { if (candidates.length > 1) ambiguous++; continue }
-  const img = candidates[0].images?.flat
-  const file = img?.start || img?.main || img?.peak
-  if (!file || !/^images\/flat\/[a-z0-9_-]+\.webp$/i.test(file)) continue
-  const src = path.join(source, file)
-  if (!fs.existsSync(src)) throw new Error('Missing RepDB illustration: ' + file)
-  const name = path.basename(file)
-  fs.copyFileSync(src, path.join(outDir, name))
-  used.add(name)
-  mapping[ex.id] = name
+const copied = new Set()
+const unmatched = []
+const ambiguous = []
+for (const exercise of EXDB) {
+  const key = normalize(exercise.n)
+  const possible = new Set([...(byName.get(key) || []), ...(byName.get(nameTokens(key)) || [])])
+  const matches = [...possible].filter(entry => {
+    const a = equipment(exercise.eq)
+    const b = equipment(entry.equipment)
+    return !a || !b || a === b
+  })
+  if (matches.length !== 1) {
+    ;(matches.length ? ambiguous : unmatched).push({ id: exercise.id, name: exercise.n, equipment: exercise.eq })
+    continue
+  }
+  const illustration = matches[0].images?.flat
+  const file = illustration?.start || illustration?.main || illustration?.peak
+  if (!file || !/^images\/flat\/[a-z0-9_-]+\.webp$/i.test(file)) {
+    unmatched.push({ id: exercise.id, name: exercise.n, reason: 'no free still' })
+    continue
+  }
+  const from = path.resolve(source, file)
+  if (!from.startsWith(source + path.sep) || !fs.existsSync(from)) throw Error('Missing safe RepDB file: ' + file)
+  const filename = path.basename(file)
+  fs.copyFileSync(from, path.join(mediaDir, filename))
+  copied.add(filename)
+  mapping[exercise.id] = filename
 }
-fs.writeFileSync(path.join(ROOT, 'frontend/src/lib/repdb-image-map.json'), JSON.stringify(mapping, null, 2) + '\n')
-console.log('RepDB: matched ' + Object.keys(mapping).length + ' openForm exercises, '+used.size+' unique images; ambiguous '+ambiguous)
-if (Object.keys(mapping).length < 10) throw new Error('Too few exact RepDB exercise matches; review mapping before release')
+const target = path.join(ROOT, 'frontend/src/lib/repdb-image-map.json')
+fs.writeFileSync(target, JSON.stringify(mapping, null, 2) + '\n')
+const report = { catalogSize: EXDB.length, repdbSize: catalog.length,
+  mappedExercises: Object.keys(mapping).length, imageFiles: copied.size,
+  unmatchedCount: unmatched.length, ambiguousCount: ambiguous.length,
+  unmatchedExamples: unmatched.slice(0, 80), ambiguousExamples: ambiguous.slice(0, 30) }
+fs.writeFileSync(path.join(ROOT, 'repdb-coverage.json'), JSON.stringify(report, null, 2) + '\n')
+console.log('RepDB coverage:', JSON.stringify({ mapped: report.mappedExercises, total: report.catalogSize, files: report.imageFiles, unmatched: report.unmatchedCount, ambiguous: report.ambiguousCount }))
+console.log('Unmatched sample:', JSON.stringify(unmatched.slice(0, 12)))
+if (report.mappedExercises < 10) throw Error('Insufficient matching free exercise images')
