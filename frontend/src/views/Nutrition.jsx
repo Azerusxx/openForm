@@ -9,6 +9,7 @@ import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
   dayTotals, dayMicros, MICRO_NUTRIENTS, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
 import { trainingEnergyForDay } from '../lib/training-energy.js'
+import MacroRings from '../components/MacroRings.jsx'
 import './Nutrition.css'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
@@ -247,29 +248,9 @@ export default function Nutrition() {
       <section className="of-calorie-card" aria-label="Kalorienbilanz">
         <div className="of-calorie-meta"><div><span className="of-calorie-symbol of-intake"><Icon name="download" /></span><strong>{fmt(totals.kcal)}</strong><small>zugeführt</small></div>
           <div><span className="of-calorie-symbol of-burn"><Icon name="flame" /></span><strong>{training.kcal ? `≈ ${fmt(displayedBurned)}` : fmt(displayedBurned)}</strong><small>{training.kcal ? 'Aktivität + Training (ca.)' : 'Aktivität'}</small></div></div>
-        <div className="of-calorie-ring" role="progressbar" aria-label="Kalorienverbrauch des Tagesziels" aria-valuenow={Math.round(totals.kcal)} aria-valuemin="0" aria-valuemax={data.goals.kcal} style={{ '--of-ring-pct': `${Math.min(100, Math.max(0, totals.kcal / Math.max(1,data.goals.kcal) * 100))}%` }}>
-          <strong>{Math.abs(remaining)}</strong><span>kcal {remaining >= 0 ? 'übrig' : 'über Ziel'}</span>
-        </div>
+        <MacroRings totals={totals} goals={macroGoals} remaining={remaining} />
         <div className="of-calorie-foot">Tagesziel {fmt(data.goals.kcal)} kcal <span>*Training geschätzt, kein Extra-Kalorienbudget</span></div>
       </section>
-      <div className="of-macro-rings" aria-label="Makro-Tagesziele">
-        {[
-          ['carbs','Kohlenhydrate','carbs'],
-          ['fat','Fett','fat'],
-          ['protein','Protein','protein'],
-        ].map(([key,label,color]) => {
-          const goal = Number(macroGoals[key]) || 0
-          const current = Number(totals[key]) || 0
-          const percentage = goal > 0 ? Math.min(100, current / goal * 100) : 0
-          return <div className={`of-macro-ring-card of-${color}${goal > 0 && current > goal ? ' of-over-goal' : ''}`} key={key}>
-            <div className="of-macro-ring" role="progressbar" aria-label={label} aria-valuemin="0" aria-valuenow={Math.round(current)} aria-valuemax={goal} style={{'--of-macro-pct': `${percentage}%`}}>
-              <span>{Math.round(percentage)}<small>%</small></span>
-            </div>
-            <strong>{label}</strong>
-            <span className="of-macro-ring-value">{goal > 0 ? `${fmt(current)} / ${fmt(goal)} g` : `${fmt(current)} g erfasst`}</span>
-          </div>
-        })}
-      </div>
       <p className="of-dim" style={{margin:"6px 0 12px"}}>Kohlenhydrate und Fett: automatisch aus Kalorienziel und Protein berechnet, sofern kein eigenes Ziel gespeichert ist.</p>
       <section className="of-nutrients-accordion" aria-label="Zusätzliche Nährstoffe und Supplements">
         <button className="of-accordion-toggle" type="button" aria-expanded={showNutritionExtras} aria-controls="of-nutrition-details" onClick={() => setShowNutritionExtras(v => !v)}>

@@ -2,8 +2,8 @@
 // the latest release on GitHub and optionally downloads + installs the APK.
 //
 // The GitHub releases API is public, so no token is needed (60 requests an hour per address,
-// and the check runs once per app session). GitHub is openGym's home since v1.4.0; the GitLab
-// mirror stopped getting releases, so a phone that asked it saw no update.
+// and the check runs once per app session). Only openForm releases are eligible;
+// upstream openGym releases are unrelated to this fork.
 // On Android (Capacitor) the APK is downloaded natively into the cache directory (an APK with
 // the animations is ~300 MB: read into the WebView's memory it ran phones out of it, and
 // github.com's download redirect has no CORS headers for a WebView fetch anyway), checked
@@ -11,9 +11,10 @@
 
 import { MOBILE } from './mobile.js'
 
-const REPO = 'DuarteSantos8/openGym'
+export const UPDATE_REPO = 'Azerusxx/openForm'
+const REPO = UPDATE_REPO
 const LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`
-export const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
+export const RELEASES_PAGE = `https://github.com/${REPO}/releases`
 
 /**
  * Compares two semver strings (e.g. "1.2.11" vs "1.3.0").
@@ -78,8 +79,8 @@ export async function fetchChecksum(hashUrl) {
   let text
   if (MOBILE) {
     const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
-    await Filesystem.downloadFile({ url: hashUrl, path: 'opengym-update.apk.sha256', directory: Directory.Cache })
-    text = (await Filesystem.readFile({ path: 'opengym-update.apk.sha256', directory: Directory.Cache, encoding: Encoding.UTF8 })).data
+    await Filesystem.downloadFile({ url: hashUrl, path: 'openform-update.apk.sha256', directory: Directory.Cache })
+    text = (await Filesystem.readFile({ path: 'openform-update.apk.sha256', directory: Directory.Cache, encoding: Encoding.UTF8 })).data
   } else {
     const res = await fetch(hashUrl)
     if (!res.ok) return null
@@ -114,7 +115,7 @@ export async function downloadAndInstall(url, expectedHash, onProgress = null) {
   }
   if (!/^[0-9a-f]{64}$/i.test(expectedHash || '')) throw new Error('no checksum to verify the download against')
   const { Filesystem, Directory } = await import('@capacitor/filesystem')
-  const fileName = 'opengym-update.apk'
+  const fileName = 'openform-update.apk'
   const listener = onProgress
     ? await Filesystem.addListener('progress', p => onProgress(p.bytes, p.contentLength))
     : null

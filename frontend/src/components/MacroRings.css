@@ -1,0 +1,29 @@
+/* Three distinct, saturated tones derived from the chosen appearance
+   accent. The original --acc updates with the chosen theme and custom hex. */
+.of-032 .of-macro-ring-block{
+  --macro-track:var(--sep);
+  --macro-carbs:color-mix(in srgb,var(--acc) 89%,#185165 11%);
+  --macro-fat:color-mix(in srgb,var(--acc) 57%,#ffcd37 43%);
+  --macro-protein:color-mix(in srgb,var(--acc) 58%,#ff5670 42%);
+  --macro-excess:#f36a65;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  width:100%;margin:10px 0 4px;
+}
+.of-032 .of-nested-macro-rings{position:relative;width:min(246px,100%);aspect-ratio:1}
+.of-032 .of-nested-macro-rings svg{width:100%;height:100%;display:block;overflow:visible}
+.of-032 .of-nested-macro-rings circle{transition:stroke-dashoffset 220ms ease}
+.of-032 .of-macro-ring-center{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;flex-direction:column;pointer-events:none}
+.of-032 .of-macro-ring-center strong{font-size:31px;font-weight:750;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.of-032 .of-macro-ring-center span{font-size:12px;color:var(--label-3);margin-top:4px}
+.of-032 .of-macro-ring-center .is-over,.of-032 .of-macro-legend-row .is-over{color:var(--macro-excess)}
+.of-032 .of-macro-ring-legend{width:100%;display:grid;gap:4px;margin:0 0 4px}
+.of-032 .of-macro-legend-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;min-height:32px}
+.of-032 .of-macro-legend-name{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.of-032 .of-macro-legend-name i{width:13px;height:13px;border-radius:50%;flex-shrink:0}
+.of-032 .of-macro-legend-row strong{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.of-032 .of-calorie-details{align-self:stretch;width:100%;border-top:1px solid var(--sep);margin-top:8px;font-size:12px}
+.of-032 .of-calorie-details summary{color:var(--label-2);padding:12px 0;cursor:pointer;font-weight:600}
+.of-032 .of-calorie-details[open] summary{margin-bottom:2px}
+.of-032 .of-calorie-details .of-calorie-breakdown{padding:0 0 8px;margin-top:0}
+.of-032 .of-calorie-details>p{color:var(--label-3);margin:0 0 12px;line-height:1.5;font-size:11px}
+@media(prefers-reduced-motion:reduce){.of-032 .of-nested-macro-rings circle{transition:none}}
