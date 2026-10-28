@@ -189,13 +189,7 @@ jobs:
           set -euo pipefail
           apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
           expected=$(find frontend/public/exercise-media/repdb -type f -name '*.webp' | wc -l)
-          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/repdb/[^/]+[.]webp        uses: actions/upload-artifact@v4
-        with:
-          name: openForm-0.3.7h-debug
-          path: frontend/android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
- || true)
+          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/repdb/[^/]+[.]webp$' || true)
           echo "RepDB Stills: $actual / $expected"
           test "$expected" -ge 10
           test "$expected" -eq "$actual" || { echo "::error::RepDB images missing in APK"; exit 1; }
