@@ -9,6 +9,8 @@ import { fmtNum, exCount } from '../lib/format.js'
 import { t, tn, exerciseNameFor, exerciseNameClass } from '../lib/i18n.js'
 import { Thumb } from '../components/Media.jsx'
 import REPDB_IMAGE_MAP from '../lib/repdb-image-map.json'
+import { mediaOf } from '../lib/media-refs.js'
+import { mediaStore } from '../lib/media-store.js'
 import { listPrivateExerciseImageIds, subscribePrivateExerciseImages, exportPrivateExerciseImages, importPrivateExerciseImages } from '../lib/private-exercise-images.js'
 import { exerciseDetailSheet, addToRoutineSheet, customExSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -28,6 +30,7 @@ export default function Library() {
   const [showAll, setShowAll] = useState(false)
   const [onlyImages,setOnlyImages]=useState(false)
   const [privateIds,setPrivateIds]=useState([])
+  const [verifiedCustomImages,setVerifiedCustomImages]=useState([])
   const imageImport=useRef(null)
   useEffect(()=>{
     let mounted=true
@@ -36,6 +39,22 @@ export default function Library() {
     const unsubscribe=subscribePrivateExerciseImages(refresh)
     return()=>{mounted=false;unsubscribe()}
   },[])
+  useEffect(()=>{
+    let alive=true
+    const verify=async()=>{
+      const entries=await Promise.all((S.customEx||[]).map(async ex=>{
+        const media=mediaOf(ex)
+        const ref=media?.poster || (media?.kind==='image' ? media : null)
+        if (!ref?.hash) return null
+        try {return await mediaStore.get(ref.hash) ? String(ex.id) : null}
+        catch{return null}
+      }))
+      if(alive)setVerifiedCustomImages(entries.filter(Boolean))
+    }
+    verify()
+    const off=mediaStore.subscribe(verify)
+    return()=>{alive=false;off()}
+  },[S.customEx])
   const downloadImages=async()=>{
     try{
       const json=JSON.stringify(await exportPrivateExerciseImages())
@@ -70,7 +89,7 @@ export default function Library() {
   // while searching, the exercises you have logged or planned follow right after them.
   const narrowedList = eqOn ? eqFiltered.filter(e => e.eq === eqOn) : eqFiltered
   const usage = useMemo(() => (q.trim() ? usageOf(S) : null), [q, S.routines, S.workouts])
-  const visibleList=onlyImages ? narrowedList.filter(e=>privateIds.includes(String(e.id)) || !!REPDB_IMAGE_MAP[e.id] || (e.custom && !!e.media)) : narrowedList
+  const visibleList=onlyImages ? narrowedList.filter(e=>privateIds.includes(String(e.id)) || !!REPDB_IMAGE_MAP[e.id] || verifiedCustomImages.includes(String(e.id))) : narrowedList
   const f = usage ? sortYoursFirst(visibleList, S, usage) : sortFavouritesFirst(visibleList, S)
   useRevealActiveChip(bpStrip, bp)
   useRevealActiveChip(eqStrip, eqOn)
