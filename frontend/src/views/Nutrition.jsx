@@ -52,7 +52,10 @@ export default function Nutrition() {
   const [camera, setCamera] = useState(false)
   const [recipeName, setRecipeName] = useState('')
   const [recipeServings, setRecipeServings] = useState(2)
-  const [recipeSelected, setRecipeSelected] = useState([])
+  const [recipeItems, setRecipeItems] = useState([])
+  const [recipeEditing, setRecipeEditing] = useState(null)
+  const [recipeIngredientIndex, setRecipeIngredientIndex] = useState(null)
+  const [foodDestination, setFoodDestination] = useState('diary')
   const [suppName, setSuppName] = useState('')
   const [suppDose, setSuppDose] = useState('')
   const [suppUnit, setSuppUnit] = useState('piece')
@@ -92,12 +95,25 @@ export default function Nutrition() {
     catch { setNotice('Speichern fehlgeschlagen. Bitte Speicher prüfen und ein Backup exportieren.'); return false }
   }
   const update = fn => commit(fn(loadNutrition()))
+  const ingredientFromFood = food => {
+    try {
+      const ingredient = createEntry({ ...food, id: null, date, mealType: selectedMeal })
+      setRecipeItems(items => recipeIngredientIndex == null ? [...items, ingredient] : items.map((item,i) => i === recipeIngredientIndex ? ingredient : item))
+      setRecipeIngredientIndex(null); setShowForm(false); setEditing(null); setForm(EMPTY());setTab('recipes')
+      setNotice('Zutat zum Rezept hinzugefügt – kein Tagebucheintrag.')
+    } catch(err){setNotice(err.message)}
+  }
+  const openRecipeFood = () => {
+    setFoodDestination('recipe');setRecipeIngredientIndex(null);setForm({...EMPTY(),date});setEditing(null)
+    setShowForm(false);setSearch('');setResults([]);setBarcode('');setTab('food');setNotice('')
+  }
   const startNew = (type = selectedMeal) => { setSelectedMeal(type); setForm({ ...EMPTY(), date, mealType: type }); setEditing(null); setShowForm(true); setTab('food'); setAddMenu(false); setNotice('') }
   const edit = e => {
     setForm({ ...e, quantity: String(e.quantity), pieceSize: String(e.pieceSize ?? ''), per100: { ...e.per100 }, per100Micros: { ...e.per100Micros } })
     setSelectedMeal(e.mealType || 'other'); setEditing(e.id); setShowForm(true); setTab('food'); setNotice('')
   }
   const log = (food, type = selectedMeal) => {
+    if (foodDestination === 'recipe') { ingredientFromFood(food); return }
     try { update(d => ({ ...d, entries: [...d.entries, { ...repeatMeal(food, date), mealType: type }] })); setTab('today') }
     catch (err) { setNotice(err.message) }
   }
@@ -105,6 +121,7 @@ export default function Nutrition() {
     e.preventDefault()
     try {
       if (Object.values(form.per100).some(v => v === '' || v == null)) throw new Error('Bitte alle vier Nährwerte eingeben (auch echte 0).')
+      if (foodDestination === 'recipe') { ingredientFromFood(form); return }
       const next = createEntry({ ...form, id: editing, date: form.date })
       if (editing) {
         const existing = data.entries.find(e => e.id === editing)
@@ -119,7 +136,7 @@ export default function Nutrition() {
   const setProduct = p => {
     setForm({ ...EMPTY(), name: p.name, quantity: String(p.estimatedGrams || 100), basis: p.basis, unit: p.basis,
       source: p.source, barcode: p.barcode, per100: p.per100, per100Micros: p.per100Micros || {}, date, mealType: selectedMeal })
-    setEditing(null); setShowForm(true); setTab('food'); setNotice('Produkt gefunden. Nährwerte und Portion vor dem Speichern prüfen.')
+    setEditing(null); setShowForm(true); setTab('food'); setNotice(foodDestination === 'recipe' ? 'Zutat gefunden. Menge prüfen und zum Rezept hinzufügen.' : 'Produkt gefunden. Nährwerte und Portion vor dem Speichern prüfen.')
   }
   const lookup = async candidate => {
     setBusy(true); setNotice('')
@@ -173,10 +190,18 @@ export default function Nutrition() {
   const saveRecipe = e => {
     e.preventDefault()
     try {
-      const selected = unique.filter(x => recipeSelected.includes(x.id))
-      const recipe = createRecipe(recipeName, selected, recipeServings)
-      if (update(d => ({ ...d, recipes: [...d.recipes, recipe] }))) { setRecipeName(''); setRecipeSelected([]) }
-    } catch (err) { setNotice(err.message) }
+      const recipe = createRecipe(recipeName, recipeItems, recipeServings)
+      if (recipeEditing) recipe.id = recipeEditing
+      if (update(d => ({ ...d, recipes: recipeEditing ? d.recipes.map(r => r.id === recipeEditing ? recipe : r) : [...d.recipes, recipe] }))) {
+        setRecipeName('');setRecipeItems([]);setRecipeServings(2);setRecipeEditing(null)
+        setNotice('Rezept gespeichert. Im Tagebuch wurde nichts eingetragen.')
+      }
+    } catch(err){setNotice(err.message)}
+  }
+  const editRecipe = recipe => {
+    setRecipeName(recipe.name);setRecipeServings(recipe.servings)
+    setRecipeItems(recipe.items.map(i => ({...i,per100:{...i.per100}})))
+    setRecipeEditing(recipe.id);setFoodDestination('recipe');setTab('recipes')
   }
   const takeRecipe = recipe => {
     const amount = Number(window.prompt(`Wie viele Portionen „${recipe.name}“?`, '1'))
@@ -355,7 +380,7 @@ export default function Nutrition() {
     </div>}
     {tab === 'favorites' && <div className="card of-reusable"><h2>Favoriten</h2>{data.favorites.length ? data.favorites.map(f => <div className="of-reuse-row" key={f.id}><span>{f.food.name}</span><button onClick={() => { log(f.food, selectedMeal); goSection('today') }}>Eintragen</button></div>) : <p>Markiere Lebensmittel im Tagebuch mit dem Stern, um sie hier schnell wiederzufinden.</p>}</div>}
     {tab === 'food' && <>
-      <div className="of-meal-context">Eintragen für <strong>{MEAL_GROUPS.find(g => g.id === selectedMeal)?.title || 'Snacks'}</strong></div>
+      <div className="of-meal-context">{foodDestination === 'recipe' ? <>Zutat für <strong>{recipeName || 'neues Rezept'}</strong> <button onClick={() => {setTab('recipes');setShowForm(false);setRecipeIngredientIndex(null)}}>Zurück zum Rezept</button></> : <>Eintragen für <strong>{MEAL_GROUPS.find(g => g.id === selectedMeal)?.title || 'Snacks'}</strong></>}</div>
       {!showForm && (data.favorites.length > 0 || unique.length > 0) && <section className="of-food-shortcuts" aria-label="Schnell eintragen">
         {!!data.favorites.length && <><h3><Icon name="star" /> Favoriten</h3><div className="of-quick-food-list">{data.favorites.slice(0,6).map(f => <button type="button" key={f.id} onClick={() => log(f.food)}><strong>{f.food.name}</strong><small>{fmt(entryTotals(f.food).kcal)} kcal · {fmt(entryTotals(f.food).protein)} g Protein</small><span>+</span></button>)}</div></>}
         {!!unique.length && <><h3><Icon name="repeat" /> Zuletzt gegessen</h3><div className="of-quick-food-list">{unique.filter(e => !isFavorite(data,e)).slice(0,5).map(e => <button type="button" key={e.id} onClick={() => log(e)}><strong>{e.name}</strong><small>{fmt(entryTotals(e).kcal)} kcal</small><span>+</span></button>)}</div></>}
@@ -376,10 +401,10 @@ export default function Nutrition() {
         <button onClick={() => setProduct(p)}>Übernehmen</button></div>)}</div>}
       {camera && <FoodCameraScan onFound={async code => { setCamera(false); await lookup(code) }} onClose={() => setCamera(false)} />}
       {showForm && <form className="card of-form" onSubmit={saveMeal}>
-        <h2>{editing ? 'Mahlzeit bearbeiten' : 'Mahlzeit hinzufügen'}</h2>
-        <label>Mahlzeit<select value={form.mealType || 'other'} onChange={e => setForm(f => ({ ...f, mealType: e.target.value }))}>{MEAL_GROUPS.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
+        <h2>{foodDestination === 'recipe' ? 'Rezeptzutat' : editing ? 'Mahlzeit bearbeiten' : 'Mahlzeit hinzufügen'}</h2>
+        {foodDestination !== 'recipe' && <label>Mahlzeit<select value={form.mealType || 'other'} onChange={e => setForm(f => ({ ...f, mealType: e.target.value }))}>{MEAL_GROUPS.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>}
         <label>Name<input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></label>
-        <label>Datum<input required type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></label>
+        {foodDestination !== 'recipe' && <label>Datum<input required type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></label>}
         <div className="of-2-col"><label>Portion<input required type="number" min="0.01" step="any" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} /></label>
           <label>Einheit<select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value, basis: e.target.value === 'piece' ? f.basis : e.target.value }))}>
             <option value="g">Gramm</option><option value="ml">Milliliter</option><option value="piece">Stück</option></select></label></div>
@@ -390,23 +415,34 @@ export default function Nutrition() {
           <label key={k}>{label} ({k === 'kcal' ? 'kcal' : 'g'})<input required type="number" min="0" step="any" value={form.per100[k]} onChange={e => setForm(f => ({ ...f, per100: { ...f.per100, [k]: e.target.value } }))} /></label>)}</div>
         <details className="of-optional-micros"><summary>Mikronährstoffe ergänzen (optional)</summary><p className="of-dim">Angaben pro 100 g/ml, nur bekannte Werte eintragen. Leere Felder bleiben unbekannt.</p><div className="of-2-col">{MICRO_NUTRIENTS.map(({key,label,unit}) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={form.per100Micros?.[key] ?? ''} onChange={e => setForm(f => ({ ...f, per100Micros: {...f.per100Micros, [key]: e.target.value} }))} /></label>)}</div></details>
         <div className="of-macro-sub">Portion: {fmt(entryTotals(form).kcal)} kcal · {fmt(entryTotals(form).protein)} g Protein</div>
-        <div className="of-form-buttons"><button type="button" onClick={() => setShowForm(false)}>Abbrechen</button><button type="submit">{editing ? 'Aktualisieren' : 'Eintragen'}</button></div>
+        <div className="of-form-buttons"><button type="button" onClick={() => {setShowForm(false);if(foodDestination==='recipe'){setTab('recipes');setRecipeIngredientIndex(null)}}}>Abbrechen</button><button type="submit">{foodDestination === 'recipe' ? 'Zum Rezept hinzufügen' : editing ? 'Aktualisieren' : 'Eintragen'}</button></div>
       </form>}
       {!!data.favorites.length && <div className="of-dim">Favoriten findest du jetzt oben in der Lebensmittelsuche.</div>}
     </>}
     {tab === 'recipes' && <>
-      <div className="card of-form"><h2>Meine Rezepte</h2><p className="of-dim">Rezepte aus bereits erfassten Lebensmitteln zusammenstellen. Die Mengen bilden das ganze Rezept, Portionen teilen es auf.</p>
+      <div className="card of-form"><h2>{recipeEditing ? 'Rezept bearbeiten' : 'Neues Rezept erstellen'}</h2><p className="of-dim">Zutaten direkt suchen, scannen oder manuell ergänzen – ohne Tagebucheintrag.</p>
         <form className="of-recipe-builder" onSubmit={saveRecipe}>
-          <label>Rezeptname<input required value={recipeName} onChange={e => setRecipeName(e.target.value)} placeholder="z. B. Hähnchen mit Reis" /></label>
-          <label>Portionen aus dem Rezept<input required min="1" step="any" type="number" value={recipeServings} onChange={e => setRecipeServings(e.target.value)} /></label>
-          <div className="of-dim">Zutaten auswählen (die Mengen kannst du vorher im Tagebuch bearbeiten):</div>
-          {unique.length ? <div className="of-ingredients">{unique.map(m => <label key={m.id}><input type="checkbox" checked={recipeSelected.includes(m.id)}
-            onChange={e => setRecipeSelected(xs => e.target.checked ? [...xs,m.id] : xs.filter(id => id !== m.id))} />{m.name} · {fmt(m.quantity)} {m.unit === 'piece' ? 'Stk.' : m.unit}</label>)}</div> : <p>Erfasse zuerst Zutaten im Lebensmittelbereich.</p>}
-          <button className="of-primary" type="submit" disabled={!recipeSelected.length}>Rezept speichern</button>
+          <label>Rezeptname<input required value={recipeName} onChange={e => setRecipeName(e.target.value)} placeholder="z. B. Hähnchen-Gnocchi-Pfanne" /></label>
+          <label>Anzahl Portionen<input required min="1" step="1" type="number" value={recipeServings} onChange={e => setRecipeServings(e.target.value)} /></label>
+          <h3>Zutaten</h3>
+          {recipeItems.map((item,i) => <div className="of-reuse-row" key={i}>
+            <span><strong>{item.name}</strong><small>{fmt(item.quantity)} {item.unit === 'piece' ? 'Stk.' : item.unit} · {fmt(entryTotals(item).kcal)} kcal</small></span>
+            <button type="button" onClick={() => {setFoodDestination('recipe');setRecipeIngredientIndex(i);setForm({...item,quantity:String(item.quantity),pieceSize:String(item.pieceSize??''),per100:{...item.per100}});setShowForm(true);setTab('food')}}>Bearbeiten</button>
+            <button type="button" aria-label="Zutat entfernen" onClick={() => setRecipeItems(xs => xs.filter((_,j)=>j!==i))}><Icon name="trash"/></button>
+          </div>)}
+          {!recipeItems.length && <p className="of-dim">Noch keine Zutaten hinzugefügt.</p>}
+          <button type="button" onClick={openRecipeFood}><Icon name="plus"/> Zutat suchen oder scannen</button>
+          {recipeItems.length > 0 && <div className="of-macro-sub">{(() => {
+            const total = recipeItems.reduce((sum,item) => {const n=entryTotals(item);for(const k of ['kcal','protein','carbs','fat'])sum[k]+=n[k];return sum},{kcal:0,protein:0,carbs:0,fat:0})
+            const servings=Number(recipeServings)>0 ? Number(recipeServings) : 1
+            return `Pro Portion: ${fmt(total.kcal/servings)} kcal · ${fmt(total.protein/servings)} g Protein · ${fmt(total.carbs/servings)} g KH · ${fmt(total.fat/servings)} g Fett`
+          })()}</div>}
+          <button className="of-primary" type="submit" disabled={!recipeItems.length}>{recipeEditing?'Rezept aktualisieren':'Rezept speichern'}</button>
+          {recipeEditing && <button type="button" onClick={() => {setRecipeEditing(null);setRecipeItems([]);setRecipeName('');setRecipeServings(2)}}>Bearbeitung abbrechen</button>}
         </form></div>
       {data.recipes.length ? data.recipes.map(r => { const t = recipeTotals(r); return <div className="card of-recipe" key={r.id}><strong>{r.name}</strong>
         <div className="of-dim">{r.items.length} Zutaten · {r.servings} Portionen · pro Portion {fmt(t.kcal)} kcal / {fmt(t.protein)} g Protein</div>
-        <div className="of-recipe-actions"><button onClick={() => takeRecipe(r)}><Icon name="plus" /> Portion eintragen</button>
+        <div className="of-recipe-actions"><button onClick={() => editRecipe(r)}><Icon name="pencil"/> Bearbeiten</button><button onClick={() => takeRecipe(r)}><Icon name="plus" /> Portion eintragen</button>
           <button aria-label="Rezept löschen" onClick={() => { if (window.confirm(`Rezept „${r.name}“ löschen?`)) update(d => ({ ...d, recipes: d.recipes.filter(x => x.id !== r.id) })) }}><Icon name="trash" /></button></div>
       </div> }) : <div className="of-empty">Noch keine Rezepte gespeichert.</div>}
     </>}
