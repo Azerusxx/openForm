@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store/useStore.js'
+import { savePrivateExerciseImage, removePrivateExerciseImage, getPrivateExerciseImage, subscribePrivateExerciseImages } from './lib/private-exercise-images.js'
 import { useUI } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf, byCategory, smOf, searchExercises, similarExercises, exOr, isAssisted, betterWeight, beatsWeight, isCustomEx } from './lib/exercises.js'
 import { activeProfile, exAvailable, ALL_EQUIPMENT, newProfile, profileEquipment, ACC_V } from './lib/equipment.js'
@@ -971,6 +972,34 @@ export function detailTags(ex) {
   return out
 }
 
+function PrivateExerciseImageEditor({ ex }) {
+  const input=useRef(null)
+  const [exists,setExists]=useState(false)
+  const [busy,setBusy]=useState(false)
+  const refresh=()=>getPrivateExerciseImage(ex.id).then(b=>setExists(!!b)).catch(()=>setExists(false))
+  useEffect(()=>{refresh();return subscribePrivateExerciseImages(refresh)},[ex.id])
+  const change=async event=>{
+    const file=event.target.files?.[0]
+    if(!file)return
+    setBusy(true)
+    try {await savePrivateExerciseImage(ex.id,file);toast('Übungsbild lokal gespeichert')}
+    catch(e){toast(e?.message||'Bild konnte nicht gespeichert werden')}
+    finally{setBusy(false);event.target.value=''}
+  }
+  const remove=async()=>{
+    setBusy(true)
+    try{await removePrivateExerciseImage(ex.id);toast('Eigenes Bild entfernt')}
+    catch(e){toast(e?.message||'Löschen fehlgeschlagen')}
+    finally{setBusy(false)}
+  }
+  return <div style={{display:'flex',gap:8,margin:'8px 0',flexWrap:'wrap'}}>
+    <input ref={input} type="file" accept="image/*" style={{display:'none'}} onChange={change} />
+    <button type="button" className="btn" disabled={busy} onClick={()=>input.current?.click()}>{exists?'Eigenes Bild ändern':'Eigenes Bild hinzufügen'}</button>
+    {exists&&<button type="button" className="btn" disabled={busy} onClick={remove}>Eigenes Bild löschen</button>}
+    <span className="small dim" style={{alignSelf:'center'}}>Privat · nur auf diesem Gerät</span>
+  </div>
+}
+
 function ExerciseDetail({ ex, close }) {
   useLang() // the description and steps arrive in their own chunk the first time a sheet asks
   const st = useStore(s => s.S)
@@ -991,6 +1020,7 @@ function ExerciseDetail({ ex, close }) {
       </button>
     </div>
     <Media ex={ex} />
+    <PrivateExerciseImageEditor ex={ex} />
     <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '10px 0' }}>
       {detailTags(ex).map(tg => <span key={tg.key} className={'tag' + (tg.acc ? ' acc' : '')}>{tg.icon && <Icon name={tg.icon} />}{tg.label}</span>)}
     </div>
