@@ -84,3 +84,7 @@ export async function importPrivateExerciseImages(data){
  notify()
  return count
 }
+
+export async function listPrivateExerciseImageIds(){
+ return await transact('readonly',store=>store.getAllKeys())
+}
