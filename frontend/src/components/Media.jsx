@@ -29,6 +29,19 @@ export function usePrivateExerciseImage(id) {
 // name files of the shipped dataset (a stray img/gif on a custom exercise, written by a fork, is
 // ignored). The split is by component, not by branch, so each side keeps its own hooks in order.
 export default function Media(p) {
+  return <ExerciseMediaWithOverride {...p} />
+}
+
+// One override path for BOTH catalogue and custom exercises.
+// CustomMedia previously bypassed the private image store entirely.
+function ExerciseMediaWithOverride(p) {
+  const privateUrl = usePrivateExerciseImage(p.ex?.id)
+  if (privateUrl) {
+    return <div className={'exmedia' + (p.compact ? ' compact' : '')} id={p.id}>
+      <img src={privateUrl} alt={exerciseNameFor(p.ex)} decoding="async"
+        style={{objectFit:'contain',width:'100%',height:'100%'}} />
+    </div>
+  }
   return isCustomEx(p.ex) ? <CustomMedia {...p} /> : <BuiltinMedia {...p} />
 }
 
@@ -154,6 +167,11 @@ export function autoplayMuted(el) {
 // broken-image glyph in a list of them (#281). The failure is remembered per image, so a list
 // that re-renders does not ask again; a new exercise in the same slot tries its own.
 export function Thumb(p) {
+  return <ExerciseThumbWithOverride {...p} />
+}
+function ExerciseThumbWithOverride(p) {
+  const privateUrl = usePrivateExerciseImage(p.ex?.id)
+  if (privateUrl) return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={privateUrl} alt="" />
   return isCustomEx(p.ex) ? <CustomThumb {...p} /> : <BuiltinThumb {...p} />
 }
 function BuiltinThumb({ ex }) {
