@@ -115,6 +115,22 @@ for (const exercise of EXDB) {
   mapping[exercise.id]=images[0]
   accepted.push({id:exercise.id,name:exercise.n,repdbId:top.entry.id,repdbName:top.entry.name_en,score:+top.score.toFixed(3),images})
 }
+// Reviewed exact exercise-id overrides. Do not apply loose global synonyms:
+// openForm #5813 is a 45-degree bodyweight hyperextension with arms at chest,
+// corresponding to RepDB's bench back-extension illustration.
+const reviewedOverrides = { '5813': 'back-extension' }
+for (const [id, repdbId] of Object.entries(reviewedOverrides)) {
+  const entry = catalog.find(e => e.id === repdbId)
+  const exercise = EXDB.find(e => e.id === id)
+  if (!entry || !exercise) throw Error('Reviewed exercise override missing: '+id+' => '+repdbId)
+  const file = entry.images?.flat?.start || entry.images?.flat?.main
+  if (!file || !file.startsWith('images/flat/') || !file.endsWith('.webp')) throw Error('Invalid reviewed illustration: '+repdbId)
+  const filename=path.basename(file)
+  fs.copyFileSync(path.join(source,file),path.join(mediaDir,filename))
+  copied.add(filename)
+  mapping[id]=filename
+  accepted.push({id,name:exercise.n,repdbId,repdbName:entry.name_en,score:1,images:[filename],reviewed:true})
+}
 const target = path.join(ROOT, 'frontend/src/lib/repdb-image-map.json')
 fs.writeFileSync(target, JSON.stringify(mapping, null, 2) + '\n')
 const report = {catalogSize:EXDB.length,repdbSize:catalog.length,
