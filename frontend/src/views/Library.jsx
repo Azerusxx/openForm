@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { EXDB, BODYPARTS, allExercises, equipmentOf, byCategory, searchExercises, similarExercises } from '../lib/exercises.js'
@@ -8,6 +8,8 @@ import { bestWeightFor } from '../lib/history.js'
 import { fmtNum, exCount } from '../lib/format.js'
 import { t, tn, exerciseNameFor, exerciseNameClass } from '../lib/i18n.js'
 import { Thumb } from '../components/Media.jsx'
+import REPDB_IMAGE_MAP from '../lib/repdb-image-map.json'
+import { listPrivateExerciseImageIds, subscribePrivateExerciseImages, exportPrivateExerciseImages, importPrivateExerciseImages } from '../lib/private-exercise-images.js'
 import { exerciseDetailSheet, addToRoutineSheet, customExSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import ExerciseViewToggle from '../components/ExerciseViewToggle.jsx'
@@ -23,7 +25,32 @@ export default function Library() {
   const [bp, setBp] = useState('')
   const [eq, setEq] = useState('')
   const [cat, setCat] = useState('')
-  const [showAll, setShowAll] = useState(false)   // ignore the active equipment profile for this session
+  const [showAll, setShowAll] = useState(false)
+  const [onlyImages,setOnlyImages]=useState(false)
+  const [privateIds,setPrivateIds]=useState([])
+  const imageImport=useRef(null)
+  useEffect(()=>{
+    let mounted=true
+    const refresh=()=>listPrivateExerciseImageIds().then(ids=>{if(mounted)setPrivateIds(ids.map(String))}).catch(()=>{})
+    refresh()
+    const unsubscribe=subscribePrivateExerciseImages(refresh)
+    return()=>{mounted=false;unsubscribe()}
+  },[])
+  const downloadImages=async()=>{
+    try{
+      const json=JSON.stringify(await exportPrivateExerciseImages())
+      const url=URL.createObjectURL(new Blob([json],{type:'application/json'}))
+      const a=document.createElement('a');a.href=url;a.download='openForm-private-exercise-images.json';a.click()
+      setTimeout(()=>URL.revokeObjectURL(url),1000)
+    }catch(e){alert(e?.message||'Export fehlgeschlagen')}
+  }
+  const restoreImages=async event=>{
+    const file=event.target.files?.[0]
+    if(!file)return
+    try{const n=await importPrivateExerciseImages(await file.text());alert(n+' private Übungsbilder importiert')}
+    catch(e){alert(e?.message||'Import fehlgeschlagen')}
+    finally{event.target.value=''}
+  }   // ignore the active equipment profile for this session
   const [shown, setShown] = useState(40)
   const bpStrip = useRef(null), eqStrip = useRef(null), catStrip = useRef(null)
   const moreRef = useAutoMore(() => setShown(s => s + 40))
@@ -43,7 +70,8 @@ export default function Library() {
   // while searching, the exercises you have logged or planned follow right after them.
   const narrowedList = eqOn ? eqFiltered.filter(e => e.eq === eqOn) : eqFiltered
   const usage = useMemo(() => (q.trim() ? usageOf(S) : null), [q, S.routines, S.workouts])
-  const f = usage ? sortYoursFirst(narrowedList, S, usage) : sortFavouritesFirst(narrowedList, S)
+  const visibleList=onlyImages ? narrowedList.filter(e=>privateIds.includes(String(e.id)) || !!REPDB_IMAGE_MAP[e.id] || (e.custom && !!e.media)) : narrowedList
+  const f = usage ? sortYoursFirst(visibleList, S, usage) : sortFavouritesFirst(visibleList, S)
   useRevealActiveChip(bpStrip, bp)
   useRevealActiveChip(eqStrip, eqOn)
   useRevealActiveChip(catStrip, catOn)
@@ -73,6 +101,12 @@ export default function Library() {
       <div className="sub lib-count">{ownCount
         ? tn('{1} animated exercises + 1 of your own', '{1} animated exercises + {0} of your own', ownCount, EXDB.length)
         : t('{0} exercises with animations', EXDB.length)}</div>
+    </div>
+    <div className="row" style={{gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+      <button type="button" className={'chip nocap'+(onlyImages?' on':'')} onClick={()=>{setOnlyImages(v=>!v);setShown(40)}}>Nur Übungen mit Bild</button>
+      <button type="button" className="chip nocap" onClick={downloadImages}>Bilder sichern</button>
+      <button type="button" className="chip nocap" onClick={()=>imageImport.current?.click()}>Bilder importieren</button>
+      <input ref={imageImport} type="file" accept=".json,application/json" style={{display:'none'}} onChange={restoreImages}/>
     </div>
     <div className="search-row" style={{ marginBottom: 10 }}><div className={'search' + (narrowed ? ' has-count' : '') + (q ? ' has-clear' : '')}><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
       <input className="input" placeholder={t('Search…')} value={q} onChange={e => { setQ(e.target.value); setShown(40) }} />
