@@ -5,6 +5,24 @@ import { useStore } from '../store/useStore.js'
 import { t, exerciseNameFor } from '../lib/i18n.js'
 import Icon from './Icon.jsx'
 import CustomMedia, { CustomThumb } from './CustomMedia.jsx'
+import { getPrivateExerciseImage, subscribePrivateExerciseImages } from '../lib/private-exercise-images.js'
+
+
+// Reads the device-only override; never sends it to a remote service.
+export function usePrivateExerciseImage(id) {
+  const [url,setUrl]=useState(null)
+  const [revision,setRevision]=useState(0)
+  useEffect(()=>subscribePrivateExerciseImages(()=>setRevision(n=>n+1)),[])
+  useEffect(()=>{
+    let active=true,objectUrl=null
+    getPrivateExerciseImage(id).then(blob=>{
+      if(blob&&active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl)}
+      else if(active)setUrl(null)
+    }).catch(()=>{if(active)setUrl(null)})
+    return()=>{active=false;if(objectUrl)URL.revokeObjectURL(objectUrl)}
+  },[id,revision])
+  return url
+}
 
 // An exercise's picture, wherever one shows. A custom exercise goes to CustomMedia.jsx — its own
 // photo, GIF, video or link, from the local media store — and never through imgSrc/gifSrc, which
@@ -21,6 +39,7 @@ export default function Media(p) {
 // (gifSize 'off') — then nothing renders here and the exercise card closes up, exactly like
 // an exercise without media. Any other/legacy value behaves as 'full'.
 function BuiltinMedia({ ex, id, compact, minimizable }) {
+  const privateUrl = usePrivateExerciseImage(ex.id)
   const [playing, setPlaying] = useState(true)
   // 'gif' → the animation failed, the still is showing; 'all' → the still failed too. Media is
   // fetched from wherever the build points (a mount, a CDN): a dropped connection, an expired
@@ -33,7 +52,7 @@ function BuiltinMedia({ ex, id, compact, minimizable }) {
   const update = useStore(s => s.update)
   const clip = ex.gif && isVideoSrc(gifSrc(ex, body)) ? gifSrc(ex, body) : null
   const clipSrc = useClipInMemory(clip)
-  if (!ex.gif) return null
+  if (!ex.gif && !privateUrl && !ex.img) return null
   if (minimizable && gifSize === 'off') return null
   const mini = minimizable && gifSize === 'mini'
   const toggleSize = e => { e.stopPropagation(); update(s => { s.gifSize = mini ? 'full' : 'mini' }) }
@@ -43,6 +62,9 @@ function BuiltinMedia({ ex, id, compact, minimizable }) {
     if (failed) { setFailed(null); setPlaying(true); return }
     setPlaying(p => !p)
   }
+  if (privateUrl) return <div className={'exmedia' + (compact ? ' compact' : '') + (mini ? ' mini' : '')} id={id}>
+    <img src={privateUrl} alt={exerciseNameFor(ex)} decoding="async" style={{objectFit:'contain',width:'100%',height:'100%'}} />
+  </div>
   return (
     <div className={'exmedia' + (compact ? ' compact' : '') + (mini ? ' mini' : '') + (failed === 'all' ? ' broken' : '')} id={id} onClick={onTap}>
       {failed === 'all'
@@ -135,9 +157,11 @@ export function Thumb(p) {
   return isCustomEx(p.ex) ? <CustomThumb {...p} /> : <BuiltinThumb {...p} />
 }
 function BuiltinThumb({ ex }) {
+  const privateUrl = usePrivateExerciseImage(ex.id)
   const body = useStore(s => figureOf(s.S))
   const src = ex.img ? imgSrc(ex, body) : null
   const [broken, setBroken] = useState(null)
+  if (privateUrl) return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={privateUrl} alt="" />
   if (!src || broken === src) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
   return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={src} alt="" onError={() => setBroken(src)} />
 }
