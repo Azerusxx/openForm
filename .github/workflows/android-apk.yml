@@ -89,16 +89,11 @@ jobs:
           VITE_MOBILE: '1'
         run: npm run build
 
-      - name: Optionale lizenzierte Gym-Medien einbinden
+      - name: RepDB-Bildzuordnung und Mobile-Bundle validieren
         shell: bash
         run: |
           set -euo pipefail
-          if [ -d catalogue/media/still ] && [ -d catalogue/media/clip ] && [ -f catalogue/media/NOTICE.md ]; then
-            node scripts/catalogue/stage-media.mjs frontend/dist
-            echo "Vorhandene Gym-Medien in das App-Bundle kopiert."
-          else
-            echo "::warning::Keine lizenzierten Gym-Medien vorhanden. APK wird ohne Gym-Bilder gebaut."
-          fi
+          node scripts/catalogue/verify-repdb-bundle.mjs
 
       - name: Capacitor Android synchronisieren
         working-directory: frontend
@@ -190,6 +185,16 @@ jobs:
           echo "$pkg" | grep -F "name='app.openform.personal.test'" >/dev/null || { echo "::error::Android-Paket-ID weicht ab"; exit 1; }
           echo "$pkg" | grep -F "versionName='0.3.7h'" >/dev/null || { echo "::error::Android-Version weicht ab"; exit 1; }
           echo "APK-Signatur bestätigt, Zertifikat SHA-256: $actual"
+
+      - name: Alte nicht freigegebene Gym-Medien ausschliessen
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
+          if unzip -Z1 "$apk" | grep -Eq '^assets/public/exercise-media/(still|clip)/'; then
+            echo "::error::Unlicensed old openGym media present in public APK"
+            exit 1
+          fi
 
       - name: RepDB Bilder im APK pruefen
         shell: bash
