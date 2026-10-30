@@ -15,7 +15,7 @@ export function createCompleteBackup(training, nutrition, now = new Date()) {
     exportedAt: now.toISOString(),
     training,
     nutrition: normalizedNutrition(nutrition),
-    notes: 'Training und Ernährung als JSON. Fotos/Videos separat über das Medien-ZIP sichern. Kein Cloud-Sync der Ernährung.'
+    notes: 'Training und Ernährung als JSON. Fotos/Videos separat über das Medien-ZIP sichern. Eigene Übungsbilder unter Übungen → Bilder sichern separat exportieren und auf dem neuen Gerät importieren. Kein Cloud-Sync der Ernährung.'
   }
 }
 
