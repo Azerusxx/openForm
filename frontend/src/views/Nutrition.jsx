@@ -223,8 +223,8 @@ export default function Nutrition() {
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
 
-  const openFood = (type = selectedMeal) => { setSelectedMeal(type); setShowForm(false); setTab('food'); setAddMenu(false); setDrawer(false); setNotice('') }
-  const goSection = section => { setTab(section); setDrawer(false); setAddMenu(false); setShowForm(false); setNotice('') }
+  const openFood = (type = selectedMeal) => { setFoodDestination('diary');setRecipeIngredientIndex(null);setSelectedMeal(type); setShowForm(false); setTab('food'); setAddMenu(false); setDrawer(false); setNotice('') }
+  const goSection = section => { if(section !== 'food')setFoodDestination('diary');setTab(section); setDrawer(false); setAddMenu(false); setShowForm(false); setNotice('') }
   const addWater = amount => update(d => ({ ...d, water: { ...d.water, [date]: Math.max(0, (d.water?.[date] || 0) + amount) } }))
   const saveActivity = e => {
     e.preventDefault()
@@ -251,7 +251,7 @@ export default function Nutrition() {
 
       </aside>
     </div>}
-    {tab !== 'today' && <div className="of-subview-head"><button type="button" onClick={() => goSection('today')} aria-label="Zurück zur Ernährung"><Icon name="chevronLeft" /></button><h2>{tab === 'food' ? (showForm ? 'Mahlzeit erfassen' : 'Lebensmittel') : SECTIONS.find(([id]) => id === tab)?.[1]}</h2></div>}
+    {tab !== 'today' && <div className="of-subview-head"><button type="button" onClick={() => goSection('today')} aria-label="Zurück zur Ernährung"><Icon name="chevronLeft" /></button><h2>{tab === 'food' ? (foodDestination === 'recipe' ? 'Rezeptzutat auswählen' : showForm ? 'Mahlzeit erfassen' : 'Lebensmittel') : SECTIONS.find(([id]) => id === tab)?.[1]}</h2></div>}
     {(tab === 'today' || tab === 'diary') && <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
       <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
       <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
