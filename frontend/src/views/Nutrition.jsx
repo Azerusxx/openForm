@@ -1,4 +1,5 @@
 import { hybridFoodSearch } from '../lib/nutrition-hybrid.js'
+import { prepareMealPhoto, recognizeMealPhoto, photoMealTotals, changeIngredientGrams } from '../lib/nutrition-photo.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
@@ -50,6 +51,11 @@ export default function Nutrition() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [camera, setCamera] = useState(false)
+  const [mealPhoto, setMealPhoto] = useState(null)
+  const [photoEstimate, setPhotoEstimate] = useState(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const photoInput = useRef(null)
+  const cameraInput = useRef(null)
   const [recipeName, setRecipeName] = useState('')
   const [recipeServings, setRecipeServings] = useState(2)
   const [recipeItems, setRecipeItems] = useState([])
@@ -157,6 +163,30 @@ export default function Nutrition() {
     if (!MOBILE) { setCamera(true); return }
     try { const found = await scanCode(); if (found) await lookup(found.value) }
     catch { setNotice('Kamera nicht verfügbar. Barcode bitte eintippen.') }
+  }
+  const selectMealPhoto = async file => {
+    if (!file) return
+    setNotice('');setPhotoEstimate(null);setPhotoBusy(true)
+    try {
+      const prepared = await prepareMealPhoto(file)
+      setMealPhoto(prepared);setShowForm(false);setTab('food');setAddMenu(false)
+    } catch(err) { setNotice(err.message || 'Foto konnte nicht geöffnet werden.') }
+    finally { setPhotoBusy(false) }
+  }
+  const analyzeMealPhoto = async () => {
+    if (!mealPhoto || photoBusy) return
+    setPhotoBusy(true);setNotice('')
+    try { setPhotoEstimate(await recognizeMealPhoto(mealPhoto)) }
+    catch(err) { setNotice(err.message || 'Fotoanalyse fehlgeschlagen.') }
+    finally { setPhotoBusy(false) }
+  }
+  const useMealEstimate = () => {
+    if (!photoEstimate) return
+    const summary = photoMealTotals(photoEstimate.ingredients)
+    if (!(summary.grams>0)) {setNotice('Bitte eine Portion größer als 0 g eingeben.');return}
+    setProduct({name:photoEstimate.name || 'Fotografierte Mahlzeit',estimatedGrams:summary.grams,
+      basis:'g',source:'ai_photo_estimate',barcode:null,per100:summary.per100,per100Micros:{}})
+    setMealPhoto(null);setPhotoEstimate(null)
   }
   const fromPhoto = async file => {
     if (!file) return
@@ -352,7 +382,7 @@ export default function Nutrition() {
         </div>}
       </section>
       <div className="of-plus-zone"><button className="of-big-plus" aria-label="Lebensmittel hinzufügen" aria-expanded={addMenu} onClick={() => setAddMenu(x => !x)}><Icon name={addMenu ? 'xmark' : 'plus'} /></button><p>{meals.length ? 'Mahlzeit hinzufügen' : 'Tippe auf +, um deine erste Mahlzeit zu erfassen'}</p>
-        {addMenu && <div className="of-add-popover"><button onClick={() => openFood()}><Icon name="magnifier" /> Lebensmittel suchen</button><button onClick={() => { openFood(); scan() }}><Icon name="qr" /> Barcode scannen</button><button onClick={() => startNew()}><Icon name="pencil" /> Manuell eintragen</button><button onClick={() => { setAddMenu(false); fileInput.current?.click() }}><Icon name="image" /> Barcode aus Foto</button><button onClick={() => goSection('recipes')}><Icon name="plate" /> Rezept eintragen</button></div>}
+        {addMenu && <div className="of-add-popover"><button onClick={() => openFood()}><Icon name="magnifier" /> Lebensmittel suchen</button><button onClick={() => { openFood(); scan() }}><Icon name="qr" /> Barcode scannen</button><button onClick={() => startNew()}><Icon name="pencil" /> Manuell eintragen</button><button onClick={() => { openFood(); photoInput.current?.click() }}><Icon name="image" /> Essen fotografieren / erkennen</button><button onClick={() => { setAddMenu(false); fileInput.current?.click() }}><Icon name="qr" /> Barcode aus Foto</button><button onClick={() => goSection('recipes')}><Icon name="plate" /> Rezept eintragen</button></div>}
       </div>
       <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} />
       <div className="of-day-groups">
@@ -386,8 +416,28 @@ export default function Nutrition() {
         {!!unique.length && <><h3><Icon name="repeat" /> Zuletzt gegessen</h3><div className="of-quick-food-list">{unique.filter(e => !isFavorite(data,e)).slice(0,5).map(e => <button type="button" key={e.id} onClick={() => log(e)}><strong>{e.name}</strong><small>{fmt(entryTotals(e).kcal)} kcal</small><span>+</span></button>)}</div></>}
       </section>}
       <div className="of-actions"><button onClick={() => startNew()}><Icon name="plus" /> Manuell</button><button onClick={scan}><Icon name="qr" /> Scannen</button>
-        <button onClick={() => fileInput.current?.click()}><Icon name="image" /> Galerie</button>
+        <button onClick={() => photoInput.current?.click()}><Icon name="image" /> Essensfoto</button><button onClick={() => fileInput.current?.click()}><Icon name="qr" /> Barcode-Foto</button>
         <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} /></div>
+      <input hidden ref={photoInput} type="file" accept="image/*" onChange={async e => { const f=e.target.files?.[0];e.target.value='';await selectMealPhoto(f) }} />
+      <input hidden ref={cameraInput} type="file" accept="image/*" capture="environment" onChange={async e => { const f=e.target.files?.[0];e.target.value='';await selectMealPhoto(f) }} />
+      <div className="of-actions"><button type="button" onClick={() => cameraInput.current?.click()}><Icon name="camera" /> Gericht fotografieren</button></div>
+      {mealPhoto && <section className="card of-form" aria-label="Essensfoto analysieren">
+        <h2>Essensfoto analysieren</h2>
+        <img src={mealPhoto} alt="Vorschau deines Essensfotos" style={{width:'100%',maxHeight:310,objectFit:'contain',borderRadius:12}} />
+        <p className="of-dim">Das Foto wird erst mit „Mit KI analysieren“ an deinen eingestellten KI-Anbieter gesendet. Es wird nicht im Tagebuch gespeichert. Zutaten, Gramm und Nährwerte sind nur Schätzungen.</p>
+        {!photoEstimate ? <div className="of-actions"><button disabled={photoBusy} onClick={analyzeMealPhoto}>{photoBusy?'Analyse läuft…':'Mit KI analysieren'}</button><button disabled={photoBusy} onClick={() => {setMealPhoto(null);setPhotoEstimate(null)}}>Verwerfen</button></div> : <>
+          <label>Gericht<input value={photoEstimate.name} onChange={e=>setPhotoEstimate(p=>({...p,name:e.target.value}))} /></label>
+          <h3>Erkannte Zutaten (Schätzwerte)</h3>
+          {photoEstimate.ingredients.map((ingredient,i)=><div key={i} className="of-reuse-row" style={{alignItems:'center'}}>
+            <span style={{flex:1}}><input aria-label={`Zutat ${i+1}`} value={ingredient.name} onChange={e=>setPhotoEstimate(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?{...x,name:e.target.value}:x)}))}/><small>{fmt(ingredient.kcal)} kcal · {fmt(ingredient.protein)} g Protein · {fmt(ingredient.carbs)} g KH · {fmt(ingredient.fat)} g Fett</small></span>
+            <label style={{maxWidth:95}}>Gramm<input type="number" min="0" max="3000" step="1" value={ingredient.grams} onChange={e=>setPhotoEstimate(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?changeIngredientGrams(x,e.target.value):x)}))}/></label>
+            <button type="button" aria-label={`Zutat ${ingredient.name} entfernen`} onClick={()=>setPhotoEstimate(p=>({...p,ingredients:p.ingredients.filter((_,j)=>j!==i)}))}><Icon name="trash" /></button>
+          </div>)}
+          <p className="of-macro-sub">{(()=>{const total=photoMealTotals(photoEstimate.ingredients);return 'Geschätzt: '+fmt(total.grams)+' g · '+fmt(total.kcal)+' kcal · '+fmt(total.protein)+' g Protein · '+fmt(total.carbs)+' g KH · '+fmt(total.fat)+' g Fett'})()}</p>
+          {photoEstimate.uncertainty && <p className="of-dim">Unsicherheit: {photoEstimate.uncertainty}</p>}
+          <div className="of-actions"><button type="button" onClick={useMealEstimate}>Nährwerte prüfen und übernehmen</button><button type="button" onClick={()=>setPhotoEstimate(null)}>Neu analysieren</button><button type="button" onClick={()=>{setMealPhoto(null);setPhotoEstimate(null)}}>Verwerfen</button></div>
+        </>}
+      </section>}
       <form className="card of-lookup" onSubmit={e => { e.preventDefault(); lookup(barcode) }}>
         <label htmlFor="food-barcode">Lebensmittel-Barcode</label>
         <div><input id="food-barcode" inputMode="numeric" placeholder="EAN eingeben" value={barcode} onChange={e => setBarcode(e.target.value)} />
