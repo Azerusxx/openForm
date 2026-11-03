@@ -429,8 +429,9 @@ export default function Nutrition() {
           <label>Gericht<input value={photoEstimate.name} onChange={e=>setPhotoEstimate(p=>({...p,name:e.target.value}))} /></label>
           <h3>Erkannte Zutaten (Schätzwerte)</h3>
           {photoEstimate.ingredients.map((ingredient,i)=><div key={i} className="of-reuse-row" style={{alignItems:'center'}}>
-            <span style={{flex:1}}><strong>{ingredient.name}</strong><small>{fmt(ingredient.kcal)} kcal · {fmt(ingredient.protein)} g Protein · {fmt(ingredient.carbs)} g KH · {fmt(ingredient.fat)} g Fett</small></span>
+            <span style={{flex:1}}><input aria-label={`Zutat ${i+1}`} value={ingredient.name} onChange={e=>setPhotoEstimate(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?{...x,name:e.target.value}:x)}))}/><small>{fmt(ingredient.kcal)} kcal · {fmt(ingredient.protein)} g Protein · {fmt(ingredient.carbs)} g KH · {fmt(ingredient.fat)} g Fett</small></span>
             <label style={{maxWidth:95}}>Gramm<input type="number" min="0" max="3000" step="1" value={ingredient.grams} onChange={e=>setPhotoEstimate(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?changeIngredientGrams(x,e.target.value):x)}))}/></label>
+            <button type="button" aria-label={`Zutat ${ingredient.name} entfernen`} onClick={()=>setPhotoEstimate(p=>({...p,ingredients:p.ingredients.filter((_,j)=>j!==i)}))}><Icon name="trash" /></button>
           </div>)}
           <p className="of-macro-sub">{(()=>{const total=photoMealTotals(photoEstimate.ingredients);return 'Geschätzt: '+fmt(total.grams)+' g · '+fmt(total.kcal)+' kcal · '+fmt(total.protein)+' g Protein · '+fmt(total.carbs)+' g KH · '+fmt(total.fat)+' g Fett'})()}</p>
           {photoEstimate.uncertainty && <p className="of-dim">Unsicherheit: {photoEstimate.uncertainty}</p>}
