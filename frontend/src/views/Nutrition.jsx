@@ -238,7 +238,7 @@ export default function Nutrition() {
     if (amount !== null && (!Number.isFinite(amount) || amount < 0)) { setNotice('Nährstoffmenge prüfen.'); return }
     const sameName = data.supplements.find(s => s.id !== editingSupplement && s.name.trim().toLocaleLowerCase('de') === suppName.trim().toLocaleLowerCase('de'))
     if (sameName && !window.confirm(`„${sameName.name}“ ist bereits vorhanden. Wirklich einen weiteren Eintrag anlegen?`)) return
-    const nutrients = {...(previous?.nutrients || {}),...suppNutrients}
+    const nutrients = {...suppNutrients}
     if (amount !== null) nutrients[suppNutrient] = amount
     const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients, reminderTime: suppReminder, reminderEnabled: suppReminderEnabled && !!suppReminder, logs: previous?.logs || [] }
     if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setSuppNutrients({}); setSuppReminder('');setSuppReminderEnabled(false); setEditingSupplement(null); setSuppFormOpen(false) }
@@ -364,7 +364,7 @@ export default function Nutrition() {
               <label className="of-supp-field">Einheit<select aria-label="Einheit" value={suppUnit} onChange={e => setSuppUnit(e.target.value)}><option value="piece">Stk.</option><option value="g">g</option><option value="mg">mg</option><option value="ml">ml</option></select></label>
             </div>
             <div className="of-supp-form-row">
-              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
+              <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => {setSuppNutrient(e.target.value);setSuppAmount(suppNutrients[e.target.value] == null ? '' : String(suppNutrients[e.target.value]))}}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
               <label className="of-supp-field">Wirkstoffgehalt pro {suppUnit === 'piece' ? 'Stück' : suppUnit}<input aria-label="Wirkstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
               <button type="button" onClick={()=>{if(suppAmount!=='' && Number(suppAmount)>=0){setSuppNutrients(p=>({...p,[suppNutrient]:Number(suppAmount)}));setSuppAmount('')}}}>Weiteren Wirkstoff übernehmen</button>
               <label className="of-supp-field">Erinnerung (optional)<input type="time" value={suppReminder} onChange={e=>setSuppReminder(e.target.value)} /></label>
