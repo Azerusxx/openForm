@@ -56,7 +56,7 @@ export async function estimateFood(query) {
   const env = key ? { [meta.apiKeyEnv]:key } : {}
   const result = await adapter.invoke({
     cfg,env,model:device.model,fetch:nativeFetch,timeoutMs:60000,maxTokens:650,
-    system:'Du schätzt Lebensmittel-Nährwerte. Antworte ausschließlich mit einem JSON-Objekt. Erfinde keine Recherche, Herstellerangaben oder Quellen. Verwende realistische typische Portionsgrößen. Werte gelten für die gesamte genannte Portion. Keys: name (string), grams (number), kcal (number), protein (number), carbs (number), fat (number). Bei Unsicherheit konservativ schätzen.',
+    system:'Du schätzt Lebensmittel-Nährwerte. Antworte ausschließlich mit einem JSON-Objekt. Erfinde keine Recherche, Herstellerangaben oder Quellen. Verwende realistische typische Portionsgrößen. Werte gelten für die gesamte genannte Portion. Keys: name (string), grams (number), kcal (number), protein (number), carbs (number), fat (number), optional per100Micros (object). Mikronährstoffe nur wenn plausibel, immer pro 100 g und in den Einheiten dieser erlaubten Keys: '+MICRO_NUTRIENTS.map(x=>x.key+' '+x.unit).join(', ')+'. Unbekannte Werte weglassen, nicht null oder 0 setzen. Bei Unsicherheit konservativ schätzen.',
     prompt:'Schätze die gesamte verzehrte Menge und Makronährwerte für: '+query
   })
   if (result.code !== 0) throw new Error('KI-Anfrage fehlgeschlagen: '+String(result.stderr || 'Keine Antwort').slice(0,160))
