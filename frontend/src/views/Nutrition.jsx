@@ -241,7 +241,7 @@ export default function Nutrition() {
     const nutrients = {...suppNutrients}
     if (amount !== null) nutrients[suppNutrient] = amount
     const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients, reminderTime: suppReminder, reminderEnabled: suppReminderEnabled && !!suppReminder, logs: previous?.logs || [] }
-    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setSuppNutrients({}); setSuppReminder('');setSuppReminderEnabled(false); setEditingSupplement(null); setSuppFormOpen(false) }
+    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { if (supplement.reminderEnabled) syncSupplementReminders(loadNutrition().supplements, true).then(ok=>{if(!ok)setNotice('Android-Benachrichtigungen bitte in den Einstellungen erlauben.')}); setSuppName(''); setSuppDose(''); setSuppAmount(''); setSuppNutrients({}); setSuppReminder('');setSuppReminderEnabled(false); setEditingSupplement(null); setSuppFormOpen(false) }
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
@@ -369,7 +369,7 @@ export default function Nutrition() {
               <button type="button" onClick={()=>{if(suppAmount!=='' && Number(suppAmount)>=0){setSuppNutrients(p=>({...p,[suppNutrient]:Number(suppAmount)}));setSuppAmount('')}}}>Weiteren Wirkstoff übernehmen</button>
               <label className="of-supp-field">Erinnerung (optional)<input type="time" value={suppReminder} onChange={e=>setSuppReminder(e.target.value)} /></label>
               <label><input type="checkbox" checked={suppReminderEnabled} onChange={e=>setSuppReminderEnabled(e.target.checked)} /> Täglich erinnern, bis die Einnahme bestätigt ist</label>
-              {Object.entries(suppNutrients).map(([key,value])=><div key={key}>{MICRO_NUTRIENTS.find(n=>n.key===key)?.label || key}: {value} {MICRO_NUTRIENTS.find(n=>n.key===key)?.unit} <button type="button" aria-label={`${key} entfernen`} onClick={()=>setSuppNutrients(p=>Object.fromEntries(Object.entries(p).filter(([k])=>k!==key)))}>Entfernen</button></div>)}
+              {Object.entries(suppNutrients).map(([key,value])=><div key={key}>{MICRO_NUTRIENTS.find(n=>n.key===key)?.label || key}: {value} {MICRO_NUTRIENTS.find(n=>n.key===key)?.unit} <button type="button" aria-label={`${key} entfernen`} onClick={()=>{setSuppNutrients(p=>Object.fromEntries(Object.entries(p).filter(([k])=>k!==key)));if(suppNutrient===key)setSuppAmount('')}}>Entfernen</button></div>)}
             </div>
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
