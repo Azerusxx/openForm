@@ -5,7 +5,8 @@ import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
 import { bwSheet } from '../sheets.jsx'
 import { MOBILE } from '../lib/mobile.js'
-import { scanCode, importCodeFromImage } from '../lib/scan.js'
+import { scanCode } from '../lib/scan.js'
+import { analyzeFoodPhoto } from '../lib/nutrition-photo.js'
 import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
   dayTotals, dayMicros, MICRO_NUTRIENTS, fetchFoodByBarcode, searchFoodByName, mergeNutrition, nutritionBackup, readNutritionBackup } from '../lib/nutrition.js'
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
@@ -68,7 +69,9 @@ export default function Nutrition() {
   const [suppFormOpen, setSuppFormOpen] = useState(false)
   const [suppReminder, setSuppReminder] = useState('')
   const [suppReminderEnabled, setSuppReminderEnabled] = useState(false)
-  const fileInput = useRef(null)
+  const galleryInput = useRef(null)
+  const photoCameraInput = useRef(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const backupInput = useRef(null)
   const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
   const totals = dayTotals(data.entries, date)
@@ -89,6 +92,7 @@ export default function Nutrition() {
   }
   const micros = Object.fromEntries(MICRO_NUTRIENTS.map(({key}) => [key, Math.round(((foodMicros[key] || 0) + (supplementMicros[key] || 0)) * 100) / 100]))
 
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview) }, [photoPreview])
   useEffect(() => {
     const onSaved = () => setData(loadNutrition())
     window.addEventListener('storage', onSaved)
@@ -181,18 +185,16 @@ export default function Nutrition() {
   }
   const fromPhoto = async file => {
     if (!file) return
+    setBusy(true)
+    setNotice('Foto wird analysiert. Bitte auf das Ergebnis warten.')
+    const preview = URL.createObjectURL(file)
+    setPhotoPreview(old => { if (old) URL.revokeObjectURL(old); return preview })
     try {
-      let found
-      if (MOBILE) found = await importCodeFromImage(file)
-      else if (typeof BarcodeDetector !== 'undefined') {
-        const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] })
-        const image = await createImageBitmap(file)
-        try { const hits = await detector.detect(image); found = hits[0] && { value: hits[0].rawValue } }
-        finally { image.close() }
-      }
-      if (found?.value) await lookup(found.value)
-      else setNotice('Keinen Barcode erkannt. Für KI-Fotoanalyse brauchen wir später eine gesicherte API-Anbindung.')
-    } catch { setNotice('Bild konnte nicht gelesen werden. Barcode bitte eintippen.') }
+      const meal = await analyzeFoodPhoto(file)
+      setProduct(meal)
+      setNotice('KI-Foto-Schätzung: Gericht, Portion und Nährwerte kontrollieren. Erst „Eintragen“ speichert.')
+    } catch (err) { setNotice(err?.message || 'Fotoanalyse fehlgeschlagen.') }
+    finally { setBusy(false) }
   }
   const exportBackup = () => {
     const blob = new Blob([nutritionBackup(data)], { type: 'application/json;charset=utf-8' })
@@ -278,6 +280,8 @@ export default function Nutrition() {
     {(tab === 'today' || tab === 'diary') && <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
       <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
       <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
+    <input hidden ref={galleryInput} type="file" accept="image/*" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
+    <input hidden ref={photoCameraInput} type="file" accept="image/*" capture="environment" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
     {notice && <div className="of-notice" role="status">{notice}</div>}
     {tab === 'today' && <>
       <div className="of-health-chips">
@@ -380,9 +384,8 @@ export default function Nutrition() {
         </div>}
       </section>
       <div className="of-plus-zone"><button className="of-big-plus" aria-label="Lebensmittel hinzufügen" aria-expanded={addMenu} onClick={() => setAddMenu(x => !x)}><Icon name={addMenu ? 'xmark' : 'plus'} /></button><p>{meals.length ? 'Mahlzeit hinzufügen' : 'Tippe auf +, um deine erste Mahlzeit zu erfassen'}</p>
-        {addMenu && <div className="of-add-popover"><button onClick={() => openFood()}><Icon name="magnifier" /> Lebensmittel suchen</button><button onClick={() => { openFood(); scan() }}><Icon name="qr" /> Barcode scannen</button><button onClick={() => startNew()}><Icon name="pencil" /> Manuell eintragen</button><button onClick={() => { setAddMenu(false); fileInput.current?.click() }}><Icon name="image" /> Barcode aus Foto</button><button onClick={() => goSection('recipes')}><Icon name="plate" /> Rezept eintragen</button></div>}
+        {addMenu && <div className="of-add-popover"><button onClick={() => openFood()}><Icon name="magnifier" /> Lebensmittel suchen</button><button onClick={() => { openFood(); scan() }}><Icon name="qr" /> Barcode scannen</button><button onClick={() => startNew()}><Icon name="pencil" /> Manuell eintragen</button><button onClick={() => { setAddMenu(false); setFoodDestination('diary'); setTab('food'); photoCameraInput.current?.click() }}><Icon name="image" /> Essen fotografieren</button><button onClick={() => goSection('recipes')}><Icon name="plate" /> Rezept eintragen</button></div>}
       </div>
-      <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} />
       <div className="of-day-groups">
         <section className="of-meal-section of-activity-section"><h2><span className="of-section-icon"><Icon name="figureRun" /></span>Aktivität <button className="of-section-more" onClick={() => setShowActivity(v => !v)} aria-label="Aktivität hinzufügen"><Icon name="plus" /></button></h2>
           {training.sessions.map(w => <div className="of-logged-row" key={`gym-${w.id}`}><span><strong>{w.name}</strong><small>≈ {w.kcal} kcal · {w.minutes} Min. · aus Trainingsdauer und Gewicht geschätzt</small></span></div>)}
@@ -413,9 +416,8 @@ export default function Nutrition() {
         {!!data.favorites.length && <><h3><Icon name="star" /> Favoriten</h3><div className="of-quick-food-list">{data.favorites.slice(0,6).map(f => <button type="button" key={f.id} onClick={() => log(f.food)}><strong>{f.food.name}</strong><small>{fmt(entryTotals(f.food).kcal)} kcal · {fmt(entryTotals(f.food).protein)} g Protein</small><span>+</span></button>)}</div></>}
         {!!unique.length && <><h3><Icon name="repeat" /> Zuletzt gegessen</h3><div className="of-quick-food-list">{unique.filter(e => !isFavorite(data,e)).slice(0,5).map(e => <button type="button" key={e.id} onClick={() => log(e)}><strong>{e.name}</strong><small>{fmt(entryTotals(e).kcal)} kcal</small><span>+</span></button>)}</div></>}
       </section>}
-      <div className="of-actions"><button onClick={() => startNew()}><Icon name="plus" /> Manuell</button><button onClick={scan}><Icon name="qr" /> Scannen</button>
-        <button onClick={() => fileInput.current?.click()}><Icon name="image" /> Galerie</button>
-        <input hidden ref={fileInput} type="file" accept="image/*" onChange={async e => { await fromPhoto(e.target.files?.[0]); e.target.value = '' }} /></div>
+      <div className="of-actions"><button onClick={() => startNew()}><Icon name="plus" /> Manuell</button><button onClick={scan}><Icon name="qr" /> Barcode</button>
+        <button disabled={busy} onClick={() => photoCameraInput.current?.click()}><Icon name="image" /> Foto</button><button disabled={busy} onClick={() => galleryInput.current?.click()}><Icon name="image" /> Galerie</button></div>
       <form className="card of-lookup" onSubmit={e => { e.preventDefault(); lookup(barcode) }}>
         <label htmlFor="food-barcode">Lebensmittel-Barcode</label>
         <div><input id="food-barcode" inputMode="numeric" placeholder="EAN eingeben" value={barcode} onChange={e => setBarcode(e.target.value)} />
@@ -429,6 +431,7 @@ export default function Nutrition() {
         <button onClick={() => setProduct(p)}>Übernehmen</button></div>)}</div>}
       {camera && <FoodCameraScan onFound={async code => { setCamera(false); await lookup(code) }} onClose={() => setCamera(false)} />}
       {showForm && <form className="card of-form" onSubmit={saveMeal}>
+        {photoPreview && form.source === 'ai_photo_estimate' && <img src={photoPreview} alt="Foto der Mahlzeit zur Überprüfung" style={{width:'100%',maxHeight:240,objectFit:'contain',borderRadius:12}} />}
         <h2>{foodDestination === 'recipe' ? 'Rezeptzutat' : editing ? 'Mahlzeit bearbeiten' : 'Mahlzeit hinzufügen'}</h2>
         {foodDestination !== 'recipe' && <label>Mahlzeit<select value={form.mealType || 'other'} onChange={e => setForm(f => ({ ...f, mealType: e.target.value }))}>{MEAL_GROUPS.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>}
         <label>Name<input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></label>
