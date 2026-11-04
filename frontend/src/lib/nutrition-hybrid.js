@@ -83,7 +83,7 @@ export async function estimateFoodMicros(name, { invoke = null } = {}) {
   })
   if (response.code !== 0) throw new Error('KI-Anfrage fehlgeschlagen.')
   let payload
-  try { payload = JSON.parse(String(response.text).replace(/^\\s*```(?:json)?\\s*/i,'').replace(/\\s*```\\s*$/,'')) }
+  try { payload = JSON.parse(String(response.text).replace(/^\s*```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'')) }
   catch { throw new Error('Ungültige KI-Antwort.') }
   const micros = cleanMicros(payload?.per100Micros)
   if (!Object.keys(micros).length) throw new Error('Keine plausiblen Mikronährstoffwerte verfügbar.')
