@@ -28,15 +28,32 @@ export function parseFoodPhotoAnswer(raw) {
 export async function photoToDataUrl(file) {
   if (!file || !String(file.type).startsWith('image/')) throw new Error('Bitte ein Foto auswählen.')
   if(file.size>18*1024*1024) throw new Error('Foto zu groß (max. 18 MB).')
-  const image=await createImageBitmap(file)
+  // Android WebViews without createImageBitmap can still load an ordinary image.
+  let image, close=()=>{}
+  if (typeof createImageBitmap === 'function') {
+    image=await createImageBitmap(file)
+    close=()=>image.close()
+  } else {
+    const url=URL.createObjectURL(file)
+    try {
+      image=await new Promise((resolve,reject)=>{
+        const img=new Image()
+        img.onload=()=>resolve(img)
+        img.onerror=()=>reject(new Error('Foto konnte nicht geöffnet werden.'))
+        img.src=url
+      })
+    } finally { URL.revokeObjectURL(url) }
+  }
   try {
     const scale=Math.min(1,1280/Math.max(image.width,image.height))
     const canvas=document.createElement('canvas')
     canvas.width=Math.max(1,Math.round(image.width*scale))
     canvas.height=Math.max(1,Math.round(image.height*scale))
-    canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height)
+    const ctx=canvas.getContext('2d')
+    if(!ctx) throw new Error('Bildverarbeitung ist auf diesem Gerät nicht verfügbar.')
+    ctx.drawImage(image,0,0,canvas.width,canvas.height)
     return canvas.toDataURL('image/jpeg',0.78)
-  } finally { image.close() }
+  } finally { close() }
 }
 
 export async function analyzeFoodPhoto(file,{send=nativeFetch}={}) {
@@ -61,7 +78,7 @@ export async function analyzeFoodPhoto(file,{send=nativeFetch}={}) {
     url=base+'/v1/messages'
     headers['x-api-key']=apiKey
     headers['anthropic-version']='2023-06-01'
-    body={model:d.model,max_tokens:900,messages:[{role:'user',content:[
+    body={model:d.model,max_completion_tokens:900,messages:[{role:'user',content:[
       {type:'text',text:INSTRUCTIONS},{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}}
     ]}]}
   } else {
