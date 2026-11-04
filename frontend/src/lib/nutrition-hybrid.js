@@ -1,6 +1,6 @@
 // Hybrid food lookup: OFF first, configured on-device Coach provider only as fallback.
 // Never writes nutrition data or stores API credentials.
-import { searchFoodByName } from './nutrition.js'
+import { searchFoodByName, MICRO_NUTRIENTS, cleanMicros } from './nutrition.js'
 import { loadCoachDevice } from './coach-device.js'
 import { getApiKey } from './coach-secrets.js'
 import { nativeFetch } from './capacitor-fetch.js'
@@ -23,7 +23,7 @@ function validateEstimate(obj, query) {
   if (!Number.isFinite(amount) || amount < 10 || amount > 5000 || values.some(x => !Number.isFinite(x) || x < 0)) throw new Error('Die KI-Schätzung enthält ungültige Mengen oder Nährwerte.')
   if (values[0] > 12000 || values.slice(1).some(x => x > 1000)) throw new Error('Die KI-Schätzung ist unplausibel.')
   const per100 = Object.fromEntries(['kcal','protein','carbs','fat'].map((key,i) => [key, Math.round(values[i] * 10000 / amount) / 100]))
-  return { name: obj.name.trim().slice(0,160) || query, basis:'g', barcode:null, per100, per100Micros:{}, source:'ai_estimate', estimatedGrams:amount, note:'KI-Schätzung für die gesamte genannte Portion; Werte pro 100 g umgerechnet. Bitte prüfen.' }
+  return { name: obj.name.trim().slice(0,160) || query, basis:'g', barcode:null, per100, per100Micros:cleanMicros(obj.per100Micros), source:'ai_estimate', estimatedGrams:amount, note:'KI-Schätzung für die gesamte genannte Portion; Werte pro 100 g umgerechnet. Bitte prüfen.' }
 }
 export async function hybridFoodSearch(query, { search = searchFoodByName, estimate = estimateFood } = {}) {
   const term = String(query || '').trim()
@@ -63,4 +63,29 @@ export async function estimateFood(query) {
   let parsed
   try { parsed = JSON.parse(String(result.text).replace(/^\s*```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'')) } catch { throw new Error('KI-Antwort war kein gültiges JSON.') }
   return validateEstimate(parsed,query)
+}
+
+/** Only explicit, validated estimates are proposed; missing values remain unknown. */
+export async function estimateFoodMicros(name, { invoke = null } = {}) {
+  const device = await loadCoachDevice()
+  if (device.mode !== 'byok' || !device.provider || !device.model) throw new Error('Bitte zuerst den KI-Coach unter Einstellungen einrichten.')
+  const adapters = await import('./coach-local.js')
+  const adapter = adapters.ADAPTERS[device.provider]
+  const meta = HTTP_PROVIDERS[device.provider]
+  if (!adapter || !meta) throw new Error('KI-Anbieter nicht unterstützt.')
+  const key = await getApiKey()
+  if (!key && !meta.keyOptional) throw new Error('API-Schlüssel fehlt.')
+  const response = await (invoke || adapter.invoke)({
+    cfg:{provider:device.provider,providerOptions:device.baseUrl ? {[device.provider]:{baseUrl:device.baseUrl}} : {}},
+    env:key ? {[meta.apiKeyEnv]:key} : {},model:device.model,fetch:nativeFetch,timeoutMs:60000,maxTokens:900,
+    system:'Schätze nur plausible Mikronährstoffe PRO 100 g eines Lebensmittels. Antworte nur mit JSON {"per100Micros":{...}}. Erlaubte Keys und Einheiten: '+MICRO_NUTRIENTS.map(x=>x.key+': '+x.unit).join(', ')+'. Gib nur Werte an, die du plausibel einschätzen kannst. Unbekanntes weglassen; keine erfundenen präzisen Herstellerwerte.',
+    prompt:'Lebensmittel: '+String(name).slice(0,180)
+  })
+  if (response.code !== 0) throw new Error('KI-Anfrage fehlgeschlagen.')
+  let payload
+  try { payload = JSON.parse(String(response.text).replace(/^\\s*```(?:json)?\\s*/i,'').replace(/\\s*```\\s*$/,'')) }
+  catch { throw new Error('Ungültige KI-Antwort.') }
+  const micros = cleanMicros(payload?.per100Micros)
+  if (!Object.keys(micros).length) throw new Error('Keine plausiblen Mikronährstoffwerte verfügbar.')
+  return micros
 }
