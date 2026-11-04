@@ -7,7 +7,9 @@ test('nutrition landing mirrors daily journal without duplicating global navigat
   for (const label of ['Frühstück','Mittagessen','Abendessen','Snacks','zugeführt','verbrannt','kcal','Wasser']) {
     assert.ok(view.includes(label) || css.includes(label), `${label} missing`)
   }
-  for (const action of ['Lebensmittel suchen','Barcode scannen','Manuell eintragen','Barcode aus Foto']) assert.ok(view.includes(action))
+  for (const action of ['Lebensmittel suchen','Barcode scannen','Manuell eintragen','Essen fotografieren','Galerie']) assert.ok(view.includes(action), `${action} missing`)
+  assert.match(view, /analyzeFoodPhoto\(file\)/, 'food photographs must use visual AI analysis')
+  assert.doesNotMatch(view, /importCodeFromImage/, 'meal photographs must not be sent to the barcode image decoder')
   for (const section of ['Tagebuch','Trends','Rezepte','Favoriten','Supplements','Export / Import']) assert.ok(view.includes(section))
   assert.match(view, /of-drawer-overlay/)
   assert.doesNotMatch(view, /nav\('\/settings\/nutrition-profile'\)/)
