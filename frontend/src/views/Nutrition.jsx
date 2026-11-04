@@ -1,4 +1,5 @@
 import { hybridFoodSearch, estimateFoodMicros } from '../lib/nutrition-hybrid.js'
+import { syncSupplementReminders } from '../lib/supplement-reminders.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
@@ -65,6 +66,8 @@ export default function Nutrition() {
   const [microBusy, setMicroBusy] = useState(false)
   const [editingSupplement, setEditingSupplement] = useState(null)
   const [suppFormOpen, setSuppFormOpen] = useState(false)
+  const [suppReminder, setSuppReminder] = useState('')
+  const [suppReminderEnabled, setSuppReminderEnabled] = useState(false)
   const fileInput = useRef(null)
   const backupInput = useRef(null)
   const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
@@ -97,6 +100,7 @@ export default function Nutrition() {
     catch { setNotice('Speichern fehlgeschlagen. Bitte Speicher prüfen und ein Backup exportieren.'); return false }
   }
   const update = fn => commit(fn(loadNutrition()))
+  useEffect(()=>{ syncSupplementReminders(data.supplements).catch(()=>{}) },[data.supplements])
   const ingredientFromFood = food => {
     try {
       const ingredient = createEntry({ ...food, id: null, date, mealType: selectedMeal })
@@ -236,8 +240,8 @@ export default function Nutrition() {
     if (sameName && !window.confirm(`„${sameName.name}“ ist bereits vorhanden. Wirklich einen weiteren Eintrag anlegen?`)) return
     const nutrients = {...(previous?.nutrients || {}),...suppNutrients}
     if (amount !== null) nutrients[suppNutrient] = amount
-    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients, logs: previous?.logs || [] }
-    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setSuppNutrients({}); setEditingSupplement(null); setSuppFormOpen(false) }
+    const supplement = { id: previous?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`), name: suppName.trim(), dose: Number(suppDose), unit: suppUnit, nutrients, reminderTime: suppReminder, reminderEnabled: suppReminderEnabled && !!suppReminder, logs: previous?.logs || [] }
+    if (update(d => ({ ...d, supplements: previous ? d.supplements.map(s => s.id === previous.id ? supplement : s) : [...d.supplements, supplement] }))) { setSuppName(''); setSuppDose(''); setSuppAmount(''); setSuppNutrients({}); setSuppReminder('');setSuppReminderEnabled(false); setEditingSupplement(null); setSuppFormOpen(false) }
   }
   const toggleSupplement = supplement => update(d => ({ ...d, supplements: d.supplements.map(s => s.id !== supplement.id ? s :
     { ...s, logs: s.logs.includes(date) ? s.logs.filter(x => x !== date) : [...s.logs, date] }) }))
@@ -347,12 +351,12 @@ export default function Nutrition() {
           {!showSupplements && <p className="of-dim of-supp-hint">{data.supplements.length ? 'Hier kannst du deine täglichen Einnahmen abhaken und die hinterlegten Dosierungen bearbeiten.' : 'Hier einmal deine Supplements und Tagesdosen hinterlegen, danach täglich abhaken.'}</p>}
           {showSupplements && <>
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
-            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
-            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppNutrients({...s.nutrients}); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
+            <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{s.reminderEnabled && s.reminderTime ? `Erinnerung ${s.reminderTime} · ` : ''}{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
+            <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppNutrients({...s.nutrients});setSuppReminder(s.reminderTime || '');setSuppReminderEnabled(!!s.reminderEnabled); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
             <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
           </div>)}
           {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
-          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { setEditingSupplement(null); setSuppName(""); setSuppDose(""); setSuppUnit("piece"); setSuppAmount(""); setSuppNutrients({}); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
+          {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { setEditingSupplement(null); setSuppName(""); setSuppDose(""); setSuppUnit("piece"); setSuppAmount(""); setSuppNutrients({});setSuppReminder('');setSuppReminderEnabled(false); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
           {suppFormOpen && <form className="of-inline-supp-form" onSubmit={addSupplement}>
             <label className="of-supp-field">Supplement<input aria-label="Supplementname" placeholder="z. B. Magnesium" value={suppName} onChange={e => setSuppName(e.target.value)} required /></label>
             <div className="of-supp-form-row">
@@ -363,11 +367,14 @@ export default function Nutrition() {
               <label className="of-supp-field">Enthaltener Nährstoff<select aria-label="Enthaltener Nährstoff" value={suppNutrient} onChange={e => setSuppNutrient(e.target.value)}>{MICRO_NUTRIENTS.map(n => <option value={n.key} key={n.key}>{n.label} ({n.unit})</option>)}</select></label>
               <label className="of-supp-field">Wirkstoffgehalt pro {suppUnit === 'piece' ? 'Stück' : suppUnit}<input aria-label="Wirkstoffgehalt pro Einheit" type="number" min="0" step="any" placeholder={MICRO_NUTRIENTS.find(n => n.key === suppNutrient)?.unit || 'mg'} value={suppAmount} onChange={e => setSuppAmount(e.target.value)} /></label>
               <button type="button" onClick={()=>{if(suppAmount!=='' && Number(suppAmount)>=0){setSuppNutrients(p=>({...p,[suppNutrient]:Number(suppAmount)}));setSuppAmount('')}}}>Weiteren Wirkstoff übernehmen</button>
+              <label className="of-supp-field">Erinnerung (optional)<input type="time" value={suppReminder} onChange={e=>setSuppReminder(e.target.value)} /></label>
+              <label><input type="checkbox" checked={suppReminderEnabled} onChange={e=>setSuppReminderEnabled(e.target.checked)} /> Täglich erinnern, bis die Einnahme bestätigt ist</label>
               {Object.entries(suppNutrients).map(([key,value])=><div key={key}>{MICRO_NUTRIENTS.find(n=>n.key===key)?.label || key}: {value} {MICRO_NUTRIENTS.find(n=>n.key===key)?.unit} <button type="button" aria-label={`${key} entfernen`} onClick={()=>setSuppNutrients(p=>Object.fromEntries(Object.entries(p).filter(([k])=>k!==key)))}>Entfernen</button></div>)}
             </div>
             <button type="submit" aria-label={editingSupplement ? 'Supplement speichern' : 'Supplement hinzufügen'}>{editingSupplement ? 'Änderungen speichern' : 'Supplement hinzufügen'} <Icon name={editingSupplement ? 'check' : 'plus'} /></button>
             <button type="button" className="of-supp-cancel" onClick={() => { setSuppFormOpen(false); setEditingSupplement(null); setSuppAmount("") }}>Abbrechen</button>
           </form>}
+          <p className="of-dim">Die Erinnerung öffnet openForm; erst das Abhaken zählt als Einnahme. Benachrichtigungen müssen in Android erlaubt sein.</p>
           <p className="of-dim">Supplement-Einnahmen werden dokumentiert. Wirkstoffmengen werden nur mit hinterlegtem Gehalt berechnet. Proteinshakes mit Kalorien zusätzlich als Lebensmittel erfassen.</p>
           </>}
         </div>}
