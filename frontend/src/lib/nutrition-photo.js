@@ -78,13 +78,13 @@ export async function analyzeFoodPhoto(file,{send=nativeFetch}={}) {
     url=base+'/v1/messages'
     headers['x-api-key']=apiKey
     headers['anthropic-version']='2023-06-01'
-    body={model:d.model,...(d.provider==='openai'?{max_completion_tokens:900}:{max_tokens:900}),messages:[{role:'user',content:[
+    body={model:d.model,max_tokens:900,messages:[{role:'user',content:[
       {type:'text',text:INSTRUCTIONS},{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}}
     ]}]}
   } else {
     url=base.replace(/\/v1$/,'')+'/v1/chat/completions'
     if(apiKey) headers.Authorization='Bearer '+apiKey
-    body={model:d.model,max_tokens:900,messages:[{role:'user',content:[
+    body={model:d.model,...(d.provider==='openai'?{max_completion_tokens:900}:{max_tokens:900}),messages:[{role:'user',content:[
       {type:'text',text:INSTRUCTIONS},{type:'image_url',image_url:{url:dataUrl,detail:'auto'}}
     ]}]}
   }
