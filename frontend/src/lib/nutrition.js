@@ -1,4 +1,5 @@
 import { cleanFavorites, cleanRecipes, cleanSupplements } from './nutrition-extra.js'
+import { mirrorNutrition } from './nutrition-native-backup.js'
 // openForm nutrition v0.1: intentionally separate from gym_state_v1 until sync/merge
 // and complete-backup support have been implemented and tested.
 // Nutrients are optional. An absent value means UNKNOWN, not zero.
@@ -114,6 +115,9 @@ export const loadNutrition = (store = globalThis.localStorage) => {
 export function saveNutrition(data, store = globalThis.localStorage) {
   const safe = normalizedNutrition(data)
   store.setItem(NUTRITION_KEY, JSON.stringify(safe))
+  // A native mirror is best-effort and must never block an otherwise successful local save.
+  // Only mirror the real app store, not test/preview storage adapters.
+  if (store === globalThis.localStorage) mirrorNutrition(safe).catch(()=>{})
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('openform-nutrition-changed'))
   return safe
 }
