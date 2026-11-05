@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { weightForecast, circumferenceForecast } from '../lib/body-development.js'
 import { todayISO, fmtDate, fmtNum } from '../lib/format.js'
-import LineChart from './LineChart.jsx'
 import Icon from './Icon.jsx'
 import './BodyDevelopment.css'
 
@@ -32,7 +31,6 @@ export default function BodyDevelopment({ S }) {
        <div><span>In 4 Wochen, rechnerisch</span><strong>{fmtNum(weight.projected.y)} {S.unit}</strong></div>
        <div><span>Grobe mögliche Spanne</span><strong>{fmtNum(weight.projected.lower)}–{fmtNum(weight.projected.upper)} {S.unit}</strong></div>
      </div>
-     <div className="body-development-plot"><LineChart points={weight.points} h={142} unit={S.unit} color="var(--teal)" /></div>
      {weight.goalDate && <p className="body-development-target">
        <Icon name="target" /> Dein eingetragenes Gewichtsziel wäre bei unverändertem Trend rechnerisch etwa {fmtDate(weight.goalDate,true)} erreichbar. Das ist <strong>kein zugesagtes Zieldatum</strong>.
      </p>}
