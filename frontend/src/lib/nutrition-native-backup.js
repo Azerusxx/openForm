@@ -1,7 +1,8 @@
 // Native redundancy for nutrition. localStorage remains authoritative when valid.
 // Never overwrite existing local data based on an older native snapshot.
 import { MOBILE } from './mobile.js'
-import { NUTRITION_KEY, normalizedNutrition } from './nutrition.js'
+// Keep this module dependency-free from nutrition.js to avoid a circular import during startup.
+const NUTRITION_KEY = 'openform_nutrition_v1'
 
 const FILE = 'openform-nutrition-backup.json'
 let writeQueue = Promise.resolve()
@@ -15,7 +16,7 @@ export function restoreDecision(localRaw, nativeRaw) {
   if(valid(localRaw)) return { restore:false, reason:'local-valid' }
   const native = valid(nativeRaw)
   if(!native) return { restore:false, reason:'no-valid-backup' }
-  return { restore:true, reason:localRaw == null ? 'local-missing' : 'local-corrupt', data:normalizedNutrition(native) }
+  return { restore:true, reason:localRaw == null ? 'local-missing' : 'local-corrupt', data:native }
 }
 export async function restoreNutritionMirror(store = globalThis.localStorage) {
   if(!MOBILE || !store) return { restore:false, reason:'not-mobile' }
@@ -37,7 +38,7 @@ export function mirrorNutrition(data) {
     const { Filesystem,Directory,Encoding } = await import('@capacitor/filesystem')
     await Filesystem.writeFile({
       path:FILE,directory:Directory.Data,encoding:Encoding.UTF8,
-      data:JSON.stringify(normalizedNutrition(data))
+      data:JSON.stringify(data)
     })
     return true
   })
