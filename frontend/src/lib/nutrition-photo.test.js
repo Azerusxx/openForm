@@ -19,6 +19,13 @@ describe('Food photo AI input', () => {
   it('rejects impossible quantities and unknown amounts',()=>{
     expect(()=>parseFoodPhotoAnswer('{"name":"Brot","grams":0,"kcal":200,"protein":8,"carbs":32,"fat":3}')).toThrow()
   })
+  it('does not silently convert missing or null nutrients to zero',()=>{
+    for (const broken of [
+      {name:'Essen',grams:200,kcal:null,protein:10,carbs:20,fat:5},
+      {name:'Essen',grams:200,kcal:250,protein:10,carbs:20},
+      {name:'Essen',grams:null,kcal:250,protein:10,carbs:20,fat:5}
+    ]) expect(()=>parseFoodPhotoAnswer(JSON.stringify(broken))).toThrow()
+  })
   it('accepts fenced AI JSON',()=>{
     const s='\`\`\`json\n{"name":"Apfel","grams":100,"kcal":52,"protein":0.3,"carbs":14,"fat":0.2}\n\`\`\`'
     expect(parseFoodPhotoAnswer(s).per100.kcal).toBe(52)
