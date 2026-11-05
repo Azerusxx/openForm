@@ -1,6 +1,7 @@
 // Native redundancy for nutrition. localStorage remains authoritative when valid.
 // Never overwrite existing local data based on an older native snapshot.
-import { MOBILE } from './mobile.js'
+// Keep the pure nutrition model importable by Node test runners (import.meta.env is Vite-only).
+const MOBILE = import.meta.env?.VITE_MOBILE === '1'
 // Keep this module dependency-free from nutrition.js to avoid a circular import during startup.
 const NUTRITION_KEY = 'openform_nutrition_v1'
 
