@@ -12,14 +12,14 @@ const informative={
  volatile:'Die Werte schwanken zu stark für eine sinnvolle lineare Prognose.',
 }
 const fmtSign=n=>(n>0?'+':'')+fmtNum(n)
-export default function BodyDevelopment({ S }) {
+export default function BodyDevelopment({ S, embedded = false }) {
  const nav=useNavigate()
  const today=todayISO()
  const weight=useMemo(()=>weightForecast(S.bodyweight,today,{unit:S.unit,goal:S.targetW}),[S.bodyweight,S.unit,S.targetW,today])
  const waist=useMemo(()=>circumferenceForecast(S.measurements,'waist',today,{unit:S.unit==='lb'?'in':'cm'}),[S.measurements,S.unit,today])
  const abdomen=useMemo(()=>circumferenceForecast(S.measurements,'abdomen',today,{unit:S.unit==='lb'?'in':'cm'}),[S.measurements,S.unit,today])
  const hasPrediction=weight.status==='ready'
- return <section className="card body-development" aria-label="Körperentwicklung und Prognose">
+ return <section className={embedded ? "body-development" : "card body-development"} aria-label="Körperentwicklung und Prognose">
    <div className="row between body-development-title">
      <div><h2><Icon name="chartLine" /> Körperentwicklung & Prognose</h2>
        <p className="muted small">Gewicht als Wochenmittel, Taille und Bauch aus deinen Körpermessungen.</p></div>
