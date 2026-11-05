@@ -32,7 +32,14 @@ export function buildSupplementNotifications(supplements, now = new Date()) {
   }
   return notes
 }
-export async function syncSupplementReminders(supplements,interactive=false) {
+// Multiple app-resume and nutrition-save events can arrive together.
+// Serialize cancel + schedule so an older job cannot wipe newer reminders.
+let syncQueue = Promise.resolve()
+export function syncSupplementReminders(supplements,interactive=false) {
+  syncQueue = syncQueue.catch(()=>false).then(()=>performSupplementSync(supplements,interactive))
+  return syncQueue
+}
+async function performSupplementSync(supplements,interactive=false) {
   if(!MOBILE) return false
   try {
     const {LocalNotifications} = await import('@capacitor/local-notifications')
