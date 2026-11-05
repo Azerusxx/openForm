@@ -22,6 +22,27 @@ createRoot(document.getElementById('root')).render(
   <StrictMode><App /></StrictMode>
 )
 
+// Keep optional supplement reminders replenished even when the user opens only Gym.
+// The scheduling code never creates intake logs or changes nutrition data.
+if (MOBILE) {
+  const refreshSupplements = async () => {
+    try {
+      const [{ loadNutrition }, { syncSupplementReminders }] = await Promise.all([
+        import('./lib/nutrition.js'), import('./lib/supplement-reminders.js')
+      ])
+      await syncSupplementReminders(loadNutrition().supplements)
+    } catch { /* permission denied/offline: reminders remain opt-in */ }
+  }
+  refreshSupplements()
+  window.addEventListener('focus', refreshSupplements)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshSupplements()
+  })
+  import('@capacitor/app').then(({ App }) =>
+    App.addListener('appStateChange', ({ isActive }) => { if (isActive) refreshSupplements() })
+  ).catch(() => {})
+}
+
 // The photos and videos of custom exercises, in every build (the phone and the demo included):
 // uploads of what the server lacks, the local clean-up, and the plan's files kept offline.
 startMediaSync(useStore)
