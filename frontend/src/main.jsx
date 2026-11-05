@@ -7,6 +7,7 @@ import { startMediaSync } from './lib/media-sync.js'
 import { startNativeKeyboard } from './lib/native-keyboard.js'
 import './index.css'
 import { checkpointBeforeUpgrade } from './lib/openform-recovery.js'
+import { restoreNutritionMirror } from './lib/nutrition-native-backup.js'
 
 // App.jsx restores per-route scroll itself; the browser's own attempt races it.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
@@ -14,6 +15,9 @@ if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
 // Non-destructive local checkpoint; external export still essential before uninstalling.
 checkpointBeforeUpgrade()
 
+// Restore native nutrition snapshot before the first React render if local storage is missing or invalid.
+// Existing valid nutrition is never overwritten by an older snapshot.
+await restoreNutritionMirror()
 createRoot(document.getElementById('root')).render(
   <StrictMode><App /></StrictMode>
 )
