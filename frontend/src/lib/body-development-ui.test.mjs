@@ -26,3 +26,13 @@ test('body forecast is read-only and uses existing check-in formats',()=>{
  assert.ok(src.includes('S.targetW'))
  assert.ok(!src.includes('useStore.getState().update'))
 })
+
+test('stats displays bodyweight chart only once while preserving trend forecast',()=>{
+ const stats=read('../views/Stats.jsx')
+ const forecast=read('../components/BodyDevelopment.jsx')
+ assert.ok(stats.includes('<LineChart points={bwPts}'))
+ assert.ok(stats.includes('weighInsSheet'))
+ assert.ok(forecast.includes('weightForecast'))
+ assert.ok(forecast.includes('weight.projected.y'))
+ assert.ok(!forecast.includes('<LineChart'), 'forecast must not duplicate the bodyweight chart')
+})
