@@ -426,6 +426,7 @@ export default function Stats() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
   const [range, setRange] = useState(90)
+  const [bodyTab, setBodyTab] = useState('history')
   // Plan's "Weekly muscle volume" row lands here (/stats?focus=weekly-volume). The router is a
   // HashRouter, so the query sits in the hash; the scroll waits a frame for the page's own
   // scroll-to-top on navigation to have happened first.
@@ -705,27 +706,30 @@ export default function Stats() {
           : t('Waist, arms, body fat and anything else you measure, each with its own curve.')}</div></div>
       <Button size="sm" variant="tinted" trailingIcon="chevronRight" style={{ flexShrink: 0 }} onClick={() => nav('/measurements')}>{t('Open')}</Button>
     </div>
-    <BodyDevelopment S={S} />
-    {(hasEffort(S) || hasEstimableEffort(S)) && <EffortCard S={S} />}
-
-    <div className="cols">
-      <div className="card">
-        <div className="row between bw-head" style={{ marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>{t('Body weight')}</h2>
+    <section className="card" aria-label="Körperentwicklung">
+      <h2 style={{ marginBottom: 12 }}>Körperentwicklung</h2>
+      <Segmented className="seg-range" value={bodyTab} onChange={setBodyTab}
+        options={[{ value: 'history', label: 'Verlauf' }, { value: 'forecast', label: 'Prognose' }]} />
+      {bodyTab === 'history' ? <div role="tabpanel" aria-label="Gewichtsverlauf">
+        <div className="row between bw-head" style={{ margin: '12px 0 8px' }}>
+          <h3 style={{ margin: 0 }}>{t('Body weight')}</h3>
           <div className="row" style={{ gap: 8 }}>
             <Button size="sm" icon="target" style={S.targetW ? { color: 'var(--yellow)' } : undefined} onClick={goalSheet}>{S.targetW ? fmtNum(S.targetW) : t('Goal')}</Button>
             <Button size="sm" icon="plus" onClick={() => bwSheet()}>{t('Log')}</Button>
           </div>
         </div>
-        <Segmented className="seg-range" value={range} onChange={setRange}
-          options={rangeOptions()} />
+        <Segmented className="seg-range" value={range} onChange={setRange} options={rangeOptions()} />
         <div className="chart"><LineChart points={bwPts} h={160} unit={S.unit} goal={S.targetW} /></div>
-        {/* every weigh-in, week by week with its average (Discord 'Weight') */}
         {S.bodyweight.length > 0 && <div className="row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
           <Button size="sm" variant="ghost" trailingIcon="chevronRight" onClick={weighInsSheet}>{t('All weigh-ins')}</Button>
         </div>}
-      </div>
+      </div> : <div role="tabpanel" aria-label="Gewichtsprognose">
+        <BodyDevelopment S={S} embedded />
+      </div>}
+    </section>
+    {(hasEffort(S) || hasEstimableEffort(S)) && <EffortCard S={S} />}
 
+    <div className="cols">
       <div className="card">
         <h2>{t('Exercise progress')}</h2>
         {exHist.length ? <>
