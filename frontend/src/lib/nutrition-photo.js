@@ -15,8 +15,11 @@ export function parseFoodPhotoAnswer(raw) {
   } catch { throw new Error('Die KI lieferte kein gültiges JSON. Bitte ein anderes Bildmodell wählen.') }
   if (obj?.error) throw new Error(String(obj.error).slice(0,160))
   if (typeof obj?.name!=='string' || !obj.name.trim()) throw new Error('Keine Mahlzeit auf dem Foto erkannt.')
-  const grams=Number(obj.grams)
-  const values=['kcal','protein','carbs','fat'].map(k=>Number(obj[k]))
+  // A missing or null estimate is UNKNOWN, never a measured zero.
+  const required=['grams','kcal','protein','carbs','fat']
+  if (required.some(key=>typeof obj[key] !== 'number' || !Number.isFinite(obj[key]))) throw new Error('Fotoanalyse unvollständig: Portionsgröße oder Nährwerte fehlen.')
+  const grams=obj.grams
+  const values=['kcal','protein','carbs','fat'].map(k=>obj[k])
   if (!Number.isFinite(grams) || grams < 10 || grams > 5000 ||
       values.some(v=>!Number.isFinite(v) || v<0) || values[0]>12000 ||
       values.slice(1).some(v=>v>1000)) throw new Error('Unplausible Portions- oder Nährwertschätzung.')
@@ -88,7 +91,8 @@ export async function analyzeFoodPhoto(file,{send=nativeFetch}={}) {
       {type:'text',text:INSTRUCTIONS},{type:'image_url',image_url:{url:dataUrl,detail:'auto'}}
     ]}]}
   }
-  const res=await send(url,{method:'POST',headers,body:JSON.stringify(body)})
+  const timeout=AbortSignal.timeout(60000)
+  const res=await send(url,{method:'POST',headers,body:JSON.stringify(body),signal:timeout})
   const payload=await res.json().catch(()=>null)
   if(!res.ok) {
     const message=payload?.error?.message || payload?.error || 'API-Anfrage fehlgeschlagen'
