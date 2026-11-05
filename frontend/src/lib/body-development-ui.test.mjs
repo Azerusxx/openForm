@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8')
 test('body trend card appears in stats without replacing existing weight/measurements',()=>{
  const x=read('../views/Stats.jsx')
- assert.ok(x.includes('<BodyDevelopment S={S} />'))
+ assert.ok(x.includes('<BodyDevelopment S={S} embedded />'))
  assert.ok(x.includes('Body weight'))
  assert.ok(x.includes("nav('/measurements')"))
 })
@@ -35,4 +35,17 @@ test('stats displays bodyweight chart only once while preserving trend forecast'
  assert.ok(forecast.includes('weightForecast'))
  assert.ok(forecast.includes('weight.projected.y'))
  assert.ok(!forecast.includes('<LineChart'), 'forecast must not duplicate the bodyweight chart')
+})
+
+test('weight history and prediction live behind one exclusive tab selection',()=>{
+ const stats=read('../views/Stats.jsx')
+ const forecast=read('../components/BodyDevelopment.jsx')
+ assert.ok(stats.includes("const [bodyTab, setBodyTab] = useState('history')"))
+ assert.ok(stats.includes("value={bodyTab} onChange={setBodyTab}"))
+ assert.ok(stats.includes("label: 'Verlauf'"))
+ assert.ok(stats.includes("label: 'Prognose'"))
+ assert.ok(stats.includes("bodyTab === 'history' ?"))
+ assert.ok(stats.includes("<BodyDevelopment S={S} embedded />"))
+ assert.ok(forecast.includes('embedded ? "body-development" : "card body-development"'))
+ assert.equal((stats.match(/<LineChart points={bwPts}/g)||[]).length,1)
 })
