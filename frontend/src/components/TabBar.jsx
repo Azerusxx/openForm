@@ -13,7 +13,7 @@ import { useConnectionTrouble } from './SyncBanner.jsx'
 // state it took with it is the DOM node itself: focus, the :active tint, any in-flight transition.
 function Tab({ active, icon, label, onClick, dot }) {
   return (
-    <button className={active ? 'on' : ''} onClick={onClick} aria-label={dot ? label + ', ' + t('Connection problem') : undefined}>
+    <button className={active ? 'on' : ''} aria-current={active ? "page" : undefined} onClick={onClick} aria-label={dot ? label + ', ' + t('Connection problem') : undefined}>
       <span className="tab-ic"><Icon name={icon} />{dot && <span className="tab-dot" aria-hidden="true" />}</span><span>{label}</span>
     </button>
   )
@@ -32,6 +32,8 @@ export default function TabBar({ onStart }) {
   const cur = loc.pathname.split('/')[1] || 'home'
   const on = k => cur === k || (cur === 'history' && k === 'stats') || (cur === 'settings' && k === 'home') || (cur === 'muscles' && k === 'library') || (cur === 'structural-balance' && k === 'stats')
 
+  const activeIndex = on('home') ? 0 : on('plan') ? 1 : on('nutrition') ? 2 : cur === 'workout' ? 3 : on('stats') ? 4 : on('library') ? 5 : -1
+
   const running = !!S.active && cur !== 'workout' && !S.active.editingWorkoutId && !S.active.backfill && S.active.start > 0
   const startWorkout = () => {
     if (!S.active) {
@@ -43,12 +45,12 @@ export default function TabBar({ onStart }) {
   }
 
   return (
-    <nav id="tabbar">
+    <nav id="tabbar" data-floating-glass data-has-active={activeIndex >= 0 ? "true" : "false"} style={{ '--of-active-index': Math.max(0, activeIndex) }} aria-label="Hauptnavigation">
       <Tab active={on('home')} icon="house" label="Start" dot={trouble} onClick={() => nav('/home')} />
       <Tab active={on('plan')} icon="calendar" label="Plan" onClick={() => nav('/plan')} />
       {/* Nutrition is a second primary action next to Start. Keep the flame glyph and
           the same 52px round touch target; selection still navigates to Nutrition. */}
-      <button className={'food' + (on('nutrition') ? ' on' : '')} onClick={() => nav('/nutrition')} aria-label="Essen">
+      <button className={'food' + (on('nutrition') ? ' on' : '')} onClick={() => nav('/nutrition')} aria-label="Essen" aria-current={on('nutrition') ? 'page' : undefined}>
         <span className="cir"><Icon name="flame" /></span><span>Essen</span>
       </button>
       {/* On the workout screen itself there is nothing to resume, so the button reads as the
@@ -59,7 +61,7 @@ export default function TabBar({ onStart }) {
           button still named Resume; a past workout being edited or logged after the fact has no
           clock to run. */}
       <button className={'start' + (S.active ? ' rec' : '') + (S.active && cur === 'workout' ? ' on' : '')} onClick={startWorkout}
-        aria-label={running ? 'Training fortsetzen' : 'Training starten'}>
+        aria-label={running ? 'Training fortsetzen' : 'Training starten'} aria-current={cur === 'workout' ? 'page' : undefined}>
         <span className="cir"><Icon name="dumbbell" /></span>
         {running ? <span className="tab-time"><Elapsed start={S.active.start} /></span>
           : <span>{S.active ? (cur === 'workout' ? 'Training' : S.active.editingWorkoutId ? 'Bearbeiten' : 'Weiter') : 'Training'}</span>}
