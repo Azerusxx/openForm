@@ -7,7 +7,7 @@ import { startMediaSync } from './lib/media-sync.js'
 import { startNativeKeyboard } from './lib/native-keyboard.js'
 import './index.css'
 import { checkpointBeforeUpgrade } from './lib/openform-recovery.js'
-import { restoreNutritionMirror } from './lib/nutrition-native-backup.js'
+import { restoreNutritionMirror, restoreDecision, mirrorNutrition } from './lib/nutrition-native-backup.js'
 
 // App.jsx restores per-route scroll itself; the browser's own attempt races it.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
@@ -18,6 +18,12 @@ checkpointBeforeUpgrade()
 // Restore native nutrition snapshot before the first React render if local storage is missing or invalid.
 // Existing valid nutrition is never overwritten by an older snapshot.
 await restoreNutritionMirror()
+// Backfill the native mirror on upgrade even if the user has not edited food today.
+// Never mirror an invalid local blob; that could overwrite the only surviving backup.
+if (MOBILE && restoreDecision(globalThis.localStorage?.getItem('openform_nutrition_v1'), null).reason === 'local-valid') {
+  const { loadNutrition } = await import('./lib/nutrition.js')
+  mirrorNutrition(loadNutrition()).catch(()=>{})
+}
 createRoot(document.getElementById('root')).render(
   <StrictMode><App /></StrictMode>
 )
