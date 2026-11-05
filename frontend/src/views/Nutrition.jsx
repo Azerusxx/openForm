@@ -104,7 +104,16 @@ export default function Nutrition() {
     catch { setNotice('Speichern fehlgeschlagen. Bitte Speicher prüfen und ein Backup exportieren.'); return false }
   }
   const update = fn => commit(fn(loadNutrition()))
-  useEffect(()=>{ syncSupplementReminders(data.supplements).catch(()=>{}) },[data.supplements])
+  useEffect(()=>{
+    const refresh = () => {
+      if(document.visibilityState === 'hidden') return
+      syncSupplementReminders(loadNutrition().supplements).catch(()=>{})
+    }
+    refresh()
+    document.addEventListener('visibilitychange',refresh)
+    window.addEventListener('focus',refresh)
+    return () => {document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh)}
+  },[data.supplements])
   const ingredientFromFood = food => {
     try {
       const ingredient = createEntry({ ...food, id: null, date, mealType: selectedMeal })
