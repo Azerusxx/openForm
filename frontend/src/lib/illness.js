@@ -23,6 +23,8 @@ export function cleanIllness(raw) {
  if(plannedReturn&&(!end||plannedReturn<=end))return null
  return {
   start:raw.start,end,plannedReturn,
+  // UI acknowledgement only; not a clinical statement or alteration of the illness period.
+  recoveryDismissedAt:end && validDay(raw.recoveryDismissedAt) && raw.recoveryDismissedAt>end ? raw.recoveryDismissedAt : null,
   fatigueLevel:['mild','moderate','strong'].includes(raw.fatigueLevel)?raw.fatigueLevel:null,
   note:typeof raw.note==='string'?raw.note.trim().slice(0,300):'',
   // These are self-reported checkboxes, never a diagnosis or medical approval.
@@ -60,6 +62,13 @@ export function putIllness(map,id,value,now=Date.now()){
  const clean=cleanIllness(value)
  if(!clean)throw Error('Ungültiger Krankheitszeitraum oder Wiedereinstiegstermin')
  return {...(validMap(map)?map:{}),[id]:{...clean,_ts:now}}
+}
+export function dismissRecovery(map,id,today,now=Date.now()) {
+ if(typeof id!=='string'||!id.trim()||!validDay(today))throw Error('Ungültiger Wiedereinstieg')
+ const raw=validMap(map)?map[id]:null
+ const record=cleanIllness(raw)
+ if(!record?.end||record.end>=today)throw Error('Eine laufende Krankheit kann nicht als abgeschlossen markiert werden.')
+ return {...map,[id]:{...raw,recoveryDismissedAt:today,_ts:now}}
 }
 export function clearIllness(map,id,now=Date.now()) {
  if(typeof id!=='string'||!id.trim())throw Error('Ungültige Eintrags-ID')
