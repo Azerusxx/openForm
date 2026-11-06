@@ -41,36 +41,30 @@ afterEach(() => {
 
 const mount = props => act(() => root.render(<Media ex={EX} {...props} />))
 
-describe('Media gifSize', () => {
-  it('renders the full animation by default and toggles to mini in the workout', () => {
+describe('Built-in exercise media without legacy openGym links', () => {
+  it('does not request deprecated GIF or MP4 files during workouts', () => {
     mount({ minimizable: true })
-    expect(host.querySelector('.exmedia img')).toBeTruthy()
-    expect(host.querySelector('.exmedia.mini')).toBeFalsy()
-    act(() => { host.querySelector('.giftoggle').click() })
-    expect(mocks.S.gifSize).toBe('mini')
-    mount({ minimizable: true })
-    expect(host.querySelector('.exmedia.mini')).toBeTruthy()
+    expect(host.querySelector('.exmedia')).toBeFalsy()
+    expect(host.querySelector('video')).toBeFalsy()
+    expect(host.innerHTML).not.toContain('exercise-media/clip')
   })
 
-  it("renders nothing at all in the workout when gifSize is 'off'", () => {
+  it('shows a useful upload hint in exercise details when no image exists', () => {
+    mount({})
+    expect(host.textContent).toContain('eigenes Bild hinzufügen')
+    expect(host.querySelector('.exmedia img')).toBeFalsy()
+  })
+
+  it('hides the detail fallback in workout mode, including when media are turned off', () => {
     mocks.S = { gifSize: 'off' }
     mount({ minimizable: true })
     expect(host.querySelector('.exmedia')).toBeFalsy()
-    expect(host.querySelector('img')).toBeFalsy()
-    expect(host.innerHTML).toBe('')
   })
 
-  it("'off' only applies to the workout — the detail sheet (not minimizable) still shows media", () => {
-    mocks.S = { gifSize: 'off' }
+  it('does not reference legacy catalog image paths', () => {
     mount({})
-    expect(host.querySelector('.exmedia img')).toBeTruthy()
-  })
-
-  it('treats a legacy/unknown value as full', () => {
-    mocks.S = { gifSize: 'huge' }
-    mount({ minimizable: true })
-    expect(host.querySelector('.exmedia img')).toBeTruthy()
-    expect(host.querySelector('.exmedia.mini')).toBeFalsy()
+    expect(host.innerHTML).not.toContain('exercise-media/still/')
+    expect(host.innerHTML).not.toContain('exercise-media/clip/')
   })
 })
 
