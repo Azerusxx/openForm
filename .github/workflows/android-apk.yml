@@ -65,7 +65,7 @@ jobs:
 
       - name: Hybrid-Ernährungssuche testen
         working-directory: frontend
-        run: npx vitest run src/lib/nutrition-hybrid.test.js src/lib/nutrition-photo.test.js src/lib/supplement-reminders.test.js src/lib/nutrition-native-backup.test.js
+        run: npx vitest run src/lib/nutrition-hybrid.test.js src/lib/nutrition-photo.test.js src/lib/supplement-reminders.test.js src/lib/nutrition-native-backup.test.js src/components/Media.test.jsx
 
       - name: Kostenlose RepDB Uebungsbilder fuer APK laden
         shell: bash
