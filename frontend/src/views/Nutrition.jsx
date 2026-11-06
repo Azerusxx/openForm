@@ -13,6 +13,7 @@ import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
 import { addFavorite, isFavorite, repeatMeal, createRecipe, recipeTotals, logRecipe, weeklyNutrition } from '../lib/nutrition-extra.js'
 import { trainingEnergyForDay } from '../lib/training-energy.js'
 import './Nutrition.css'
+import { usePullRefresh } from '../lib/use-pull-refresh.js'
 
 // Approximate adult reference values, not medical targets. Sodium is an upper guide, not a minimum.
 const MICRO_GUIDES = { omega3:null, epa:null, dha:null, fiber:30, sodium:2000, calcium:1000, iron:10, magnesium:350, potassium:4000, vitaminC:110, vitaminD:20, vitaminA:850, vitaminE:14, vitaminB1:1.2, vitaminB2:1.4, vitaminB6:1.6, vitaminB12:4, folate:300, zinc:11, iodine:200, selenium:70 }
@@ -34,6 +35,7 @@ export default function Nutrition() {
   const gym = useStore(s => s.S)
   const weight = gym.bodyweight?.at(-1)?.w
   const [data, setData] = useState(loadNutrition)
+  const refreshing = usePullRefresh(() => {setData(loadNutrition());setNotice('Übersicht aktualisiert.')}, !gym.active)
   const [tab, setTab] = useState('today')
   const [drawer, setDrawer] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
@@ -314,6 +316,7 @@ export default function Nutrition() {
     return () => window.removeEventListener('keydown', escape)
   }, [drawer, addMenu])
   return <div className="narrow of-nutrition of-032">
+    {refreshing && <div className="of-pull-feedback" role="status">Aktualisiere Ernährung …</div>}
     <header className="of-appbar">
       <div className="of-appbar-brand"><div><h1>Essen</h1></div></div>
       <button className="of-menu-trigger" type="button" aria-label="Ernährungsmenü öffnen" aria-expanded={drawer} onClick={() => setDrawer(true)}><span aria-hidden="true">☰</span></button>
