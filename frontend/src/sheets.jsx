@@ -974,6 +974,7 @@ export function detailTags(ex) {
 
 function PrivateExerciseImageEditor({ ex }) {
   const input=useRef(null)
+  const cameraInput=useRef(null)
   const [exists,setExists]=useState(false)
   const [busy,setBusy]=useState(false)
   const refresh=()=>getPrivateExerciseImage(ex.id).then(b=>setExists(!!b)).catch(()=>setExists(false))
@@ -994,7 +995,9 @@ function PrivateExerciseImageEditor({ ex }) {
   }
   return <div style={{display:'flex',gap:8,margin:'8px 0',flexWrap:'wrap'}}>
     <input ref={input} type="file" accept="image/*" style={{display:'none'}} onChange={change} />
+    <input ref={cameraInput} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={change} />
     <button type="button" className="btn" disabled={busy} onClick={()=>input.current?.click()}>{exists?'Eigenes Bild ändern':'Eigenes Bild hinzufügen'}</button>
+    <button type="button" className="btn" disabled={busy} onClick={()=>cameraInput.current?.click()}>Foto aufnehmen</button>
     {exists&&<button type="button" className="btn" disabled={busy} onClick={remove}>Eigenes Bild löschen</button>}
     <span className="small dim" style={{alignSelf:'center'}}>Privat · nur auf diesem Gerät</span>
   </div>
