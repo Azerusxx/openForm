@@ -34,3 +34,22 @@ test('lost primary routes stay accessible',()=>{
  const plan=read('../views/Plan.jsx')
  assert.match(plan,/nav\('\/library'\)/)
 })
+
+test('Create actions reach their forms and Android back closes the quick menu',()=>{
+ const nutrition=read('../views/Nutrition.jsx')
+ const back=read('../lib/back.js')
+ assert.match(nutrition,/new URLSearchParams\(location\.search\)\.get\('create'\)/)
+ for(const action of ["'food'","'recipe'","'water'"]) assert.ok(nutrition.includes(action),action)
+ assert.match(tab,/openform-close-overlay/)
+ assert.match(back,/closeOverlay: \(\) => !window\.dispatchEvent/)
+ assert.match(nutrition,/undoRecipeDelete/)
+ assert.match(nutrition,/Rückgängig/)
+})
+test('pull to refresh is vertical only, never intercepts a left-edge back swipe',()=>{
+ const hook=read('../lib/use-pull-refresh.js')
+ assert.match(hook,/dy<90/)
+ assert.match(hook,/Math\.abs\(dx\)\*1\.7/)
+ assert.match(hook,/passive:true/)
+ assert.match(read('../views/Home.jsx'),/usePullRefresh/)
+ assert.match(read('../views/Nutrition.jsx'),/usePullRefresh/)
+})
