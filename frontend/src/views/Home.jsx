@@ -15,7 +15,7 @@ import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
 import { dayNoteOf } from '../lib/day-notes.js'
-import { illnessOnDay, latestIllness, recoveryStatus } from '../lib/illness.js'
+import { illnessOnDay, latestIllness, recoveryStatus, dismissRecovery } from '../lib/illness.js'
 import { loadNutrition, dayTotals } from '../lib/nutrition.js'
 import './Nutrition.css'
 
@@ -23,6 +23,7 @@ import './Nutrition.css'
 export default function Home() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
+  const update = useStore(s => s.update)
   const user = useStore(s => s.user)
   // The banner switched off and the sync stuck: a dot on the gear (Settings → Show connection status).
   const trouble = useConnectionTrouble()
@@ -119,7 +120,7 @@ export default function Home() {
   const onQueueStart = id => { if (S.active) nav('/workout'); else startFlow([id]) }
   const todayIllness = illnessOnDay(S,todayISO(),todayISO())
   const lastIllness = latestIllness(S,todayISO())
-  const showRecovery = !todayIllness && lastIllness?.end && (new Date(todayISO()+'T12:00:00') - new Date(lastIllness.end+'T12:00:00')) / 86400000 <= 14
+  const showRecovery = !todayIllness && lastIllness?.end && !lastIllness.recoveryDismissedAt && (new Date(todayISO()+'T12:00:00') - new Date(lastIllness.end+'T12:00:00')) / 86400000 <= 14
   const recovery = showRecovery ? recoveryStatus(lastIllness,todayISO()) : null
 
   return <div className="narrow">
@@ -134,7 +135,10 @@ export default function Home() {
       <p>{todayIllness
         ? 'Krank seit ' + fmtDate(todayIllness.start,true) + (todayIllness.end ? ' · bis '+fmtDate(todayIllness.end,true) : ' · Ende noch offen')
         : recovery?.label}</p>
-      {showRecovery && <p className="muted small">Erst bei deutlicher Genesung behutsam trainieren. Ein Datum im Kalender ersetzt keine medizinische Abklärung.</p>}
+      {showRecovery && <>
+        <p className="muted small">Erst bei deutlicher Genesung behutsam trainieren. Ein Datum im Kalender ersetzt keine medizinische Abklärung.</p>
+        <Button size="sm" variant="tinted" onClick={() => update(s => { s.illnessPeriods = dismissRecovery(s.illnessPeriods,lastIllness.id,todayISO()) })}>Wiedereinstieg abgeschlossen</Button>
+      </>}
     </div>}
     <div className="card">
       {/* A coach week runs by order, not by weekday, so its progress row stands in for the
