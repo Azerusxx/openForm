@@ -56,7 +56,7 @@ export default function Nutrition() {
   const [results, setResults] = useState([])
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
-  const [deletedRecipe, setDeletedRecipe] = useState(null)
+  const [deletedItem, setDeletedItem] = useState(null)
   const [camera, setCamera] = useState(false)
   const [recipeName, setRecipeName] = useState('')
   const [recipeServings, setRecipeServings] = useState(2)
@@ -266,23 +266,28 @@ export default function Nutrition() {
   const openFood = (type = selectedMeal) => { setFoodDestination('diary');setRecipeIngredientIndex(null);setSelectedMeal(type); setShowForm(false); setTab('food'); setAddMenu(false); setDrawer(false); setNotice('') }
   const goSection = section => { if(section !== 'food')setFoodDestination('diary');setTab(section); setDrawer(false); setAddMenu(false); setShowForm(false); setNotice('') }
   const addWater = amount => update(d => ({ ...d, water: { ...d.water, [date]: Math.max(0, (d.water?.[date] || 0) + amount) } }))
-  const deleteRecipeWithUndo = recipe => {
-    if (!window.confirm(`Rezept „${recipe.name}“ löschen?`)) return
-    const index = loadNutrition().recipes.findIndex(r => r.id === recipe.id)
-    if(update(d=>({...d,recipes:d.recipes.filter(x=>x.id!==recipe.id)}))) {
-      setDeletedRecipe({recipe,index})
-      setNotice('Rezept gelöscht. Du kannst den Schritt rückgängig machen.')
+  // Reversible removal for food entries, recipes, supplements and activities.
+  // Reinstates the original immutable record at its old index; never changes its ID or values.
+  const deleteWithUndo = (collection, item, name, confirm = true) => {
+    if (confirm && !window.confirm(`„${name}“ wirklich löschen?`)) return
+    const current = loadNutrition()[collection] || []
+    const index = current.findIndex(x => x.id === item.id)
+    if(index < 0) return
+    if(update(d=>({...d,[collection]:d[collection].filter(x=>x.id!==item.id)}))) {
+      setDeletedItem({collection,item,index})
+      setNotice(name+' gelöscht. Rückgängig ist möglich.')
     }
   }
+  const deleteRecipeWithUndo = recipe => deleteWithUndo('recipes',recipe,recipe.name)
   const undoRecipeDelete = () => {
-    if(!deletedRecipe) return
-    const {recipe,index}=deletedRecipe
+    if(!deletedItem) return
+    const {collection,item,index}=deletedItem
     if(update(d=>{
-      if(d.recipes.some(x=>x.id===recipe.id)) return d
-      const recipes=[...d.recipes]
-      recipes.splice(Math.max(0,Math.min(index,recipes.length)),0,recipe)
-      return {...d,recipes}
-    })){setDeletedRecipe(null);setNotice('Rezept wiederhergestellt.')}
+      if((d[collection]||[]).some(x=>x.id===item.id)) return d
+      const items=[...(d[collection]||[])]
+      items.splice(Math.max(0,Math.min(index,items.length)),0,item)
+      return {...d,[collection]:items}
+    })){setDeletedItem(null);setNotice('Eintrag wiederhergestellt.')}
   }
 
   // Deep-link from the centered Create button. A replace cleans the URL so refreshing
@@ -334,7 +339,7 @@ export default function Nutrition() {
       <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
     <input hidden ref={galleryInput} type="file" accept="image/*" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
     <input hidden ref={photoCameraInput} type="file" accept="image/*" capture="environment" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
-    {notice && <div className="of-notice" role="status">{notice}{deletedRecipe && <button type="button" onClick={undoRecipeDelete} style={{marginInlineStart:12,minHeight:44,fontWeight:700}}>Rückgängig</button>}</div>}
+    {notice && <div className="of-notice" role="status">{notice}{deletedItem && <button type="button" onClick={undoRecipeDelete} style={{marginInlineStart:12,minHeight:44,fontWeight:700}}>Rückgängig</button>}</div>}
     {tab === 'today' && <>
       <div className="of-health-chips">
         <button className="of-health-chip" onClick={() => bwSheet()}><Icon name="scale" /><span>{weight != null ? `${fmt(weight)} ${gym.unit || 'kg'}` : 'Gewicht eintragen'}</span><Icon name="pencil" /></button>
@@ -409,7 +414,7 @@ export default function Nutrition() {
           {data.supplements.map(s => <div className="of-inline-supp" key={s.id}>
             <label><input type="checkbox" checked={s.logs.includes(date)} onChange={() => toggleSupplement(s)} /><span><strong>{s.name}</strong><small>{s.reminderEnabled && s.reminderTime ? `Erinnerung ${s.reminderTime} · ` : ''}{fmt(s.dose)} {s.unit === 'piece' ? 'Stk.' : s.unit}{Object.entries(s.nutrients || {}).map(([k,v]) => { const nutrient = MICRO_NUTRIENTS.find(n => n.key === k); return nutrient ? ` · ${fmt(v)} ${nutrient.unit} ${nutrient.label} pro ${s.unit === 'piece' ? 'Stück' : s.unit}` : '' }).join('')}</small></span></label>
             <button type="button" aria-label={`${s.name} bearbeiten`} onClick={() => { setEditingSupplement(s.id); setSuppName(s.name); setSuppDose(String(s.dose)); setSuppUnit(s.unit); const [key,value] = Object.entries(s.nutrients || {})[0] || ['magnesium','']; setSuppNutrient(key); setSuppAmount(String(value)); setSuppNutrients({...s.nutrients});setSuppReminder(s.reminderTime || '');setSuppReminderEnabled(!!s.reminderEnabled); setSuppFormOpen(true) }}><Icon name="pencil" /></button>
-            <button type="button" aria-label={`${s.name} entfernen`} onClick={() => { if (window.confirm(`„${s.name}“ entfernen?`)) update(d => ({ ...d, supplements: d.supplements.filter(x => x.id !== s.id) })) }}><Icon name="trash" /></button>
+            <button type="button" aria-label={`${s.name} entfernen`} onClick={() => deleteWithUndo('supplements',s,s.name)}><Icon name="trash" /></button>
           </div>)}
           {!data.supplements.length && <p className="of-dim">Noch keine Supplements angelegt.</p>}
           {!suppFormOpen && <button type="button" className="of-supp-open" onClick={() => { setEditingSupplement(null); setSuppName(""); setSuppDose(""); setSuppUnit("piece"); setSuppAmount(""); setSuppNutrients({});setSuppReminder('');setSuppReminderEnabled(false); setSuppFormOpen(true) }}><Icon name="plus" /> Supplement hinzufügen</button>}
@@ -441,7 +446,7 @@ export default function Nutrition() {
       <div className="of-day-groups">
         <section className="of-meal-section of-activity-section"><h2><span className="of-section-icon"><Icon name="figureRun" /></span>Aktivität <button className="of-section-more" onClick={() => setShowActivity(v => !v)} aria-label="Aktivität hinzufügen"><Icon name="plus" /></button></h2>
           {training.sessions.map(w => <div className="of-logged-row" key={`gym-${w.id}`}><span><strong>{w.name}</strong><small>≈ {w.kcal} kcal · {w.minutes} Min. · aus Trainingsdauer und Gewicht geschätzt</small></span></div>)}
-          {(data.activities || []).filter(a => a.date === date).map(a => <div className="of-logged-row" key={a.id}><span>{a.name} <small>{a.kcal} kcal verbrannt</small></span><button aria-label="Aktivität löschen" onClick={() => update(d => ({ ...d, activities: d.activities.filter(x => x.id !== a.id) }))}><Icon name="trash" /></button></div>)}
+          {(data.activities || []).filter(a => a.date === date).map(a => <div className="of-logged-row" key={a.id}><span>{a.name} <small>{a.kcal} kcal verbrannt</small></span><button aria-label="Aktivität löschen" onClick={() => deleteWithUndo('activities',a,a.name,false)}><Icon name="trash" /></button></div>)}
           {showActivity && <form className="of-activity-form" onSubmit={saveActivity}><input aria-label="Aktivität" placeholder="z. B. Spazierengehen" value={activityName} onChange={e => setActivityName(e.target.value)} required /><input aria-label="Verbrannte kcal" type="number" min="1" max="10000" placeholder="kcal" value={activityKcal} onChange={e => setActivityKcal(e.target.value)} required /><button type="submit">Speichern</button></form>}
           {!showActivity && <button className="of-meal-add" onClick={() => setShowActivity(true)} aria-label="Aktivität erfassen"><Icon name="plus" /></button>}
         </section>
@@ -450,7 +455,7 @@ export default function Nutrition() {
           const kcal = items.reduce((a,m) => a + entryTotals(m).kcal, 0)
           return <section className="of-meal-section" key={group.id}>
             <h2><span className="of-section-icon"><Icon name={group.icon} /></span>{group.title}<small>{fmt(kcal)} kcal</small></h2>
-            {items.map(m => { const t = entryTotals(m); return <div className="of-logged-row" key={m.id}><div><strong>{m.name}</strong><small>{fmt(m.quantity)} {m.unit === 'piece' ? 'Stk.' : m.unit} · {fmt(t.kcal)} kcal · {fmt(t.protein)} g Protein</small></div><div className="of-item-btn"><button aria-label={`Bearbeiten: ${m.name}`} onClick={() => edit(m)}><Icon name="pencil" /></button><button aria-label={`Favorit: ${m.name}`} className={isFavorite(data,m) ? 'of-fav-on' : ''} onClick={() => update(d => addFavorite(d,m))}><Icon name="star" /></button><button aria-label={`Wiederholen: ${m.name}`} onClick={() => log(m, group.id)}><Icon name="repeat" /></button><button aria-label={`Löschen: ${m.name}`} onClick={() => { if (window.confirm(`„${m.name}“ wirklich löschen?`)) update(d => ({ ...d, entries: d.entries.filter(e => e.id !== m.id) })) }}><Icon name="trash" /></button></div></div> })}
+            {items.map(m => { const t = entryTotals(m); return <div className="of-logged-row" key={m.id}><div><strong>{m.name}</strong><small>{fmt(m.quantity)} {m.unit === 'piece' ? 'Stk.' : m.unit} · {fmt(t.kcal)} kcal · {fmt(t.protein)} g Protein</small></div><div className="of-item-btn"><button aria-label={`Bearbeiten: ${m.name}`} onClick={() => edit(m)}><Icon name="pencil" /></button><button aria-label={`Favorit: ${m.name}`} className={isFavorite(data,m) ? 'of-fav-on' : ''} onClick={() => update(d => addFavorite(d,m))}><Icon name="star" /></button><button aria-label={`Wiederholen: ${m.name}`} onClick={() => log(m, group.id)}><Icon name="repeat" /></button><button aria-label={`Löschen: ${m.name}`} onClick={() => deleteWithUndo('entries',m,m.name)}><Icon name="trash" /></button></div></div> })}
             <button className="of-meal-add" onClick={() => openFood(group.id)} aria-label={`${group.title} hinzufügen`}><Icon name="plus" /></button>
           </section>
         })}
