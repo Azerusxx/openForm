@@ -168,6 +168,10 @@ export default function Plan() {
         <button className="iconbtn" onClick={openMenu} aria-label={t('Plan options')} title={t('Plan options')}><Icon name="share" /></button>
       </div>
     </div>
+    <div className="of-training-shortcuts" aria-label="Training – Schnellzugriffe">
+      <Button size="sm" icon="dumbbell" onClick={() => nav('/library')}>Übungen</Button>
+      <Button size="sm" icon="history" onClick={() => nav('/history')}>Trainingsverlauf</Button>
+    </div>
     <input ref={fileRef} type="file" accept="application/json,.json" onChange={pickFile} hidden />
     <Segmented className="plan-views" value={view} onChange={setView}
       options={[{ value: 'schedule', label: t('Schedule') }, { value: 'routines', label: t('Routines') }]} />
