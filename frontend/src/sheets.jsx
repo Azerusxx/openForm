@@ -2384,6 +2384,8 @@ function IllnessPeriodEditor({ iso, editId, close }) {
   const [noWarning, setNoWarning] = useState(record?.noWarning || false)
   const [dailyEnergy, setDailyEnergy] = useState(record?.dailyEnergy || false)
   const draft = { start, end: end || null, plannedReturn: plannedReturn || null,
+    // Preserve acknowledgement when editing notes/checks, but reset it if the illness dates change.
+    recoveryDismissedAt: record?.start === start && record?.end === (end || null) ? record?.recoveryDismissedAt : null,
     note, fatigueLevel: fatigueLevel || null, feverFree, improving, noWarning, dailyEnergy }
   const valid = cleanIllness(draft)
   const status = recoveryStatus(draft, todayISO())
