@@ -23,9 +23,10 @@ export function decideBack({ top, canGoBack, exitArmed }) {
   return exitArmed ? 'exit' : 'arm-exit'
 }
 
-export function makeBackHandler({ getSheets, closeSheet, toast, goBack, exit, now = Date.now }) {
+export function makeBackHandler({ getSheets, closeSheet, toast, goBack, exit, closeOverlay = () => false, now = Date.now }) {
   let armedAt = -Infinity
   return (ev = {}) => {
+    if (closeOverlay()) { armedAt = -Infinity; return 'overlay' }
     const sheets = getSheets()
     const action = decideBack({
       top: sheets[sheets.length - 1],
@@ -53,6 +54,7 @@ export async function initBackButton() {
       toast: msg => useUI.getState().toast(msg),
       goBack: () => window.history.back(),
       exit: () => App.exitApp(),
+      closeOverlay: () => !window.dispatchEvent(new Event('openform-close-overlay', { cancelable: true })),
     })
     const sub = await App.addListener('backButton', handler)
     return () => sub.remove()
