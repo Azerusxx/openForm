@@ -160,7 +160,12 @@ export default function Library() {
         <div className="grow"><div className="tt">{t('Create your own exercise')}</div><div className="ss">{t('name + body part, and a photo or video if you like')}</div></div><Icon name="plus" className="chev" />
       </div>
       {f.slice(0, shown).map(row)}
-      {f.length === 0 && !similar.length && <div className="empty"><div className="ico"><Icon name="magnifier" /></div>{t('No match')}</div>}
+      {f.length === 0 && !similar.length && <div className="empty"><div className="ico"><Icon name="magnifier" /></div>
+        <strong>Keine passenden Übungen gefunden</strong>
+        <p className="muted small">Versuche einen anderen Suchbegriff oder setze die Filter zurück. Du kannst auch eine eigene Übung erstellen.</p>
+        <Button size="sm" onClick={() => { setBp('');setEq('');setCat('');setOnlyImages(false);setShown(40) }}>Filter zurücksetzen</Button>
+        <Button size="sm" variant="tinted" onClick={() => customExSheet(null, ex => exerciseDetailSheet(ex), q.trim())}>Übung erstellen</Button>
+      </div>}
       {similar.length > 0 && <h4 className="sec similar-label">{f.length ? t('Similar exercises') : t('No exact match. These come close:')}</h4>}
       {similar.map(row)}
     </div>
