@@ -70,7 +70,7 @@ export default function TabBar({ onStart }) {
           <button onClick={()=>launch('workout')}><Icon name="dumbbell" />Training starten</button>
           <button onClick={()=>launch('recipe')}><Icon name="book" />Rezept erstellen</button>
           <button onClick={()=>launch('weight')}><Icon name="chart" />Gewicht eintragen</button>
-          <button onClick={()=>launch('water')}><Icon name="plus" />Wasser erfassen</button>
+          <button onClick={()=>launch('water')}><Icon name="droplet" />Wasser erfassen</button>
           <button onClick={()=>launch('exercise')}><Icon name="plus" />Übung erstellen</button>
         </div>
       </section>
