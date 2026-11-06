@@ -13,7 +13,7 @@ test('water and favorites have one-touch shortcuts and unknown macro goals are e
 })
 test('bottom navigation remains routed correctly with German labels',()=>{
  const src=read('../components/TabBar.jsx')
- for(const term of ['Start','Plan','Essen','Training','Statistik','Übungen','/nutrition','/stats','/library']) assert.ok(src.includes(term),term)
+ for(const term of ['Start','Essen','Erstellen','Training','Profil','/nutrition','/plan','/settings']) assert.ok(src.includes(term),term)
 })
 test('Android app ID preserved across updates',()=>{
  const src=read('../../android/app/build.gradle')
