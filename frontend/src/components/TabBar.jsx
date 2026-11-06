@@ -62,13 +62,13 @@ export default function TabBar({ onStart }) {
   return <>
     {createOpen && <div className="of-create-overlay" onClick={()=>setCreateOpen(false)}>
       <section className="of-create-sheet" role="dialog" aria-modal="true" aria-label="Erstellen" onClick={e=>e.stopPropagation()}>
-        <div className="of-create-head"><strong>Was möchtest du erstellen?</strong><button type="button" onClick={()=>setCreateOpen(false)} aria-label="Schließen"><Icon name="x" /></button></div>
+        <div className="of-create-head"><strong>Was möchtest du erstellen?</strong><button type="button" onClick={()=>setCreateOpen(false)} aria-label="Schließen"><Icon name="xmark" /></button></div>
         <div className="of-create-actions">
           <button onClick={()=>launch('food')}><Icon name="plate" />Essen erfassen</button>
           <button onClick={()=>launch('workout')}><Icon name="dumbbell" />Training starten</button>
           <button onClick={()=>launch('recipe')}><Icon name="book" />Rezept erstellen</button>
           <button onClick={()=>launch('weight')}><Icon name="chart" />Gewicht eintragen</button>
-          <button onClick={()=>launch('water')}><Icon name="droplet" />Wasser erfassen</button>
+          <button onClick={()=>launch('water')}><Icon name="plus" />Wasser erfassen</button>
           <button onClick={()=>launch('exercise')}><Icon name="plus" />Übung erstellen</button>
         </div>
       </section>
@@ -79,10 +79,10 @@ export default function TabBar({ onStart }) {
       <Tab active={active.nutrition} icon="plate" label="Essen" onClick={()=>go('/nutrition')} />
       <button type="button" className={'of-create-trigger' + (createOpen ? ' on' : '')}
         aria-label={createOpen ? 'Erstellen schließen' : 'Erstellen'} aria-expanded={createOpen} onClick={()=>setCreateOpen(x=>!x)}>
-        <span className="cir"><Icon name={createOpen ? 'x' : 'plus'} /></span><span>Erstellen</span>
+        <span className="cir"><Icon name={createOpen ? 'xmark' : 'plus'} /></span><span>Erstellen</span>
       </button>
       <Tab active={active.plan} icon="dumbbell" label="Training" onClick={()=>go('/plan')} />
-      <Tab active={active.settings} icon="user" label="Profil" onClick={()=>go('/settings')} />
+      <Tab active={active.settings} icon="person" label="Profil" onClick={()=>go('/settings')} />
     </nav>
   </>
 }
