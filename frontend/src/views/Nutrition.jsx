@@ -54,6 +54,7 @@ export default function Nutrition() {
   const [results, setResults] = useState([])
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [deletedRecipe, setDeletedRecipe] = useState(null)
   const [camera, setCamera] = useState(false)
   const [recipeName, setRecipeName] = useState('')
   const [recipeServings, setRecipeServings] = useState(2)
@@ -263,6 +264,25 @@ export default function Nutrition() {
   const openFood = (type = selectedMeal) => { setFoodDestination('diary');setRecipeIngredientIndex(null);setSelectedMeal(type); setShowForm(false); setTab('food'); setAddMenu(false); setDrawer(false); setNotice('') }
   const goSection = section => { if(section !== 'food')setFoodDestination('diary');setTab(section); setDrawer(false); setAddMenu(false); setShowForm(false); setNotice('') }
   const addWater = amount => update(d => ({ ...d, water: { ...d.water, [date]: Math.max(0, (d.water?.[date] || 0) + amount) } }))
+  const deleteRecipeWithUndo = recipe => {
+    if (!window.confirm(`Rezept „${recipe.name}“ löschen?`)) return
+    const index = loadNutrition().recipes.findIndex(r => r.id === recipe.id)
+    if(update(d=>({...d,recipes:d.recipes.filter(x=>x.id!==recipe.id)}))) {
+      setDeletedRecipe({recipe,index})
+      setNotice('Rezept gelöscht. Du kannst den Schritt rückgängig machen.')
+    }
+  }
+  const undoRecipeDelete = () => {
+    if(!deletedRecipe) return
+    const {recipe,index}=deletedRecipe
+    if(update(d=>{
+      if(d.recipes.some(x=>x.id===recipe.id)) return d
+      const recipes=[...d.recipes]
+      recipes.splice(Math.max(0,Math.min(index,recipes.length)),0,recipe)
+      return {...d,recipes}
+    })){setDeletedRecipe(null);setNotice('Rezept wiederhergestellt.')}
+  }
+
   // Deep-link from the centered Create button. A replace cleans the URL so refreshing
   // the diary never repeats a write or silently reopens a form.
   useEffect(() => {
@@ -311,7 +331,7 @@ export default function Nutrition() {
       <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
     <input hidden ref={galleryInput} type="file" accept="image/*" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
     <input hidden ref={photoCameraInput} type="file" accept="image/*" capture="environment" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
-    {notice && <div className="of-notice" role="status">{notice}</div>}
+    {notice && <div className="of-notice" role="status">{notice}{deletedRecipe && <button type="button" onClick={undoRecipeDelete} style={{marginInlineStart:12,minHeight:44,fontWeight:700}}>Rückgängig</button>}</div>}
     {tab === 'today' && <>
       <div className="of-health-chips">
         <button className="of-health-chip" onClick={() => bwSheet()}><Icon name="scale" /><span>{weight != null ? `${fmt(weight)} ${gym.unit || 'kg'}` : 'Gewicht eintragen'}</span><Icon name="pencil" /></button>
@@ -503,7 +523,7 @@ export default function Nutrition() {
       {data.recipes.length ? data.recipes.map(r => { const t = recipeTotals(r); return <div className="card of-recipe" key={r.id}><strong>{r.name}</strong>
         <div className="of-dim">{r.items.length} Zutaten · {r.servings} Portionen · pro Portion {fmt(t.kcal)} kcal / {fmt(t.protein)} g Protein</div>
         <div className="of-recipe-actions"><button onClick={() => editRecipe(r)}><Icon name="pencil"/> Bearbeiten</button><button onClick={() => takeRecipe(r)}><Icon name="plus" /> Portion eintragen</button>
-          <button aria-label="Rezept löschen" onClick={() => { if (window.confirm(`Rezept „${r.name}“ löschen?`)) update(d => ({ ...d, recipes: d.recipes.filter(x => x.id !== r.id) })) }}><Icon name="trash" /></button></div>
+          <button aria-label="Rezept löschen" className="of-danger" onClick={() => deleteRecipeWithUndo(r)}><Icon name="trash" /></button></div>
       </div> }) : <div className="of-empty">Noch keine Rezepte gespeichert.</div>}
     </>}
     {tab === 'analysis' && <>
