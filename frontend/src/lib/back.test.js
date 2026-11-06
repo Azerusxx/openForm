@@ -101,3 +101,19 @@ describe('makeBackHandler', () => {
     expect(h.handler()).toBe('arm-exit')
   })
 })
+
+describe('Android create overlay back handling',()=>{
+  it('closes an open create sheet before changing history',()=>{
+    const calls={close:0,history:0,exit:0}
+    const handler=makeBackHandler({
+      getSheets:()=>[],closeSheet:()=>{},toast:()=>{},
+      goBack:()=>calls.history++,exit:()=>calls.exit++,
+      closeOverlay:()=>{calls.close++;return calls.close===1},
+      now:()=>1000,
+    })
+    expect(handler({canGoBack:true})).toBe('overlay')
+    expect(calls.history).toBe(0)
+    expect(handler({canGoBack:true})).toBe('history')
+    expect(calls.history).toBe(1)
+  })
+})
