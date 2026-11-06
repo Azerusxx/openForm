@@ -418,13 +418,13 @@ h4.sec{
 #tabbar button .icn{font-size:25px;--icon-stroke:1.65;color:var(--label)}
 #tabbar button.on{color:var(--acc)}
 #tabbar button.on .icn{--icon-stroke:2;color:inherit;opacity:1}
-/* Floating Glass: a single composited indicator glides between the six fixed tabs.
+/* Floating Glass: a single composited indicator glides between the five primary positions.
    We deliberately reuse the existing restrained 10px navigation blur: an extra full-screen
    backdrop-filter would be expensive while a workout is running. */
 #tabbar[data-floating-glass]{isolation:isolate}
 #tabbar[data-floating-glass]::before{
   content:'';position:absolute;pointer-events:none;z-index:0;
-  left:6px;top:0;width:calc((100% - 12px)/6);height:3px;
+  left:6px;top:0;width:calc((100% - 12px)/5);height:3px;
   border-radius:0 0 999px 999px;
   background:var(--acc);
   box-shadow:0 2px 10px color-mix(in srgb,var(--acc) 38%,transparent);
@@ -2313,3 +2313,26 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .stats-illness-impact .stats-illness-advice{color:var(--label-2)}
 .stats-illness-impact button{min-height:37px;border-radius:10px;border:1px solid var(--illness-color);color:var(--illness-color);background:transparent;padding:8px 11px;font-size:12px;font-weight:650}
 .stats-illness-impact button:focus-visible{outline:2px solid var(--illness-color);outline-offset:2px}
+
+
+/* Five-tab navigation: native-sized targets, center quick-create and low-cost glass surface. */
+#tabbar[data-floating-glass] { padding-inline:6px }
+#tabbar[data-floating-glass]>button { min-height:48px; min-width:44px; touch-action:manipulation; }
+#tabbar button.of-create-trigger { margin-top:-18px; }
+#tabbar button.of-create-trigger .cir {
+  width:52px;height:52px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;background:var(--acc);color:var(--on-acc);
+  box-shadow:0 5px 18px color-mix(in srgb,var(--acc) 35%,transparent);
+  transition:transform 220ms var(--ease);
+}
+#tabbar button.of-create-trigger .cir .icn { color:inherit;--icon-stroke:2; }
+#tabbar button.of-create-trigger:active .cir { transform:scale(.94) }
+.of-create-overlay { position:fixed;inset:0;z-index:49;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center }
+.of-create-sheet { width:min(100%,520px);padding:16px 16px calc(90px + var(--sab));border-radius:22px 22px 0 0;background:var(--bg-el);border:1px solid var(--sep-op);box-shadow:0 -10px 38px rgba(0,0,0,.24) }
+.of-create-head { display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px }
+.of-create-head button { min-width:48px;min-height:48px;display:flex;align-items:center;justify-content:center }
+.of-create-actions { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px }
+.of-create-actions button { display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:center;min-height:84px;padding:14px;border-radius:14px;background:var(--surface);text-align:left;color:var(--label);font-size:13px;font-weight:600 }
+.of-create-actions button .icn { font-size:24px;color:var(--acc) }
+.of-create-actions button:active { transform:scale(.97);background:var(--surface-2) }
+@media (prefers-reduced-motion:reduce) { #tabbar button.of-create-trigger .cir,.of-create-actions button { transition:none!important;animation:none!important } }
