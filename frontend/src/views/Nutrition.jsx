@@ -1,6 +1,7 @@
 import { hybridFoodSearch, estimateFoodMicros } from '../lib/nutrition-hybrid.js'
 import { syncSupplementReminders } from '../lib/supplement-reminders.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
 import { bwSheet } from '../sheets.jsx'
@@ -28,6 +29,8 @@ const MEAL_GROUPS = [
 const SECTIONS = [['today','Heute','house'],['diary','Tagebuch','calendar'],['analysis','Trends','chart'],['recipes','Rezepte','plate'],['favorites','Favoriten','star'],['backup','Export / Import','download']]
 
 export default function Nutrition() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const gym = useStore(s => s.S)
   const weight = gym.bodyweight?.at(-1)?.w
   const [data, setData] = useState(loadNutrition)
@@ -260,6 +263,23 @@ export default function Nutrition() {
   const openFood = (type = selectedMeal) => { setFoodDestination('diary');setRecipeIngredientIndex(null);setSelectedMeal(type); setShowForm(false); setTab('food'); setAddMenu(false); setDrawer(false); setNotice('') }
   const goSection = section => { if(section !== 'food')setFoodDestination('diary');setTab(section); setDrawer(false); setAddMenu(false); setShowForm(false); setNotice('') }
   const addWater = amount => update(d => ({ ...d, water: { ...d.water, [date]: Math.max(0, (d.water?.[date] || 0) + amount) } }))
+  // Deep-link from the centered Create button. A replace cleans the URL so refreshing
+  // the diary never repeats a write or silently reopens a form.
+  useEffect(() => {
+    const action = new URLSearchParams(location.search).get('create')
+    if (!['food','recipe','water'].includes(action)) return
+    if (action === 'food') openFood()
+    if (action === 'recipe') {
+      setRecipeEditing(null); setRecipeItems([]); setRecipeName(''); setRecipeServings(2)
+      goSection('recipes')
+    }
+    if (action === 'water') {
+      goSection('today')
+      setShowWater(true)
+    }
+    navigate('/nutrition', { replace: true })
+  }, [location.search, navigate])
+
   const saveActivity = e => {
     e.preventDefault()
     const kcal = Number(activityKcal)
