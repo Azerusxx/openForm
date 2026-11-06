@@ -17,6 +17,7 @@ import { glyphOf } from '../lib/glyphs.js'
 import { dayNoteOf } from '../lib/day-notes.js'
 import { illnessOnDay, latestIllness, recoveryStatus, dismissRecovery } from '../lib/illness.js'
 import { loadNutrition, dayTotals } from '../lib/nutrition.js'
+import { usePullRefresh } from '../lib/use-pull-refresh.js'
 import './Nutrition.css'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
@@ -31,6 +32,7 @@ export default function Home() {
   // Nutrition lives in separate local storage until the server sync supports both schemas.
   // Updating a meal while Home is mounted refreshes these small read-only totals.
   const [nutrition, setNutrition] = useState(loadNutrition)
+  const refreshing = usePullRefresh(() => setNutrition(loadNutrition()), !S.active)
   useEffect(() => {
     const refresh = () => setNutrition(loadNutrition())
     window.addEventListener('openform-nutrition-changed', refresh)
@@ -124,6 +126,7 @@ export default function Home() {
   const recovery = showRecovery ? recoveryStatus(lastIllness,todayISO()) : null
 
   return <div className="narrow">
+    {refreshing && <div className="of-pull-feedback" role="status">Aktualisiere Übersicht …</div>}
     <div className="hdr">
       <div><h1>{user ? t('Hi {0}', user.name) : 'openForm'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
       <div className="row" style={{ gap: 6 }}>
