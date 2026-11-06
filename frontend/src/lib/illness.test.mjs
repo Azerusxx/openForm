@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {validDay,nextDay,cleanIllness,illnessOnDay,illnessRecords,latestIllness,recoveryStatus,putIllness,clearIllness} from './illness.js'
+import {validDay,nextDay,cleanIllness,illnessOnDay,illnessRecords,latestIllness,recoveryStatus,putIllness,clearIllness,dismissRecovery} from './illness.js'
 test('real dates and range validation',()=>{
  assert.equal(validDay('2026-02-30'),false)
  assert.equal(validDay('2026-02-28'),true)
@@ -42,4 +42,29 @@ test('clinical notes are bounded, absence of end date remains open',()=>{
 test('legacy day-notes and absence of illness records remain readable',()=>{
  assert.equal(illnessOnDay({dayNotes:{'2026-10-25':{tag:'sick'}}},'2026-10-25'),null)
  assert.deepEqual(illnessRecords({}),[])
+})
+
+test('recovery acknowledgement hides only the finished period and keeps all illness dates',()=>{
+ const base={start:'2026-10-25',end:'2026-10-28',plannedReturn:'2026-10-29',note:'Erholt'}
+ const periods=putIllness({},'first',base,100)
+ const dismissed=dismissRecovery(periods,'first','2026-11-06',200)
+ assert.equal(dismissed.first.recoveryDismissedAt,'2026-11-06')
+ assert.equal(dismissed.first.start,base.start)
+ assert.equal(dismissed.first.end,base.end)
+ assert.equal(dismissed.first.plannedReturn,base.plannedReturn)
+ assert.equal(dismissed.first.note,base.note)
+ assert.equal(illnessOnDay({illnessPeriods:dismissed},'2026-10-27','2026-11-06')?.id,'first')
+ assert.equal(latestIllness({illnessPeriods:dismissed},'2026-11-06')?.recoveryDismissedAt,'2026-11-06')
+ const next=putIllness(dismissed,'second',{start:'2026-11-05',end:'2026-11-06'},250)
+ assert.equal(next.second.recoveryDismissedAt,null)
+ assert.equal(next.first.recoveryDismissedAt,'2026-11-06')
+})
+test('an ongoing period cannot be dismissed and no medical checkboxes are changed',()=>{
+ const open=putIllness({},'a',{start:'2026-11-05'},100)
+ assert.throws(()=>dismissRecovery(open,'a','2026-11-06'))
+ const past=putIllness({},'a',{start:'2026-11-01',end:'2026-11-05'},100)
+ const done=dismissRecovery(past,'a','2026-11-06')
+ assert.equal(done.a.feverFree,false)
+ assert.equal(done.a.improving,false)
+ assert.equal(recoveryStatus(done.a,'2026-11-06').state,'recovering')
 })
