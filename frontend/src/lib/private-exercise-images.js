@@ -32,18 +32,34 @@ export async function savePrivateExerciseImage(id,file){
  if(!id||!file||!file.type?.startsWith('image/'))throw Error('Bitte eine Bilddatei auswählen.')
  if(file.size>MAX)throw Error('Bild ist größer als 8 MB.')
  // Decode to a normalized WebP; prevent huge camera photos from inflating backups.
- const bitmap=await createImageBitmap(file)
+ let bitmap,close=()=>{}
+ if(typeof createImageBitmap==='function'){
+  bitmap=await createImageBitmap(file)
+  close=()=>bitmap.close()
+ }else{
+  const url=URL.createObjectURL(file)
+  try{
+   bitmap=await new Promise((resolve,reject)=>{
+    const image=new Image()
+    image.onload=()=>resolve(image)
+    image.onerror=()=>reject(Error('Bild konnte nicht geöffnet werden.'))
+    image.src=url
+   })
+  }finally{URL.revokeObjectURL(url)}
+ }
  try{
   const ratio=Math.min(1,1200/Math.max(bitmap.width,bitmap.height))
   const canvas=document.createElement('canvas')
   canvas.width=Math.max(1,Math.round(bitmap.width*ratio))
   canvas.height=Math.max(1,Math.round(bitmap.height*ratio))
-  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height)
+  const ctx=canvas.getContext('2d')
+  if(!ctx)throw Error('Bildverarbeitung nicht verfügbar.')
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height)
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.84))
   if(!blob)throw Error('Bild konnte nicht verarbeitet werden.')
   await transact('readwrite',store=>store.put(blob,key(id)))
   notify()
- }finally{bitmap.close()}
+ }finally{close()}
 }
 export async function removePrivateExerciseImage(id){
  await transact('readwrite',store=>store.delete(key(id)))
