@@ -24,3 +24,12 @@ test('sick periods excuse reminders and missed-day nudges',()=>{
  assert.match(read('./day-notes.js'),/illnessOnDay/)
  assert.match(read('../../../api/nudge.js'),/illnessPeriods/)
 })
+
+test('home recovery completion is explicit and hides only its own card',()=>{
+ const home=read('../views/Home.jsx')
+ assert.match(home,/Wiedereinstieg abgeschlossen/)
+ assert.match(home,/dismissRecovery\(s\.illnessPeriods,lastIllness\.id,todayISO\(\)\)/)
+ assert.match(home,/!lastIllness\.recoveryDismissedAt/)
+ const editor=read('../sheets.jsx')
+ assert.match(editor,/recoveryDismissedAt: record\?\.start === start/)
+})
