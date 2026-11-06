@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { imgSrc, gifSrc, isVideoSrc, isCustomEx, figureOf } from '../lib/exercises.js'
+import { isCustomEx } from '../lib/exercises.js'
+import REPDB_IMAGE_MAP from '../lib/repdb-image-map.json'
 import { MOBILE } from '../lib/mobile.js'
 import { useStore } from '../store/useStore.js'
 import { t, exerciseNameFor } from '../lib/i18n.js'
@@ -51,58 +52,21 @@ function ExerciseMediaWithOverride(p) {
 // future workouts (issue #12). Settings can also turn workout media off entirely
 // (gifSize 'off') — then nothing renders here and the exercise card closes up, exactly like
 // an exercise without media. Any other/legacy value behaves as 'full'.
+// Built-in exercises no longer use the outdated openGym GIF/MP4 paths.
+// RepDB is the only bundled illustration fallback; users can override it locally.
 function BuiltinMedia({ ex, id, compact, minimizable }) {
-  const privateUrl = usePrivateExerciseImage(ex.id)
-  const [playing, setPlaying] = useState(true)
-  // 'gif' → the animation failed, the still is showing; 'all' → the still failed too. Media is
-  // fetched from wherever the build points (a mount, a CDN): a dropped connection, an expired
-  // session on a gated instance or a CDN hiccup used to leave the browser's broken-image glyph
-  // on a white block. Now the still stands in for the animation, a neutral tile stands in for
-  // both, and a tap tries again — no text, so nothing new to translate.
-  const [failed, setFailed] = useState(null)
   const gifSize = useStore(s => s.S.gifSize)
-  const body = useStore(s => figureOf(s.S))
-  const update = useStore(s => s.update)
-  const clip = ex.gif && isVideoSrc(gifSrc(ex, body)) ? gifSrc(ex, body) : null
-  const clipSrc = useClipInMemory(clip)
-  if (!ex.gif && !privateUrl && !ex.img) return null
-  if (minimizable && gifSize === 'off') return null
+  const src = REPDB_IMAGE_MAP[ex?.id] ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id] : null
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [src])
+  if (minimizable && (gifSize === 'off' || !src)) return null
   const mini = minimizable && gifSize === 'mini'
-  const toggleSize = e => { e.stopPropagation(); update(s => { s.gifSize = mini ? 'full' : 'mini' }) }
-  const showGif = playing && failed == null
-  const onError = () => setFailed(showGif ? 'gif' : 'all')
-  const onTap = () => {
-    if (failed) { setFailed(null); setPlaying(true); return }
-    setPlaying(p => !p)
-  }
-  if (privateUrl) return <div className={'exmedia' + (compact ? ' compact' : '') + (mini ? ' mini' : '')} id={id}>
-    <img src={privateUrl} alt={exerciseNameFor(ex)} decoding="async" style={{objectFit:'contain',width:'100%',height:'100%'}} />
+  if (!src || failed) return minimizable ? null : <div className="exmedia broken" id={id}>
+    <div className="exmedia-x" role="status"><Icon name="image" /><span>Kein Übungsbild vorhanden. Unten eigenes Bild hinzufügen.</span></div>
   </div>
-  return (
-    <div className={'exmedia' + (compact ? ' compact' : '') + (mini ? ' mini' : '') + (failed === 'all' ? ' broken' : '')} id={id} onClick={onTap}>
-      {failed === 'all'
-        ? <div className="exmedia-x"><Icon name="dumbbell" /></div>
-        : showGif && clip && clipSrc
-          // No poster: Android's WebView went back to it at every loop and stalled there (the
-          // still above stands in while the clip loads, so nothing is lost without it).
-          ? <video ref={autoplayMuted} className="catvid" src={clipSrc} autoPlay muted loop playsInline disablePictureInPicture
-              aria-label={exerciseNameFor(ex)} onError={onError} />
-          : showGif && clip
-            // the phone app is still reading the clip into memory: the still holds its place
-            ? <img decoding="async" draggable={false} src={imgSrc(ex, body)} alt={exerciseNameFor(ex)} />
-          : <img decoding="async" draggable={false} src={showGif ? gifSrc(ex, body) : imgSrc(ex, body)} alt={exerciseNameFor(ex)} onError={onError} />}
-      {minimizable && (
-        <button className="giftoggle" onClick={toggleSize}>
-          <Icon name={mini ? 'expand' : 'minimize'} />{mini ? t('Expand') : t('Minimize')}
-        </button>
-      )}
-      {!mini && !failed && (
-        <span className="gifhint">
-          <Icon name={playing ? 'pause' : 'play'} />{playing ? t('tap to pause') : t('tap to play')}
-        </span>
-      )}
-    </div>
-  )
+  return <div className={'exmedia' + (compact ? ' compact' : '') + (mini ? ' mini' : '')} id={id}>
+    <img src={src} decoding="async" alt={exerciseNameFor(ex)} onError={() => setFailed(true)} />
+  </div>
 }
 
 // In the phone app the clips come out of the app package through Capacitor's local server, which
@@ -175,11 +139,8 @@ function ExerciseThumbWithOverride(p) {
   return isCustomEx(p.ex) ? <CustomThumb {...p} /> : <BuiltinThumb {...p} />
 }
 function BuiltinThumb({ ex }) {
-  const privateUrl = usePrivateExerciseImage(ex.id)
-  const body = useStore(s => figureOf(s.S))
-  const src = ex.img ? imgSrc(ex, body) : null
+  const src = REPDB_IMAGE_MAP[ex?.id] ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id] : null
   const [broken, setBroken] = useState(null)
-  if (privateUrl) return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={privateUrl} alt="" />
   if (!src || broken === src) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
   return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={src} alt="" onError={() => setBroken(src)} />
 }
