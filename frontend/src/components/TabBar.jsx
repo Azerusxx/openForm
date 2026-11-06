@@ -30,8 +30,10 @@ export default function TabBar({ onStart }) {
   useEffect(()=>{
     if(!createOpen) return
     const onKey = e=>{if(e.key==='Escape')setCreateOpen(false)}
+    const onBack = e => { e.preventDefault(); setCreateOpen(false) }
     document.addEventListener('keydown',onKey)
-    return ()=>document.removeEventListener('keydown',onKey)
+    window.addEventListener('openform-close-overlay',onBack)
+    return ()=>{document.removeEventListener('keydown',onKey);window.removeEventListener('openform-close-overlay',onBack)}
   },[createOpen])
   if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
