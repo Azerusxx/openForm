@@ -1,22 +1,21 @@
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutineIds, effectiveRoutines } from '../lib/history.js'
 import { todayISO } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
+import { bwSheet, customExSheet } from '../sheets.jsx'
 import Icon from './Icon.jsx'
-import Elapsed from './Elapsed.jsx'
 import { useConnectionTrouble } from './SyncBanner.jsx'
 
-// Module scope, not TabBar's render body. Declared inside it, `Tab` was a new function on every
-// render, so React saw a different component type each time and threw the button away and built a
-// fresh one — on a bar that is fixed on screen, and once a second for the whole of a rest. The
-// state it took with it is the DOM node itself: focus, the :active tint, any in-flight transition.
+const nutritionPath = action => '/nutrition' + (action ? '?create=' + encodeURIComponent(action) : '')
+const top = () => window.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+
 function Tab({ active, icon, label, onClick, dot }) {
-  return (
-    <button className={active ? 'on' : ''} aria-current={active ? "page" : undefined} onClick={onClick} aria-label={dot ? label + ', ' + t('Connection problem') : undefined}>
-      <span className="tab-ic"><Icon name={icon} />{dot && <span className="tab-dot" aria-hidden="true" />}</span><span>{label}</span>
-    </button>
-  )
+  return <button type="button" className={active ? 'on' : ''} aria-current={active ? 'page' : undefined}
+    onClick={onClick} aria-label={dot ? label + ', ' + t('Connection problem') : label}>
+    <span className="tab-ic"><Icon name={icon} />{dot && <span className="tab-dot" aria-hidden="true" />}</span><span>{label}</span>
+  </button>
 }
 
 export default function TabBar({ onStart }) {
@@ -25,49 +24,65 @@ export default function TabBar({ onStart }) {
   const S = useStore(s => s.S)
   const user = useStore(s => s.user)
   const isGuest = useStore(s => s.isGuest())
-  // With the connection banner switched off, a sync problem shows as a dot on Home, the tab
-  // Settings lives under (#369, #330).
   const trouble = useConnectionTrouble()
+  const [createOpen,setCreateOpen] = useState(false)
+  useEffect(()=>setCreateOpen(false),[loc.pathname,loc.search])
+  useEffect(()=>{
+    if(!createOpen) return
+    const onKey = e=>{if(e.key==='Escape')setCreateOpen(false)}
+    document.addEventListener('keydown',onKey)
+    return ()=>document.removeEventListener('keydown',onKey)
+  },[createOpen])
   if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
-  const on = k => cur === k || (cur === 'history' && k === 'stats') || (cur === 'settings' && k === 'home') || (cur === 'muscles' && k === 'library') || (cur === 'structural-balance' && k === 'stats')
-
-  const activeIndex = on('home') ? 0 : on('plan') ? 1 : on('nutrition') ? 2 : cur === 'workout' ? 3 : on('stats') ? 4 : on('library') ? 5 : -1
-
-  const running = !!S.active && cur !== 'workout' && !S.active.editingWorkoutId && !S.active.backfill && S.active.start > 0
-  const startWorkout = () => {
-    if (!S.active) {
-      // A weekday can hold several routines; start the combined session if any of them has
-      // exercises, otherwise fall through to the picker.
-      if (effectiveRoutines(S, todayISO()).some(r => r.ex.length)) { onStart(effectiveRoutineIds(S, todayISO())); return }
-    }
-    nav('/workout')
+  const active = {
+    home: ['home','stats','history','structural-balance','progress-photos','measurements'].includes(cur),
+    nutrition: cur === 'nutrition',
+    plan: ['plan','library','muscles','workout','checkin'].includes(cur),
+    settings: ['settings','coach'].includes(cur),
   }
-
-  return (
-    <nav id="tabbar" data-floating-glass data-has-active={activeIndex >= 0 ? "true" : "false"} style={{ '--of-active-index': Math.max(0, activeIndex) }} aria-label="Hauptnavigation">
-      <Tab active={on('home')} icon="house" label="Start" dot={trouble} onClick={() => nav('/home')} />
-      <Tab active={on('plan')} icon="calendar" label="Plan" onClick={() => nav('/plan')} />
-      {/* Nutrition is a second primary action next to Start. Keep the flame glyph and
-          the same 52px round touch target; selection still navigates to Nutrition. */}
-      <button className={'food' + (on('nutrition') ? ' on' : '')} onClick={() => nav('/nutrition')} aria-label="Essen" aria-current={on('nutrition') ? 'page' : undefined}>
-        <span className="cir"><Icon name="flame" /></span><span>Essen</span>
+  const activeIndex = active.home ? 0 : active.nutrition ? 1 : active.plan ? 3 : active.settings ? 4 : -1
+  const go = path => {
+    if (loc.pathname === path && !loc.search) { top(); return }
+    nav(path)
+  }
+  const startWorkout = () => {
+    setCreateOpen(false)
+    if (!S.active && effectiveRoutines(S, todayISO()).some(r => r.ex.length)) {
+      onStart(effectiveRoutineIds(S, todayISO()))
+    } else nav('/workout')
+  }
+  const launch = (action) => {
+    setCreateOpen(false)
+    if(action==='workout'){startWorkout();return}
+    if(action==='weight'){bwSheet();return}
+    if(action==='exercise'){customExSheet(null);return}
+    nav(nutritionPath(action))
+  }
+  return <>
+    {createOpen && <div className="of-create-overlay" onClick={()=>setCreateOpen(false)}>
+      <section className="of-create-sheet" role="dialog" aria-modal="true" aria-label="Erstellen" onClick={e=>e.stopPropagation()}>
+        <div className="of-create-head"><strong>Was möchtest du erstellen?</strong><button type="button" onClick={()=>setCreateOpen(false)} aria-label="Schließen"><Icon name="x" /></button></div>
+        <div className="of-create-actions">
+          <button onClick={()=>launch('food')}><Icon name="plate" />Essen erfassen</button>
+          <button onClick={()=>launch('workout')}><Icon name="dumbbell" />Training starten</button>
+          <button onClick={()=>launch('recipe')}><Icon name="book" />Rezept erstellen</button>
+          <button onClick={()=>launch('weight')}><Icon name="chart" />Gewicht eintragen</button>
+          <button onClick={()=>launch('water')}><Icon name="droplet" />Wasser erfassen</button>
+          <button onClick={()=>launch('exercise')}><Icon name="plus" />Übung erstellen</button>
+        </div>
+      </section>
+    </div>}
+    <nav id="tabbar" data-floating-glass data-has-active={activeIndex >= 0 ? 'true' : 'false'}
+      style={{ '--of-active-index': Math.max(0,activeIndex) }} aria-label="Hauptnavigation">
+      <Tab active={active.home} icon="house" label="Start" dot={trouble} onClick={()=>go('/home')} />
+      <Tab active={active.nutrition} icon="plate" label="Essen" onClick={()=>go('/nutrition')} />
+      <button type="button" className={'of-create-trigger' + (createOpen ? ' on' : '')}
+        aria-label={createOpen ? 'Erstellen schließen' : 'Erstellen'} aria-expanded={createOpen} onClick={()=>setCreateOpen(x=>!x)}>
+        <span className="cir"><Icon name={createOpen ? 'x' : 'plus'} /></span><span>Erstellen</span>
       </button>
-      {/* On the workout screen itself there is nothing to resume, so the button reads as the
-          tab it is and stays lit (#29); anywhere else it brings you back to the exercise you
-          were on — the marker is kept in S.active.cur and never moves on its own (#21). The
-          glyph is a dumbbell: the main action always means training.
-          A live session you stepped away from shows its running time instead of a word, the
-          button still named Resume; a past workout being edited or logged after the fact has no
-          clock to run. */}
-      <button className={'start' + (S.active ? ' rec' : '') + (S.active && cur === 'workout' ? ' on' : '')} onClick={startWorkout}
-        aria-label={running ? 'Training fortsetzen' : 'Training starten'} aria-current={cur === 'workout' ? 'page' : undefined}>
-        <span className="cir"><Icon name="dumbbell" /></span>
-        {running ? <span className="tab-time"><Elapsed start={S.active.start} /></span>
-          : <span>{S.active ? (cur === 'workout' ? 'Training' : S.active.editingWorkoutId ? 'Bearbeiten' : 'Weiter') : 'Training'}</span>}
-      </button>
-      <Tab active={on('stats')} icon="chart" label="Statistik" onClick={() => nav('/stats')} />
-      <Tab active={on('library')} icon="dumbbell" label="Übungen" onClick={() => nav('/library')} />
+      <Tab active={active.plan} icon="dumbbell" label="Training" onClick={()=>go('/plan')} />
+      <Tab active={active.settings} icon="user" label="Profil" onClick={()=>go('/settings')} />
     </nav>
-  )
+  </>
 }
