@@ -2336,3 +2336,11 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
 .of-create-actions button .icn { font-size:24px;color:var(--acc) }
 .of-create-actions button:active { transform:scale(.97);background:var(--surface-2) }
 @media (prefers-reduced-motion:reduce) { #tabbar button.of-create-trigger .cir,.of-create-actions button { transition:none!important;animation:none!important } }
+
+/* Instant, readable feedback for pull gestures. Avoid overlays over tappable content. */
+.of-pull-feedback { margin:4px auto 10px;max-width:max-content;padding:8px 14px;
+  border-radius:999px;background:var(--surface-2);color:var(--label);
+  font-size:12px;font-weight:600;box-shadow:0 2px 12px rgba(0,0,0,.08) }
+.of-danger { color:var(--red, #dc3545)!important;min-width:44px;min-height:44px }
+.of-training-shortcuts { display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px }
+.of-training-shortcuts button { min-height:44px }
