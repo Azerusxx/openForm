@@ -93,6 +93,8 @@ export const DEF = {
   dayNotes: {},
   // Separately stamped sick periods, non-destructive to day notes and logged workouts.
   illnessPeriods: {},
+  // Studio-scoped opaque QR fingerprints -> exercise IDs; synced with per-entry timestamps.
+  gymDevices: {},
   // Body measurements (#82): one check-in per day, values in cm whatever the weight unit
   // (lib/measurements.js); merged across devices like weigh-ins (lib/sync-merge.js).
   measurements: [], measurementEnabled: null, customMeasurements: [],
