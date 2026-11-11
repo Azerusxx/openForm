@@ -51,3 +51,22 @@ test('server nudge suppresses a sickness interval without masking a later traini
  assert.equal(excusedOn(s,'2026-10-23'),true)
  assert.equal(excusedOn(s,'2026-10-26'),false)
 })
+
+
+test('QR device map stays aligned across client and server, and guest device is not dropped',()=>{
+ assert.ok(STAMPED_MAPS.includes('gymDevices'))
+ assert.deepEqual(Server.STAMPED_MAPS,STAMPED_MAPS)
+ const device={studio:'Studio A',exId:'leg-press',label:'Beinpresse',_ts:100}
+ const local={_ts:150,gymDevices:{'studio a|hashed-device':device},workouts:[]}
+ const remote={_ts:200,gymDevices:{},workouts:[]}
+ const setup=localExtras(local,remote)
+ assert.ok(setup.setup>=1)
+ const merged=mergeStates(local,remote)
+ assert.equal(merged.gymDevices['studio a|hashed-device']?.exId,'leg-press')
+})
+test('older app uploads do not silently erase saved QR device associations',()=>{
+ const original={_ts:100,gymDevices:{'studio a|hashed-device':{studio:'Studio A',exId:'leg-press',_ts:90}}}
+ const fromOlderApp={_ts:200,workouts:[]}
+ Server.stampPut(original,fromOlderApp,{overRead:true,now:201})
+ assert.deepEqual(fromOlderApp.gymDevices,original.gymDevices)
+})
