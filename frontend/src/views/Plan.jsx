@@ -6,7 +6,7 @@ import { DAYN, DAYS, weekOrder, weekStartOf, uid, exCount, routineCount, todayIS
 import { t } from '../lib/i18n.js'
 import {
   dayAssignSheet, starterPlanSheet, confirmSheet, menuSheet,
-  planHasRoutines, exportPlanFile, printWholePlan, importPlanFile,
+  planHasRoutines, exportPlanFile, printWholePlan, importPlanFile, gymDeviceSheet,
 } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button, Row, Section, Segmented } from '../components/ui.jsx'
@@ -171,6 +171,7 @@ export default function Plan() {
     <div className="of-training-shortcuts" aria-label="Training – Schnellzugriffe">
       <Button size="sm" icon="dumbbell" onClick={() => nav('/library')}>Übungen</Button>
       <Button size="sm" icon="history" onClick={() => nav('/history')}>Trainingsverlauf</Button>
+      <Button size="sm" icon="qr" onClick={() => gymDeviceSheet()}>Gerät scannen</Button>
     </div>
     <input ref={fileRef} type="file" accept="application/json,.json" onChange={pickFile} hidden />
     <Segmented className="plan-views" value={view} onChange={setView}
