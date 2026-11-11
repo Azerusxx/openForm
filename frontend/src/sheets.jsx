@@ -71,6 +71,7 @@ import { cleanIllness, illnessOnDay, illnessRecords, putIllness, clearIllness, r
 import { occupiedAlternatives } from './lib/occupied-alternatives.js'
 import { cleanStudio, fingerprintQR, assignedDevice, registerGymDevice, gymDeviceKey, removeGymDevice } from './lib/gym-device-pass.js'
 import { scanCode } from './lib/scan.js'
+import { canRenderFmt } from './lib/qr.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -1551,7 +1552,8 @@ function GymDeviceEditor({ index, close }) {
     setScanning(true);setError('')
     try {
       const found=await scanCode()
-      if(found?.value) await identify(found.value)
+      if(found?.value && canRenderFmt(found.fmt)) await identify(found.value)
+      else if (found?.value) setError('Das ist kein QR-Code. Bitte den QR-Code am Trainingsgerät scannen.')
       else setError('Kein Code erkannt. Bitte erneut versuchen oder Code eingeben.')
     } catch(e) {setError('Kamera nicht verfügbar. Bitte QR-Code manuell eingeben.')}
     finally {setScanning(false)}
@@ -1599,6 +1601,11 @@ function GymDeviceEditor({ index, close }) {
         <Button variant="primary" onClick={useExisting}>{index!=null?'Für dieses Training verwenden':'Übung öffnen'}</Button>
         <div style={{height:6}} />
         <Button variant="ghost" onClick={()=>{setPicked(association.exId);setLabel(association.label);}}>Zuordnung ändern</Button>
+        <div style={{height:6}}/>
+        <Button variant="ghost" onClick={()=>{
+          update(st=>{st.gymDevices=removeGymDevice(st.gymDevices,gymDeviceKey(studio,hash))})
+          setPicked('');setLabel('');toast('Gerätezuordnung entfernt.')
+        }}>Zuordnung entfernen</Button>
       </> : null}
       {(!association||picked) && <>
         <Button variant="tinted" onClick={pickExercise}>{picked?'Übung: '+(label||picked):'Übung auswählen'}</Button>
