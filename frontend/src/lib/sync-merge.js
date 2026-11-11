@@ -612,7 +612,7 @@ function applyDeletions(S, deleted) {
 const OWN_MERGE = new Set([
   '_ts', '_rev', '_wid', '_wids', '_unstamped', '_prior', 'active', 'unit', 'unitSet', 'resetAt', 'resetIds', 'deleted', 'edited', 'undone', 'routineOrder',
   'workouts', 'routines', 'customEx', 'equipProfiles', 'gymCards', 'bodyweight', 'measurements', 'favEx',
-  'exWeights', 'balanceOverrides', 'loadKind', 'plates', 'dbLoad', 'dumbbells', 'dayNotes', 'illnessPeriods',
+  'exWeights', 'balanceOverrides', 'loadKind', 'plates', 'dbLoad', 'dumbbells', 'dayNotes', 'illnessPeriods', 'gymDevices',
 ])
 // Stamped per key instead of whole: one day of the plan, one exercise's note or bar.
 const PER_KEY = new Set(['week', 'dayPlan', 'exNotes', 'barWeights'])
@@ -1128,6 +1128,7 @@ export function localExtras(local, server) {
     list(local?.measurements).filter(e => e && e.d != null && !measured.has(e.d)).length +
     Object.entries(isMap(local?.dayNotes) ? local.dayNotes : {}).filter(([k, v]) => readNote(v) && !readNote(server?.dayNotes?.[k])).length +
     Object.entries(isMap(local?.illnessPeriods) ? local.illnessPeriods : {}).filter(([id,r]) => r?.start && !(isMap(server?.illnessPeriods) && server.illnessPeriods[id]?.start)).length +
+    Object.entries(isMap(local?.gymDevices) ? local.gymDevices : {}).filter(([id,r]) => r?.exId && !(isMap(server?.gymDevices) && server.gymDevices[id]?.exId)).length +
     keysNew('week') + keysNew('dayPlan') + keysNew('exNotes')
   return {
     workouts: list(local?.workouts).filter(w => !have.has(workoutKey(w))).length,
