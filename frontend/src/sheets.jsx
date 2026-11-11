@@ -1440,18 +1440,21 @@ function ExercisePicker({ onPick, title, close, like }) {
 export const exercisePicker = (onPick, { title, like } = {}) => ui().openSheet(close => <ExercisePicker onPick={onPick} title={title} like={like} close={close} />)
 
 /** Start a safe swap for one exact active-workout occurrence. */
-export function swapActiveWorkoutExercise(index) {
+export function swapActiveWorkoutExercise(index, selectedId = null) {
   const active = S().active
   if (!active?.entries?.[index]) return
 
   // The "+" on a picker row commits with the default config, exactly as it does in the add
   // flows; tapping the row still opens the config sheet first.
   // Worded for the session, not the routine: a swap changes today's workout only.
-  const picker = exercisePicker((ex, quick) => quick ? swapTo(ex, defaultConfig(ex.id)) : exConfigSheet(ex, null, cfg => swapTo(ex, cfg), null, null, null, null, t('Use in this workout')), { title: t('Swap exercise'), like: active.entries[index].id })
+  const chosen = selectedId && allExercises(S()).find(ex => ex.id === selectedId)
+  if (selectedId && !chosen) { toast('Ersatzübung nicht gefunden.'); return }
+  const picker = chosen ? null : exercisePicker((ex, quick) => quick ? swapTo(ex, defaultConfig(ex.id)) : exConfigSheet(ex, null, cfg => swapTo(ex, cfg), null, null, null, null, t('Use in this workout')), { title: t('Swap exercise'), like: active.entries[index].id })
+  if(chosen) swapTo(chosen,defaultConfig(chosen.id))
   function swapTo(ex, cfg) {
     // The picker is a chooser here, not a stack you keep adding from: one swap, then back to
     // the workout. (The add flow deliberately leaves it open.)
-    picker.close()
+    picker?.close()
     const full = { ...cfg, id: ex.id }
     const st = S()
     const current = st.active?.entries?.[index]
