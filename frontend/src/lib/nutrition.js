@@ -5,9 +5,9 @@ import { mirrorNutrition } from './nutrition-native-backup.js'
 // Nutrients are optional. An absent value means UNKNOWN, not zero.
 // Stored units: fiber g; sodium/calcium/iron/magnesium/potassium/vitaminC mg; vitaminD µg.
 export const MICRO_NUTRIENTS = [
-  { key: 'omega3', label: 'Omega-3 gesamt', unit: 'mg' },
-  { key: 'epa', label: 'EPA (Omega-3)', unit: 'mg' },
-  { key: 'dha', label: 'DHA (Omega-3)', unit: 'mg' },
+  { key: 'omega3', label: 'Omega-3 gesamt', unit: 'mg', off: 'omega-3-fat_100g', factor: 1000 },
+  { key: 'epa', label: 'EPA (Omega-3)', unit: 'mg', off: 'eicosapentaenoic-acid_100g', factor: 1000 },
+  { key: 'dha', label: 'DHA (Omega-3)', unit: 'mg', off: 'docosahexaenoic-acid_100g', factor: 1000 },
   { key: 'fiber', label: 'Ballaststoffe', unit: 'g', off: 'fiber_100g', factor: 1 },
   { key: 'sodium', label: 'Natrium', unit: 'mg', off: 'sodium_100g', factor: 1000 },
   { key: 'calcium', label: 'Calcium', unit: 'mg', off: 'calcium_100g', factor: 1000 },
@@ -187,7 +187,12 @@ export function parseOpenFoodFacts(payload, barcode) {
       kcal: has('energy-kcal_100g') ? n(q['energy-kcal_100g']) : Math.round(n(q['energy-kj_100g']) / 4.184),
       protein: n(q.proteins_100g), carbs: n(q.carbohydrates_100g), fat: n(q.fat_100g)
     },
-    per100Micros: Object.fromEntries(MICRO_NUTRIENTS.flatMap(({key,off,factor}) => has(off) && Number(q[off]) >= 0 ? [[key, Math.round(Number(q[off]) * factor * 100) / 100]] : [])),
+    per100Micros: Object.fromEntries(MICRO_NUTRIENTS.flatMap(({key,off,factor}) => {
+      // Open Food Facts most often supplies salt rather than sodium. Salt = sodium × 2.5.
+      if (key === 'sodium' && !has('sodium_100g') && has('salt_100g') && Number(q.salt_100g) >= 0)
+        return [[key, Math.round(Number(q.salt_100g) * 400 * 100) / 100]]
+      return off && has(off) && Number(q[off]) >= 0 ? [[key, Math.round(Number(q[off]) * factor * 100) / 100]] : []
+    })),
     source: 'openfoodfacts'
   }
 }
