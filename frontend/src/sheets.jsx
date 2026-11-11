@@ -68,6 +68,9 @@ import { copyText } from './lib/clipboard.js'
 import { queueRemaining, pinState } from './lib/queue.js'
 import { DAY_NOTE_TAGS, DAY_NOTE_LABEL, DAY_NOTE_ICON, dayNoteOf, dayNoteLine, canNoteDay, withDayNote } from './lib/day-notes.js'
 import { cleanIllness, illnessOnDay, illnessRecords, putIllness, clearIllness, recoveryStatus } from './lib/illness.js'
+import { occupiedAlternatives } from './lib/occupied-alternatives.js'
+import { cleanStudio, fingerprintQR, assignedDevice, registerGymDevice, gymDeviceKey, removeGymDevice } from './lib/gym-device-pass.js'
+import { scanCode } from './lib/scan.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -1520,6 +1523,112 @@ export function swapActiveWorkoutExercise(index, selectedId = null) {
       onConfirm: () => apply({ loggedConfirmed: true })
     })
   }
+}
+
+/* ============================ studio equipment QR pass ============================ */
+function GymDeviceEditor({ index, close }) {
+  const state = useStore(s => s.S)
+  const [studio,setStudio] = useState('')
+  const [raw,setRaw] = useState('')
+  const [hash,setHash] = useState('')
+  const [error,setError] = useState('')
+  const [scanning,setScanning] = useState(false)
+  const [label,setLabel] = useState('')
+  const [manual,setManual] = useState(false)
+  const [picked,setPicked] = useState('')
+  const current = state.active?.entries?.[index]
+  const association = hash && studio.trim() ? assignedDevice(state.gymDevices,studio,hash) : null
+  const identify = async value => {
+    try {
+      setError('')
+      const h = await fingerprintQR(value)
+      setHash(h)
+      setRaw('') // QR content is sensitive; never put raw scanned links in state or backup.
+      setPicked('')
+    } catch(e) {setError(e.message||'Code nicht lesbar.')}
+  }
+  const scan = async () => {
+    setScanning(true);setError('')
+    try {
+      const found=await scanCode()
+      if(found?.value) await identify(found.value)
+      else setError('Kein Code erkannt. Bitte erneut versuchen oder Code eingeben.')
+    } catch(e) {setError('Kamera nicht verfügbar. Bitte QR-Code manuell eingeben.')}
+    finally {setScanning(false)}
+  }
+  const pickExercise = () => {
+    const selector=exercisePicker(ex => {
+      selector.close()
+      setPicked(ex.id)
+      setLabel(exerciseNameFor(ex))
+    },{title:'Übung für dieses Gerät auswählen'})
+  }
+  const save = () => {
+    try {
+      if(!hash)throw Error('Zuerst QR-Code scannen.')
+      if(!picked)throw Error('Bitte eine Übung zuordnen.')
+      const name=cleanStudio(studio)
+      update(s=>{s.gymDevices=registerGymDevice(s.gymDevices,{studio:name,hash,exId:picked,label})})
+      toast('Gerät für dieses Studio gespeichert.')
+    } catch(e) {setError(e.message)}
+  }
+  const useExisting = () => {
+    if(!association?.exId) return
+    close()
+    if(index != null) swapActiveWorkoutExercise(index,association.exId)
+    else exerciseDetailSheet(exOr(association.exId))
+  }
+  return <div className="of-device-editor">
+    <h3>Gerät scannen</h3>
+    <p className="muted small">Jedes Studio hat eigene Geräte. openForm merkt sich den Code nur als sicheren Fingerabdruck und öffnet keine fremden Links.</p>
+    <label className="illness-field">Fitnessstudio
+      <input className="input" value={studio} maxLength={80} onChange={e=>{setStudio(e.target.value);setPicked('')}} placeholder="z. B. Fitnessstudio Wels" />
+    </label>
+    <Button variant="primary" icon="qr" disabled={scanning||!studio.trim()} onClick={scan}>{scanning?'Kamera wird geöffnet …':'QR-Code scannen'}</Button>
+    <div style={{height:8}}/>
+    <Button variant="ghost" onClick={()=>setManual(v=>!v)}>{manual?'Manuelle Eingabe schließen':'Code manuell eingeben'}</Button>
+    {manual && <div style={{display:'flex',gap:8,marginTop:8}}>
+      <input className="input" aria-label="QR-Code-Inhalt" value={raw} onChange={e=>setRaw(e.target.value)} placeholder="QR-Wert einfügen" />
+      <Button size="sm" disabled={!raw.trim()||!studio.trim()} onClick={()=>identify(raw)}>Prüfen</Button>
+    </div>}
+    {hash && <div className="card" style={{marginTop:12}}>
+      <strong>{association?'Gerät wiedererkannt':'Neues Gerät'}</strong>
+      <p className="muted small">{association?'Bereits in diesem Studio zugeordnet.':'Einmalig die passende Übung auswählen.'}</p>
+      {association ? <>
+        <p>{association.label||exerciseNameFor(exOr(association.exId))}</p>
+        <Button variant="primary" onClick={useExisting}>{index!=null?'Für dieses Training verwenden':'Übung öffnen'}</Button>
+        <div style={{height:6}} />
+        <Button variant="ghost" onClick={()=>{setPicked(association.exId);setLabel(association.label);}}>Zuordnung ändern</Button>
+      </> : null}
+      {(!association||picked) && <>
+        <Button variant="tinted" onClick={pickExercise}>{picked?'Übung: '+(label||picked):'Übung auswählen'}</Button>
+        <div style={{height:8}}/><Button variant="primary" disabled={!picked} onClick={save}>Zuordnung speichern</Button>
+      </>}
+    </div>}
+    {error && <p role="alert" className="muted small">{error}</p>}
+    <div style={{height:12}}/><Button variant="ghost" onClick={close}>Schließen</Button>
+  </div>
+}
+export const gymDeviceSheet = (index = null) => ui().openSheet(close=><GymDeviceEditor index={index} close={close}/>)
+export function occupiedExerciseSheet(index) {
+ const state=S()
+ const entry=state.active?.entries?.[index]
+ if(!entry)return
+ const original=allExercises(state).find(e=>e.id===entry.id)||exOr(entry.id)
+ const used=state.active.entries.map(e=>e.id)
+ const suggestions=occupiedAlternatives(original,allExercises(state),used)
+ const opened=ui().openSheet(close=><div>
+   <h3>Gerät belegt</h3>
+   <p className="muted small">Ähnliche Übungen für diese Einheit. Der Trainingsplan bleibt unverändert; bereits absolvierte Sätze bleiben der ursprünglichen Übung zugeordnet.</p>
+   {suggestions.length ? suggestions.map(({ex,reason})=><button key={ex.id} className="item" style={{width:'100%',textAlign:'left',minHeight:60}} onClick={()=>{close();swapActiveWorkoutExercise(index,ex.id)}}>
+     <span className="grow"><strong>{exerciseNameFor(ex)}</strong><span className="muted small" style={{display:'block'}}>{ex.eq||'Ohne Gerät'} · {reason}</span></span><Icon name="chevronRight"/>
+   </button>) : <p>Keine ausreichend vergleichbaren Alternativen gefunden. Du kannst die Übung später versuchen oder selbst auswählen.</p>}
+   <div style={{height:8}} />
+   <Button variant="tinted" onClick={()=>{close();swapActiveWorkoutExercise(index)}}>Weitere Übungen durchsuchen</Button>
+   <div style={{height:8}} />
+   <Button variant="ghost" onClick={close}>Gerät später verwenden</Button>
+ </div>)
+ return opened
 }
 
 /* ============================ equipment profiles ============================ */
