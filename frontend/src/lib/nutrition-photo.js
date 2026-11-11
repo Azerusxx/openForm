@@ -6,7 +6,7 @@ import { nativeFetch } from './capacitor-fetch.js'
 import { HTTP_PROVIDERS, baseUrlFor } from '../../../api/coach/core/providers.js'
 import { MICRO_NUTRIENTS, cleanMicros } from './nutrition.js'
 
-const INSTRUCTIONS = 'Analyze the meal photo, in German. Identify visible food and estimate the ENTIRE portion weight in grams and ENTIRE portion calories/protein/carbs/fat. Return ONLY a JSON object with fields name (string), grams, kcal, protein, carbs, fat (numbers), optionally per100Micros (object). Micros are per 100 grams, only where reasonably estimable. Allowed micronutrient keys/units: ' + MICRO_NUTRIENTS.map(n=>n.key+' '+n.unit).join(', ') + '. Do not claim precision or invent ingredients hidden in the photo. If no food is visible respond with {"error":"Kein Essen erkannt"}';
+const INSTRUCTIONS = 'Analyze the meal photo, in German. Identify visible food and estimate the ENTIRE portion weight in grams and ENTIRE portion calories/protein/carbs/fat. Return ONLY a JSON object with fields name (string), grams, kcal, protein, carbs, fat (numbers), per100Micros (object). For clearly recognizable ingredients estimate only defensible per-100g micronutrients (especially fiber, potassium, magnesium, calcium and relevant vitamins); omit everything unknown. Micros are per 100 grams, not for the whole portion. Allowed micronutrient keys/units: ' + MICRO_NUTRIENTS.map(n=>n.key+' '+n.unit).join(', ') + '. Do not claim precision or invent ingredients hidden in the photo. If no food is visible respond with {"error":"Kein Essen erkannt"}';
 
 export function parseFoodPhotoAnswer(raw) {
   let obj
