@@ -644,6 +644,9 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
         <button className="iconbtn" aria-label={t('More')} title={t('More')} onClick={openMore}><Icon name="more" /></button>
       </div>
     </div>
+    {onOccupied && !editing && <div className="row" style={{marginBottom:8,justifyContent:'flex-end'}}>
+      <Button size="xs" variant="tinted" icon="shuffle" disabled={busy} onClick={onOccupied}>Gerät belegt</Button>
+    </div>}
     {/* Kept out of progression: by hand for this session (the ⋯ menu, with its undo right here),
         or by a deload or rehab routine, which owns that choice and offers no undo. On in every
         view, compact included: it changes what the next session is built from. */}
