@@ -15,6 +15,8 @@ export function qrExerciseHints(raw) {
     if(!normalized||normalized.length<4||normalized.length>90||nonName(normalized)||WEAK_SEGMENTS.has(normalized))return;
     if(!hints.some(h=>h.normalized===normalized))hints.push({name:decoded,normalized,kind});
   };
+  const plain=value.match(/^(?:exercise|exercise name|machine|gerät|übung)\s*[:=]\s*(.{4,90})$/i);
+  if(plain){add(plain[1],'explicit');return hints.slice(0,5)}
   try{
     const url=new URL(value);
     // Only supported URL shapes, never fetch. Ignore query arguments like id, token, ref.
