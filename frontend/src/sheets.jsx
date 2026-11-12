@@ -72,6 +72,7 @@ import { occupiedAlternatives } from './lib/occupied-alternatives.js'
 import { cleanStudio, fingerprintQR, assignedDevice, registerGymDevice, gymDeviceKey, removeGymDevice } from './lib/gym-device-pass.js'
 import { scanCode } from './lib/scan.js'
 import { canRenderFmt } from './lib/qr.js'
+import { suggestQrExercises } from './lib/gym-qr-recognition.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -1596,6 +1597,8 @@ function GymDeviceEditor({ index, close }) {
   const [label,setLabel] = useState('')
   const [manual,setManual] = useState(false)
   const [picked,setPicked] = useState('')
+  const [suggestions,setSuggestions] = useState([])
+  const [detectNote,setDetectNote] = useState('')
   const current = state.active?.entries?.[index]
   const association = hash && studio.trim() ? assignedDevice(state.gymDevices,studio,hash) : null
   const studios = [...new Set(Object.values(state.gymDevices || {}).filter(row => row?.exId && row?.studio).map(row => row.studio))]
@@ -1603,11 +1606,16 @@ function GymDeviceEditor({ index, close }) {
     try {
       setError('')
       const h = await fingerprintQR(value)
+      const alternatives = suggestQrExercises(value, allExercises(S()))
       setHash(h)
+      setSuggestions(alternatives)
+      setDetectNote(alternatives.length
+        ? 'Mögliche Übung aus dem QR-Code erkannt. Bitte kontrollieren und bestätigen.'
+        : 'Der QR-Code enthält keinen eindeutig lesbaren Übungsnamen. Bitte Übung einmalig auswählen.')
       update(s => { s.lastGymStudio = cleanStudio(studio) })
       setRaw('') // QR content is sensitive; never put raw scanned links in state or backup.
       setPicked('')
-    } catch(e) {setError(e.message||'Code nicht lesbar.')}
+    } catch(e) {setHash('');setSuggestions([]);setPicked('');setError(e.message||'Code nicht lesbar.')}
   }
   const scan = async () => {
     setScanning(true);setError('')
@@ -1633,6 +1641,8 @@ function GymDeviceEditor({ index, close }) {
       const name=cleanStudio(studio)
       update(s=>{s.gymDevices=registerGymDevice(s.gymDevices,{studio:name,hash,exId:picked,label});s.lastGymStudio=name})
       toast('Gerät für dieses Studio gespeichert.')
+      setSuggestions([])
+      setDetectNote('')
     } catch(e) {setError(e.message)}
   }
   const useExisting = () => {
@@ -1676,8 +1686,24 @@ function GymDeviceEditor({ index, close }) {
           setPicked('');setLabel('');toast('Gerätezuordnung entfernt.')
         }}>Zuordnung entfernen</Button>
       </> : null}
+      {!association && <>
+        {!!suggestions.length && <div style={{marginTop:10}}>
+          <strong>Erkennungsvorschläge</strong>
+          <p className="muted small">Der Code liefert nur Hinweise, keine geprüften Gerätedaten. Bitte richtige Übung auswählen.</p>
+          {suggestions.map(candidate=><button type="button" key={candidate.id}
+            className="item" style={{width:'100%',textAlign:'left',minHeight:52}}
+            aria-pressed={picked===candidate.id}
+            onClick={()=>{setPicked(candidate.id);setLabel(candidate.name)}}>
+            <span className="grow"><strong>{exerciseNameFor(exOr(candidate.id))}</strong>
+              <span className="muted small" style={{display:'block'}}>{candidate.reason}</span>
+            </span>
+            <Icon name={picked===candidate.id?'check':'chevronRight'} />
+          </button>)}
+        </div>}
+        {detectNote && <p className="muted small">{detectNote}</p>}
+      </>}
       {(!association||picked) && <>
-        <Button variant="tinted" onClick={pickExercise}>{picked?'Übung: '+(label||picked):'Übung auswählen'}</Button>
+        <Button variant="tinted" onClick={pickExercise}>{picked?'Übung: '+(label||exerciseNameFor(exOr(picked))):'Übung manuell auswählen'}</Button>
         <div style={{height:8}}/><Button variant="primary" disabled={!picked} onClick={save}>Zuordnung speichern</Button>
       </>}
     </div>}
