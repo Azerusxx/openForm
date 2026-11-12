@@ -1526,6 +1526,61 @@ export function swapActiveWorkoutExercise(index, selectedId = null) {
   }
 }
 
+/* Scan-to-go: focus a known exercise in the active session, or add it only to
+ * today's session. Never edit recurring routines or relabel completed sets. */
+function scannedSessionEntry(st, exId) {
+  const ex = allExercises(st).find(item => item.id === exId)
+  if (!ex) return null
+  const full = { ...defaultConfig(exId), id: exId }
+  const step = modeOf(full) === 'reps' ? weightIncrement(full, st.unit) : defaultIncrement(exId, st.unit)
+  const past = sessionHistory(st)
+  return {
+    id: exId,
+    target: withMeaning(st, full, exId),
+    plan: null,
+    sets: applyIntensifierPlan(
+      buildSets(historyAs(past, exId, dbLoadFor(st, full)), full, {
+        step: (modeOf(full) === 'reps' && ownedWeightsFor(st, full)) || step,
+        preferLast: true,
+      }),
+      full, dropGrid(st, full)
+    ),
+  }
+}
+
+function focusScannedExercise(exId) {
+  const current = S()
+  if (!current.active) return false
+  if (ui().work) { toast('Zuerst den laufenden Halte-Timer beenden.'); return false }
+  const present = current.active.entries.findIndex(entry => entry.id === exId)
+  const newEntry = present === -1 ? scannedSessionEntry(current, exId) : null
+  if (present === -1 && !newEntry) { toast('Diese Übung wurde nicht gefunden.'); return false }
+  update(st => {
+    const active = st.active
+    if (!active) return
+    let idx = active.entries.findIndex(entry => entry.id === exId)
+    if (idx < 0) {
+      active.entries.push(newEntry)
+      idx = active.entries.length - 1
+    }
+    active.cur = idx
+    // Focus only this exercise. The global workout view and saved plan stay intact.
+    active.workoutView = 'cards'
+  }, true)
+  navToWorkout()
+  return true
+}
+
+export function goToScannedExercise(exId) {
+  if (!allExercises(S()).some(ex => ex.id === exId)) {
+    toast('Diese Gerätezuordnung verweist auf eine nicht mehr vorhandene Übung.')
+    return
+  }
+  if (S().active) { focusScannedExercise(exId); return }
+  // Use the normal workout-start flow (including weigh-in preference).
+  startFlow([], exId)
+}
+
 /* ============================ studio equipment QR pass ============================ */
 function GymDeviceEditor({ index, close }) {
   const state = useStore(s => s.S)
@@ -3008,15 +3063,17 @@ export function DayNoteRow({ iso, note }) {
 /* ============================ workout lifecycle ============================ */
 // `routineIds` accepts `string | string[] | null` — `[r.id]` for one routine,
 // `effectiveRoutineIds(...)` for today's planned session, `[]` / null for explicit freestyle.
-export function startFlow(routineIds) {
+export function startFlow(routineIds, scannedExerciseId = null) {
   // The weigh-in is a setting (Settings → During a workout, issue #137): off goes straight
   // into the session with no body weight on it, same as "Start without weighing in".
-  if (S().weighIn === false) { beginWorkout(routineIds, null); return }
-  bwSheet({ required: true, onDone: bw => beginWorkout(routineIds, bw) })
+  if (S().weighIn === false) { beginWorkout(routineIds, null, scannedExerciseId); return }
+  bwSheet({ required: true, onDone: bw => beginWorkout(routineIds, bw, scannedExerciseId) })
 }
-export function beginWorkout(routineIds, bw) {
+export function beginWorkout(routineIds, bw, scannedExerciseId = null) {
   const st = S()
   const { entries, routineIds: rids, routines } = buildCombinedEntries(st, routineIds)
+  const scannedEntry = scannedExerciseId ? scannedSessionEntry(st, scannedExerciseId) : null
+  if (scannedEntry) entries.push(scannedEntry)
   update(s => {
     s.active = {
       id: uid(), d: todayISO(), start: Date.now(),
@@ -3024,10 +3081,10 @@ export function beginWorkout(routineIds, bw) {
       // exercise came from. No top-level `excludeFromProgression` — per-entry `noProg` does it.
       routineIds: rids,
       name: routines.length ? deriveSessionName(routines.map(r => r.name)) : t('Freestyle'),
-      bw: bw || null, cur: 0, entries,
+      bw: bw || null, cur: scannedEntry ? entries.length - 1 : 0, entries,
       // Snapshot the layout at start so the header ⋮ can change it for this session only —
       // changing the saved default (Settings → Workout view) mid-session leaves it alone.
-      workoutView: st.workoutView || 'cards',
+      workoutView: scannedEntry ? 'cards' : st.workoutView || 'cards',
     }
   })
   useUI.getState().stopRest()
