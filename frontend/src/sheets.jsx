@@ -1607,14 +1607,19 @@ function GymDeviceEditor({ index, close }) {
       setError('')
       const h = await fingerprintQR(value)
       const alternatives = suggestQrExercises(value, allExercises(S()))
+      const known = assignedDevice(S().gymDevices, studio, h)
+      const exact = alternatives.length === 1 && alternatives[0].score >= 88 ? alternatives[0] : null
       setHash(h)
-      setSuggestions(alternatives)
-      setDetectNote(alternatives.length
-        ? 'Mögliche Übung aus dem QR-Code erkannt. Bitte kontrollieren und bestätigen.'
-        : 'Der QR-Code enthält keinen eindeutig lesbaren Übungsnamen. Bitte Übung einmalig auswählen.')
+      setSuggestions(known ? [] : alternatives)
+      setDetectNote(known ? '' : exact
+        ? 'Übung aus dem QR-Code vorausgewählt. Bitte Zuordnung kontrollieren und speichern.'
+        : alternatives.length
+          ? 'Mögliche Übungen aus dem QR-Code erkannt. Bitte die richtige auswählen.'
+          : 'Der QR-Code enthält keinen lesbaren Übungsnamen. Bitte Übung einmalig auswählen.')
       update(s => { s.lastGymStudio = cleanStudio(studio) })
       setRaw('') // QR content is sensitive; never put raw scanned links in state or backup.
-      setPicked('')
+      setPicked(known ? '' : exact?.id || '')
+      setLabel(known ? '' : exact?.name || '')
     } catch(e) {setHash('');setSuggestions([]);setPicked('');setError(e.message||'Code nicht lesbar.')}
   }
   const scan = async () => {
