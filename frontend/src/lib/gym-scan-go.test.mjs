@@ -38,3 +38,10 @@ test('studio selection is remembered but raw QR values stay out of saved state',
  assert.match(sheets,/s\.gymDevices=registerGymDevice/)
  assert.match(sheets,/setRaw\(''\)/)
 })
+
+test('unique recognized QR hint is preselected but not persisted before review',()=>{
+ assert.match(sheets,/const exact = alternatives\.length === 1 && alternatives\[0\]\.score >= 88/)
+ assert.match(sheets,/setPicked\(known \? '' : exact\?\.id \|\| ''\)/)
+ assert.match(sheets,/disabled=\{!picked\} onClick=\{save\}/)
+ assert.match(sheets,/s\.gymDevices=registerGymDevice/)
+})
