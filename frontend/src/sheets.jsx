@@ -1551,6 +1551,10 @@ function scannedSessionEntry(st, exId) {
 function focusScannedExercise(exId) {
   const current = S()
   if (!current.active) return false
+  if (current.active.editingWorkoutId || current.active.backfill) {
+    toast('QR-GO steht nur in einem laufenden Training zur Verfügung.')
+    return false
+  }
   if (ui().work) { toast('Zuerst den laufenden Halte-Timer beenden.'); return false }
   const present = current.active.entries.findIndex(entry => entry.id === exId)
   const newEntry = present === -1 ? scannedSessionEntry(current, exId) : null
@@ -3081,6 +3085,10 @@ export function startFlow(routineIds, scannedExerciseId = null) {
 }
 export function beginWorkout(routineIds, bw, scannedExerciseId = null) {
   const st = S()
+  if (scannedExerciseId && st.active) {
+    focusScannedExercise(scannedExerciseId)
+    return
+  }
   const { entries, routineIds: rids, routines } = buildCombinedEntries(st, routineIds)
   const scannedEntry = scannedExerciseId ? scannedSessionEntry(st, scannedExerciseId) : null
   if (scannedEntry) entries.push(scannedEntry)
