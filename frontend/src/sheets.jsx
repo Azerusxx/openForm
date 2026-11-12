@@ -1584,7 +1584,7 @@ export function goToScannedExercise(exId) {
 /* ============================ studio equipment QR pass ============================ */
 function GymDeviceEditor({ index, close }) {
   const state = useStore(s => s.S)
-  const [studio,setStudio] = useState('')
+  const [studio,setStudio] = useState(() => S().lastGymStudio || Object.values(S().gymDevices || {}).find(row => row?.studio && row?.exId)?.studio || '')
   const [raw,setRaw] = useState('')
   const [hash,setHash] = useState('')
   const [error,setError] = useState('')
@@ -1594,11 +1594,13 @@ function GymDeviceEditor({ index, close }) {
   const [picked,setPicked] = useState('')
   const current = state.active?.entries?.[index]
   const association = hash && studio.trim() ? assignedDevice(state.gymDevices,studio,hash) : null
+  const studios = [...new Set(Object.values(state.gymDevices || {}).filter(row => row?.exId && row?.studio).map(row => row.studio))]
   const identify = async value => {
     try {
       setError('')
       const h = await fingerprintQR(value)
       setHash(h)
+      update(s => { s.lastGymStudio = cleanStudio(studio) })
       setRaw('') // QR content is sensitive; never put raw scanned links in state or backup.
       setPicked('')
     } catch(e) {setError(e.message||'Code nicht lesbar.')}
@@ -1625,22 +1627,29 @@ function GymDeviceEditor({ index, close }) {
       if(!hash)throw Error('Zuerst QR-Code scannen.')
       if(!picked)throw Error('Bitte eine Übung zuordnen.')
       const name=cleanStudio(studio)
-      update(s=>{s.gymDevices=registerGymDevice(s.gymDevices,{studio:name,hash,exId:picked,label})})
+      update(s=>{s.gymDevices=registerGymDevice(s.gymDevices,{studio:name,hash,exId:picked,label});s.lastGymStudio=name})
       toast('Gerät für dieses Studio gespeichert.')
     } catch(e) {setError(e.message)}
   }
   const useExisting = () => {
     if(!association?.exId) return
     close()
-    if(index != null) swapActiveWorkoutExercise(index,association.exId)
-    else exerciseDetailSheet(exOr(association.exId))
+    goToScannedExercise(association.exId)
+  }
+  const swapExisting = () => {
+    if(!association?.exId || index == null) return
+    close()
+    swapActiveWorkoutExercise(index,association.exId)
   }
   return <div className="of-device-editor">
-    <h3>Gerät scannen</h3>
-    <p className="muted small">Jedes Studio hat eigene Geräte. openForm merkt sich den Code nur als sicheren Fingerabdruck und öffnet keine fremden Links.</p>
+    <h3>QR scannen &amp; GO</h3>
+    <p className="muted small">QR-Code scannen, Gerät erkennen und mit GO direkt zur Übung. Die Zuordnung bleibt im jeweiligen Studio und fremde Links werden nicht geöffnet.</p>
     <label className="illness-field">Fitnessstudio
       <input className="input" value={studio} maxLength={80} onChange={e=>{setStudio(e.target.value);setPicked('')}} placeholder="z. B. Fitnessstudio Wels" />
     </label>
+    {!!studios.length && <div className="row" style={{gap:6,flexWrap:'wrap',margin:'8px 0'}}>
+      {studios.map(name=><Button key={name} size="xs" variant={name.toLowerCase()===studio.trim().toLowerCase()?'tinted':'ghost'} onClick={()=>{setStudio(name);setHash('');setPicked('')}}>{name}</Button>)}
+    </div>}
     <Button variant="primary" icon="qr" disabled={scanning||!studio.trim()} onClick={scan}>{scanning?'Kamera wird geöffnet …':'QR-Code scannen'}</Button>
     <div style={{height:8}}/>
     <Button variant="ghost" onClick={()=>setManual(v=>!v)}>{manual?'Manuelle Eingabe schließen':'Code manuell eingeben'}</Button>
@@ -1653,7 +1662,8 @@ function GymDeviceEditor({ index, close }) {
       <p className="muted small">{association?'Bereits in diesem Studio zugeordnet.':'Einmalig die passende Übung auswählen.'}</p>
       {association ? <>
         <p>{association.label||exerciseNameFor(exOr(association.exId))}</p>
-        <Button variant="primary" onClick={useExisting}>{index!=null?'Für dieses Training verwenden':'Übung öffnen'}</Button>
+        <Button variant="primary" icon="play" onClick={useExisting}>GO – Zur Übung</Button>
+        {index!=null && <><div style={{height:6}}/><Button variant="ghost" onClick={swapExisting}>Aktuelle Übung ersetzen (nur heute)</Button></>}
         <div style={{height:6}} />
         <Button variant="ghost" onClick={()=>{setPicked(association.exId);setLabel(association.label);}}>Zuordnung ändern</Button>
         <div style={{height:6}}/>
