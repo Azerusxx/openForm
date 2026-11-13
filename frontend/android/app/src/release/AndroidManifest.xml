@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release-only hardening. Do not change the existing debug app identity,
+     key, networking or data-migration behavior. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        tools:replace="android:allowBackup,android:usesCleartextTraffic" />
+</manifest>
