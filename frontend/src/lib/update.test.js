@@ -38,12 +38,12 @@ describe('checkForUpdate', () => {
       json: () => Promise.resolve(body),
     }))
   }
-  const asset = (name, url = 'https://github.com/x/releases/download/v9/' + name) => ({ name, browser_download_url: url })
+  const asset = (name, url = 'https://github.com/Azerusxx/openForm/releases/download/v9/' + name) => ({ name, browser_download_url: url })
 
   it('asks GitHub for the latest published release (never a draft or a beta)', async () => {
     mockFetch({ tag_name: 'v' + __APP_VERSION__, assets: [] })
     await checkForUpdate()
-    expect(globalThis.fetch.mock.calls[0][0]).toBe('https://api.github.com/repos/DuarteSantos8/openGym/releases/latest')
+    expect(globalThis.fetch.mock.calls[0][0]).toBe('https://api.github.com/repos/Azerusxx/openForm/releases/latest')
   })
 
   it('reports no update when the latest release matches the current version', async () => {
@@ -62,17 +62,17 @@ describe('checkForUpdate', () => {
     expect(result.latestVersion).toBe('0.0.1')
   })
 
-  it('reports an update when the latest release is newer', async () => {
+  it('does not offer an update when a newer release has no signed/checksummed APK', async () => {
     mockFetch({ tag_name: 'v99.0.0', assets: [] })
     const result = await checkForUpdate()
-    expect(result.hasUpdate).toBe(true)
+    expect(result.hasUpdate).toBe(false)
     expect(result.latestVersion).toBe('99.0.0')
   })
 
   it('handles tag names without a v prefix', async () => {
     mockFetch({ tag_name: '99.1.2', assets: [] })
     const result = await checkForUpdate()
-    expect(result.hasUpdate).toBe(true)
+    expect(result.hasUpdate).toBe(false)
     expect(result.latestVersion).toBe('99.1.2')
   })
 
@@ -80,32 +80,32 @@ describe('checkForUpdate', () => {
   // and its checksum as release assets. The checksum file also ends in neither .apk nor
   // anything else the APK match could take.
   const REAL_RELEASE = {
-    tag_name: 'v1.4.0',
+    tag_name: 'v99.0.0',
     assets: [
-      { name: 'openGym-1.4.0.apk', browser_download_url: 'https://github.com/DuarteSantos8/openGym/releases/download/v1.4.0/openGym-1.4.0.apk' },
-      { name: 'openGym-1.4.0.apk.sha256', browser_download_url: 'https://github.com/DuarteSantos8/openGym/releases/download/v1.4.0/openGym-1.4.0.apk.sha256' },
+      { name: 'openForm-99.0.0.apk', browser_download_url: 'https://github.com/Azerusxx/openForm/releases/download/v99.0.0/openForm-99.0.0.apk' },
+      { name: 'openForm-99.0.0.apk.sha256', browser_download_url: 'https://github.com/Azerusxx/openForm/releases/download/v99.0.0/openForm-99.0.0.apk.sha256' },
     ],
   }
 
   it('finds the APK and its checksum in a real GitHub release payload', async () => {
     mockFetch(REAL_RELEASE)
     const result = await checkForUpdate()
-    expect(result.latestVersion).toBe('1.4.0')
-    expect(result.apkUrl).toBe('https://github.com/DuarteSantos8/openGym/releases/download/v1.4.0/openGym-1.4.0.apk')
-    expect(result.hashUrl).toBe('https://github.com/DuarteSantos8/openGym/releases/download/v1.4.0/openGym-1.4.0.apk.sha256')
+    expect(result.latestVersion).toBe('99.0.0')
+    expect(result.apkUrl).toBe('https://github.com/Azerusxx/openForm/releases/download/v99.0.0/openForm-99.0.0.apk')
+    expect(result.hashUrl).toBe('https://github.com/Azerusxx/openForm/releases/download/v99.0.0/openForm-99.0.0.apk.sha256')
   })
 
   it('does not take the checksum for the APK when it is listed first', async () => {
-    mockFetch({ tag_name: 'v99.0.0', assets: [asset('a.apk.sha256'), asset('sbom.json'), asset('a.apk')] })
+    mockFetch({ tag_name: 'v99.0.0', assets: [asset('openForm-99.0.0.apk.sha256'), asset('sbom.json'), asset('openForm-99.0.0.apk')] })
     const result = await checkForUpdate()
-    expect(result.apkUrl).toMatch(/\/a\.apk$/)
-    expect(result.hashUrl).toMatch(/\/a\.apk\.sha256$/)
+    expect(result.apkUrl).toMatch(/\/openForm-99\.0\.0\.apk$/)
+    expect(result.hashUrl).toMatch(/\/openForm-99\.0\.0\.apk\.sha256$/)
   })
 
-  it('returns null URLs when the release has no APK or checksum', async () => {
+  it('rejects release assets without a matching openForm APK and checksum', async () => {
     mockFetch({ tag_name: 'v99.0.0', assets: [asset('changelog.md')] })
     const result = await checkForUpdate()
-    expect(result.hasUpdate).toBe(true)
+    expect(result.hasUpdate).toBe(false)
     expect(result.apkUrl).toBe(null)
     expect(result.hashUrl).toBe(null)
   })
@@ -128,14 +128,14 @@ describe('checkForUpdate', () => {
   })
 })
 
-describe('fetchChecksum (web)', () => {
+  describe('fetchChecksum (web)', () => {
   let originalFetch
   beforeEach(() => { originalFetch = globalThis.fetch })
   afterEach(() => { globalThis.fetch = originalFetch })
   const serve = text => { globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(text) })) }
 
   it('reads the hash out of a sha256sum line', async () => {
-    serve('EC2822' + 'a'.repeat(58) + '  openGym-1.4.0.apk\n')
+    serve('EC2822' + 'a'.repeat(58) + '  openForm-99.0.0.apk\n')
     expect(await fetchChecksum('https://x/a.apk.sha256')).toBe('ec2822' + 'a'.repeat(58))
   })
 
@@ -154,7 +154,7 @@ describe('semver comparison (via checkForUpdate behavior)', () => {
   function mockRelease(tag) {
     globalThis.fetch = vi.fn(() => Promise.resolve({
       ok: true, status: 200,
-      json: () => Promise.resolve({ tag_name: tag, assets: [] }),
+      json: () => Promise.resolve({ tag_name: tag, assets: [{ name: 'openForm-99.0.0.apk', browser_download_url: 'https://github.com/Azerusxx/openForm/releases/download/v99/openForm-99.0.0.apk' }, { name: 'openForm-99.0.0.apk.sha256', browser_download_url: 'https://github.com/Azerusxx/openForm/releases/download/v99/openForm-99.0.0.apk.sha256' }] }),
     }))
   }
 
