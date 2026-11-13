@@ -1,6 +1,7 @@
 package ch.duartesantos.opengym;
 
 import android.os.Build;
+import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebView;
@@ -27,6 +28,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BackupFolderPlugin.class);
         registerPlugin(SystemBarsPlugin.class);
         super.onCreate(savedInstanceState);
+        // Public releases must not load HTTP subresources into the HTTPS WebView,
+        // even though the private-server compatibility mode is enabled for debug APKs.
+        boolean debugApp = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (!debugApp && bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        }
         passSystemBarsToPage();
     }
 
