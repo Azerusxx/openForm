@@ -3,6 +3,8 @@
      key, networking or data-migration behavior. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- Strip a privileged diagnostic permission if a transitive library contributes it. -->
+    <uses-permission android:name="android.permission.DUMP" tools:node="remove" />
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
