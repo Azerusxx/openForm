@@ -95,6 +95,23 @@ describe('checkForUpdate', () => {
     expect(result.hashUrl).toBe('https://github.com/Azerusxx/openForm/releases/download/v99.0.0/openForm-99.0.0.apk.sha256')
   })
 
+  it('rejects the upstream openGym APK even with a higher version', async () => {
+    mockFetch({ tag_name: 'v99.0.0', assets: [
+      { name: 'openGym-99.0.0.apk', browser_download_url: 'https://github.com/DuarteSantos8/openGym/releases/download/v99.0.0/openGym-99.0.0.apk' },
+      { name: 'openGym-99.0.0.apk.sha256', browser_download_url: 'https://github.com/DuarteSantos8/openGym/releases/download/v99.0.0/openGym-99.0.0.apk.sha256' },
+    ] })
+    const result = await checkForUpdate()
+    expect(result.hasUpdate).toBe(false)
+    expect(result.apkUrl).toBe(null)
+  })
+
+  it('rejects openForm releases with a missing or unrelated checksum', async () => {
+    mockFetch({ tag_name: 'v99.0.0', assets: [
+      asset('openForm-99.0.0.apk'), asset('other.apk.sha256')
+    ] })
+    expect((await checkForUpdate()).hasUpdate).toBe(false)
+  })
+
   it('does not take the checksum for the APK when it is listed first', async () => {
     mockFetch({ tag_name: 'v99.0.0', assets: [asset('openForm-99.0.0.apk.sha256'), asset('sbom.json'), asset('openForm-99.0.0.apk')] })
     const result = await checkForUpdate()
@@ -162,7 +179,7 @@ describe('semver comparison (via checkForUpdate behavior)', () => {
   // when package.json bumps. bump(2, +1) raises the patch; bump(0, +1) raises the major.
   // Read without its build metadata, the way compareSemver reads it: a build that sets
   // APP_BUILD (#244) runs this suite as "1.3.8+<build>", and then it checks the installed side.
-  const [MAJ, MIN, PATCH] = __APP_VERSION__.split('+')[0].split('.').map(Number)
+  const [MAJ, MIN, PATCH] = __APP_VERSION__.split('+')[0].split('-')[0].split('.').map(Number)
   const bump = (idx, by) => {
     const parts = [MAJ, MIN, PATCH]
     parts[idx] += by
@@ -191,7 +208,7 @@ describe('semver comparison (via checkForUpdate behavior)', () => {
   // installed side is __APP_VERSION__, a build-time define: run the suite with APP_BUILD set
   // and every case in this block reads it with metadata too.
   const BUILD = '+2026-09-18.2'
-  const [MAJOR, MINOR, PATCH_N] = __APP_VERSION__.split('+')[0].split('.').map(Number)
+  const [MAJOR, MINOR, PATCH_N] = __APP_VERSION__.split('+')[0].split('-')[0].split('.').map(Number)
   const tagged = (maj, min, patch) => 'v' + [maj, min, patch].join('.') + BUILD
 
   it('judges a tag that carries build metadata on its numbers alone', async () => {
@@ -201,7 +218,7 @@ describe('semver comparison (via checkForUpdate behavior)', () => {
     resetUpdateCheck()
     mockRelease(tagged(MAJOR, MINOR, PATCH_N))
     const same = await checkForUpdate()
-    expect(same.hasUpdate).toBe(false)                                   // the running release
+    expect(same.hasUpdate).toBe(__APP_VERSION__.includes('-'))         // stable tag supersedes beta at same base version
     expect(same.latestVersion).toBe(__APP_VERSION__.split('+')[0] + BUILD)   // echoed as it came
 
     resetUpdateCheck()
