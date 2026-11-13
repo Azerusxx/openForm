@@ -2,8 +2,8 @@
 // the latest release on GitHub and optionally downloads + installs the APK.
 //
 // The GitHub releases API is public, so no token is needed (60 requests an hour per address,
-// and the check runs once per app session). GitHub is openGym's home since v1.4.0; the GitLab
-// mirror stopped getting releases, so a phone that asked it saw no update.
+// and the check runs once per app session). Updates must originate from the openForm repository, never the upstream openGym project.
+// No published openForm release means no update is offered.
 // On Android (Capacitor) the APK is downloaded natively into the cache directory (an APK with
 // the animations is ~300 MB: read into the WebView's memory it ran phones out of it, and
 // github.com's download redirect has no CORS headers for a WebView fetch anyway), checked
@@ -11,7 +11,7 @@
 
 import { MOBILE } from './mobile.js'
 
-const REPO = 'DuarteSantos8/openGym'
+export const REPO = 'Azerusxx/openForm'
 const LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 export const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
 
@@ -62,11 +62,18 @@ async function fetchLatest() {
   const latest = await res.json()
   const latestVersion = String(latest.tag_name || '').replace(/^v/, '')
   if (!latestVersion) return { hasUpdate: false, latestVersion: __APP_VERSION__, apkUrl: null, hashUrl: null }
-  const hasUpdate = compareSemver(latestVersion, __APP_VERSION__) > 0
+  const newerRelease = compareSemver(latestVersion, __APP_VERSION__) > 0
   const assets = latest.assets || []
-  const apk = assets.find(a => /\.apk$/i.test(a.name))
-  const hash = assets.find(a => /\.apk\.sha256$/i.test(a.name))
-  return { hasUpdate, latestVersion, apkUrl: apk?.browser_download_url || null, hashUrl: hash?.browser_download_url || null }
+  const apk = assets.find(a => /^openform[^/]*\.apk$/i.test(a.name || '') &&
+    typeof a.browser_download_url === 'string' &&
+    a.browser_download_url.startsWith(`https://github.com/${REPO}/releases/download/`))
+  const hash = apk && assets.find(a => a.name === apk.name + '.sha256' &&
+    typeof a.browser_download_url === 'string' &&
+    a.browser_download_url.startsWith(`https://github.com/${REPO}/releases/download/`))
+  // No verifiable, own-repository APK: do not prompt the user to install anything.
+  // An APK asset without its matching checksum is not enough for the native installer.
+  const hasUpdate = newerRelease && !!apk && !!hash
+  return { hasUpdate, latestVersion, apkUrl: hasUpdate ? apk.browser_download_url : null, hashUrl: hasUpdate ? hash.browser_download_url : null }
 }
 
 /**
@@ -78,8 +85,8 @@ export async function fetchChecksum(hashUrl) {
   let text
   if (MOBILE) {
     const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
-    await Filesystem.downloadFile({ url: hashUrl, path: 'opengym-update.apk.sha256', directory: Directory.Cache })
-    text = (await Filesystem.readFile({ path: 'opengym-update.apk.sha256', directory: Directory.Cache, encoding: Encoding.UTF8 })).data
+    await Filesystem.downloadFile({ url: hashUrl, path: 'openform-update.apk.sha256', directory: Directory.Cache })
+    text = (await Filesystem.readFile({ path: 'openform-update.apk.sha256', directory: Directory.Cache, encoding: Encoding.UTF8 })).data
   } else {
     const res = await fetch(hashUrl)
     if (!res.ok) return null
@@ -114,7 +121,7 @@ export async function downloadAndInstall(url, expectedHash, onProgress = null) {
   }
   if (!/^[0-9a-f]{64}$/i.test(expectedHash || '')) throw new Error('no checksum to verify the download against')
   const { Filesystem, Directory } = await import('@capacitor/filesystem')
-  const fileName = 'opengym-update.apk'
+  const fileName = 'openform-update.apk'
   const listener = onProgress
     ? await Filesystem.addListener('progress', p => onProgress(p.bytes, p.contentLength))
     : null
