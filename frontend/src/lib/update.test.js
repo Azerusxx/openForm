@@ -219,7 +219,7 @@ describe('semver comparison (via checkForUpdate behavior)', () => {
     mockRelease(tagged(MAJOR, MINOR, PATCH_N))
     const same = await checkForUpdate()
     expect(same.hasUpdate).toBe(__APP_VERSION__.includes('-'))         // stable tag supersedes beta at same base version
-    expect(same.latestVersion).toBe(__APP_VERSION__.split('+')[0] + BUILD)   // echoed as it came
+    expect(same.latestVersion).toBe(tagged(MAJOR, MINOR, PATCH_N).slice(1))   // echoed as it came
 
     resetUpdateCheck()
     mockRelease(tagged(MAJOR, Math.max(0, MINOR - 1), 0))
