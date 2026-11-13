@@ -27,12 +27,26 @@ export const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
  * carries it.
  */
 function compareSemver(a, b) {
-  const pa = a.replace(/^v/, '').split('+')[0].split('.').map(Number)
-  const pb = b.replace(/^v/, '').split('+')[0].split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0)
-    if (diff > 0) return 1
-    if (diff < 0) return -1
+  // The installed beta uses identifiers such as 0.3.7-rc.8, which Number('7-rc')
+  // must not interpret as zero. Invalid release tags are never installable updates.
+  const read = value => {
+    const m = String(value || '').match(/^v?(\\d+)\\.(\\d+)\\.(\\d+)(?:-([0-9A-Za-z.-]+))?(?:\\+[0-9A-Za-z.-]+)?$/)
+    return m ? { n: [Number(m[1]),Number(m[2]),Number(m[3])], pre: m[4] || '' } : null
+  }
+  const x = read(a), y = read(b)
+  if (!x || !y) return 0
+  for (let i = 0; i < 3; i++) if (x.n[i] !== y.n[i]) return x.n[i] > y.n[i] ? 1 : -1
+  if (!x.pre && y.pre) return 1
+  if (x.pre && !y.pre) return -1
+  const px = x.pre.split('.'), py = y.pre.split('.')
+  for(let i = 0; i < Math.max(px.length, py.length); i++){
+    if(px[i] === py[i]) continue
+    if(px[i] == null) return -1
+    if(py[i] == null) return 1
+    const nx = /^\\d+$/.test(px[i]), ny = /^\\d+$/.test(py[i])
+    if(nx && ny) return BigInt(px[i]) > BigInt(py[i]) ? 1 : -1
+    if(nx !== ny) return nx ? -1 : 1
+    return px[i] > py[i] ? 1 : -1
   }
   return 0
 }
