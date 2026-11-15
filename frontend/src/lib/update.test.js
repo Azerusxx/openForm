@@ -169,9 +169,14 @@ describe('semver comparison (via checkForUpdate behavior)', () => {
   afterEach(() => { globalThis.fetch = originalFetch })
 
   function mockRelease(tag) {
+    const apkName = 'openForm-' + String(tag).replace(/^v/, '') + '.apk'
+    const baseUrl = 'https://github.com/Azerusxx/openForm/releases/download/' + encodeURIComponent(tag) + '/'
     globalThis.fetch = vi.fn(() => Promise.resolve({
       ok: true, status: 200,
-      json: () => Promise.resolve({ tag_name: tag, assets: [{ name: 'openForm-99.0.0.apk', browser_download_url: 'https://github.com/Azerusxx/openForm/releases/download/v99/openForm-99.0.0.apk' }, { name: 'openForm-99.0.0.apk.sha256', browser_download_url: 'https://github.com/Azerusxx/openForm/releases/download/v99/openForm-99.0.0.apk.sha256' }] }),
+      json: () => Promise.resolve({ tag_name: tag, assets: [
+        { name: apkName, browser_download_url: baseUrl + apkName },
+        { name: apkName + '.sha256', browser_download_url: baseUrl + apkName + '.sha256' }
+      ] }),
     }))
   }
 
