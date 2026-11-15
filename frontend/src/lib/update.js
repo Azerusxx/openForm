@@ -30,7 +30,7 @@ function compareSemver(a, b) {
   // The installed beta uses identifiers such as 0.3.7-rc.8, which Number('7-rc')
   // must not interpret as zero. Invalid release tags are never installable updates.
   const read = value => {
-    const m = String(value || '').match(/^v?(\\d+)\\.(\\d+)\\.(\\d+)(?:-([0-9A-Za-z.-]+))?(?:\\+[0-9A-Za-z.-]+)?$/)
+    const m = String(value || '').match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/)
     return m ? { n: [Number(m[1]),Number(m[2]),Number(m[3])], pre: m[4] || '' } : null
   }
   const x = read(a), y = read(b)
@@ -43,7 +43,7 @@ function compareSemver(a, b) {
     if(px[i] === py[i]) continue
     if(px[i] == null) return -1
     if(py[i] == null) return 1
-    const nx = /^\\d+$/.test(px[i]), ny = /^\\d+$/.test(py[i])
+    const nx = /^\d+$/.test(px[i]), ny = /^\d+$/.test(py[i])
     if(nx && ny) return BigInt(px[i]) > BigInt(py[i]) ? 1 : -1
     if(nx !== ny) return nx ? -1 : 1
     return px[i] > py[i] ? 1 : -1
