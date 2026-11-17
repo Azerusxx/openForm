@@ -54,6 +54,7 @@ import { useAutoMore } from './lib/use-auto-more.js'
 import { isFav, toggleFav, sortFavouritesFirst, sortYoursFirst } from './lib/favourites.js'
 import { buildSessionEntries, buildPlannedEntry, builtOutOfProgression } from './lib/session-start.js'
 import { finishCompare, finishCardio } from './lib/finish-compare.js'
+import { postWorkoutAnalysis } from './lib/post-workout-analysis.js'
 import { workoutFit, fitFileName } from './lib/fit-export.js'
 import { joinSessionNoProg } from './lib/session-noprog.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
@@ -3654,6 +3655,7 @@ function CardioDone({ st, w }) {
 
 function FinishSummary({ w, prs, e1prs = [], close }) {
   const st = useStore(s => s.S)
+  const report = useMemo(() => postWorkoutAnalysis(st, w), [st, w])
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
     <h3 style={{ margin: '8px 0' }}>{t('Workout complete!')}</h3>
@@ -3670,12 +3672,41 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
     <h4 className="sec" style={{ textAlign: 'start' }}>{t('What you just trained')}</h4>
     <BodyMap load={loadOfWorkouts([w])} body={st.body} />
     <div style={{ height: 14 }} />
+    {report && <section className="card" style={{textAlign:'left',margin:'16px 0',padding:14}}>
+      <h4 style={{margin:'0 0 8px'}}>🤙💪 Trainingsanalyse</h4>
+      <p className="small">Aus deinen gespeicherten Sätzen berechnet · {report.sets} Arbeitssätze
+        {report.avgRir!=null ? ' · Ø RIR '+report.avgRir+' ('+report.rated+' bewertet)' : ' · RIR nicht erfasst'}
+      </p>
+      <p className="small">{report.positives ? report.positives+' Übungen verbessert. ' : ''}
+        {report.regressions ? report.regressions+' Übungen unter dem vorherigen Niveau. ' : ''}
+        {!report.positives && !report.regressions ? 'Keine eindeutig messbare Steigerung im direkten Vergleich. ' : ''}
+        Vergleiche gelten nur für tatsächlich erfasste Arbeitssätze.</p>
+      <div className="list">{report.exercises.map((ex,i)=><div className="item" key={ex.id+'-'+i} style={{display:'block'}}>
+        <strong>{EXIDX[ex.id]?exerciseNameFor(EXIDX[ex.id]):ex.name}</strong>
+        <div className="small">{ex.lines.map(set=>(set.w>0?fmtNum(set.w)+' '+st.unit+' × ':'')+fmtNum(set.r)+(set.rir!=null?' (RIR '+fmtNum(set.rir)+')':'')).join(' · ')}</div>
+        <div className="small dim">{ex.previousTop!=null ? 'Vorheriger Höchstwert: '+fmtNum(ex.previousTop)+' '+st.unit : 'Noch kein vergleichbarer früherer Eintrag'}
+          {ex.repDelta!=null?' · Wiederholungen insgesamt: '+(ex.repDelta>0?'+':'')+ex.repDelta:''}
+        </div>
+        {ex.warning && <div className="small" style={{color:'var(--orange)'}}>{ex.warning}</div>}
+        {ex.next && <div className="small accent">Nächstes Mal laut Progression: {ex.next.w!=null?fmtNum(ex.next.w)+' '+st.unit:''}{ex.next.r!=null?' × '+ex.next.r:''} ({ex.next.kind})</div>}
+      </div>)}</div>
+      {report.nextRoutine ? <>
+        <h4 style={{margin:'14px 0 6px'}}>Als Nächstes: {report.nextRoutine}</h4>
+        <p className="small dim">Geplante Übungen aus deiner Rotation. Die konkreten neuen Gewichte berechnet openForm wie bisher beim Trainingsstart; letzte Werte sind keine automatische Steigerung.</p>
+        {report.nextExercises.map((e,i)=><div className="small" key={e.id+'-'+i}>
+          {EXIDX[e.id]?exerciseNameFor(EXIDX[e.id]):e.name}
+          {e.last ? ' · zuletzt '+fmtNum(e.last.w)+' '+st.unit+' × '+fmtNum(e.last.r) : ' · noch keine Leistung erfasst'}
+        </div>)}
+      </> : <p className="small dim">Kein eindeutiger nächster A/B/C-Plan aus der gespeicherten Rotation ableitbar.</p>}
+    </section>}
     <LastAndNext st={st} w={w} />
     <CardioDone st={st} w={w} />
     {/* The moment for a progress photo or the clip of a set: the workout is already saved, so
         what is added here goes straight onto its record. */}
     <div style={{ textAlign: 'start' }}><WorkoutMediaSection w={w} hint /></div>
-    <Button variant="primary" onClick={() => closeThenNav(close, '/home')}>{t('Nice!')}</Button>
+    <Button variant="primary" icon="sparkles" onClick={() => closeThenNav(close, '/coach?debrief='+encodeURIComponent(w.id))}>Mit KI-Coach vertiefen</Button>
+    <div style={{height:8}}/>
+    <Button onClick={() => closeThenNav(close, '/home')}>{t('Nice!')}</Button>
   </div>
 }
 export function finishWorkout() {
