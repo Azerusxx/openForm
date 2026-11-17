@@ -21,8 +21,16 @@ export function nextRotationRoutine(state, workout) {
   // enabling the optional rotation mode. Only infer order when all three
   // labels are unambiguous; otherwise do not pretend to know what's next.
   if (ids.length < 2) {
-    const byLetter = ['A','B','C'].map(letter => routines.filter(r =>
-      new RegExp('^(?:plan|ganzk[oö]rper|training)\\s*'+letter+'
+    const byLetter = ['A','B','C'].map(letter => routines.filter(r => {
+      const match = String(r.name || '').trim().match(/^(?:plan|ganzk[oö]rper|training)\s*([ABC])$/i)
+      return match && match[1].toUpperCase() === letter
+    }))
+    if (byLetter.every(rows => rows.length === 1)) ids = byLetter.map(rows => rows[0].id)
+  }
+  if (ids.length < 2) return null
+  const at = ids.findIndex(id => completed.includes(id))
+  if (at < 0) return null
+  return routines.find(r => r.id === ids[(at + 1) % ids.length]) || null
 }
 
 /** Never infer perceived effort from reps or weight alone. */
