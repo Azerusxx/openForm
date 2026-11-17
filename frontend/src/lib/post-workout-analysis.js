@@ -5,6 +5,7 @@ import { isWarmupRow } from './workout-model.js'
 import { rirOf } from './effort.js'
 import { workoutVolume } from './history.js'
 import { rotationIds } from './rotation.js'
+import { buildPlannedEntry } from './session-start.js'
 
 const round = x => Math.round(x * 10) / 10
 const valid = x => typeof x === 'number' && Number.isFinite(x)
@@ -59,10 +60,15 @@ export function postWorkoutAnalysis(state, workout) {
     const prev = [...(state.workouts||[])].reverse().flatMap(w=>w.entries||[]).find(en=>en.id===cfg.id && workSets(en).length)
     const work = prev ? workSets(prev) : []
     const lastSet=work[0]||null
+    // This is the SAME progression builder the training-start flow uses; preview only.
+    let planned = null
+    try { planned = buildPlannedEntry(state,cfg,nextRoutine) } catch { /* unreadable config: don't invent values */ }
+    const target=planned?.target || {}
     return {id:cfg.id,name:nameFor(state,cfg.id), last: lastSet ? {w:Number(lastSet.w)||0,r:Number(lastSet.r)||0}:null,
-      target: {w:valid(Number(cfg.weight)) && Number(cfg.weight)>0 ? Number(cfg.weight):null,
-        reps: Number.isFinite(Number(cfg.reps)) && Number(cfg.reps)>0 ? Number(cfg.reps):null},
-      note:'Die endgültige Progression wird beim Start aus der Historie berechnet.'}
+      target: {w:valid(Number(target.weight)) && Number(target.weight)>0 ? Number(target.weight):null,
+        reps: Number.isFinite(Number(target.reps)) && Number(target.reps)>0 ? Number(target.reps):null,
+        sets:Number(target.sets)||null},
+      note:planned ? (planned.plan?.kind || 'plan') : 'Ohne sichere Progressionsdaten'}
   }) : []
   return {
     name:workout.name||'Training', date:workout.d, exercises,
