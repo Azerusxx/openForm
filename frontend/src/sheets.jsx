@@ -54,7 +54,8 @@ import { useAutoMore } from './lib/use-auto-more.js'
 import { isFav, toggleFav, sortFavouritesFirst, sortYoursFirst } from './lib/favourites.js'
 import { buildSessionEntries, buildPlannedEntry, builtOutOfProgression } from './lib/session-start.js'
 import { finishCompare, finishCardio } from './lib/finish-compare.js'
-import { postWorkoutAnalysis } from './lib/post-workout-analysis.js'
+import { postWorkoutAnalysis, postWorkoutAnalysisText } from './lib/post-workout-analysis.js'
+import { appendChat } from './lib/coach.js'
 import { workoutFit, fitFileName } from './lib/fit-export.js'
 import { joinSessionNoProg } from './lib/session-noprog.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
@@ -3789,6 +3790,12 @@ function doFinishWorkout() {
     // A rotation pass this app manages starts its next pass the moment the last session lands
     // (lib/rotation.js). A planner's queue is left alone: it completes and waits for its writer.
     refillAfter(s, w)
+    // An immediate, deterministic Coach message for consenting users. This never
+    // calls an API or changes the recorded workout, and keeps the debrief visible.
+    if (s.coach?.consent?.agreedAt && !past) {
+      const text = postWorkoutAnalysisText(s, w)
+      if (text) appendChat(s, {role:'coach',kind:'text',text})
+    }
   })
   useStore.getState().autoBackupNow()
   useUI.getState().stopRest()
