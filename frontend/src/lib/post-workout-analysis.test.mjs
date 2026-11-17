@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import {postWorkoutAnalysis,nextRotationRoutine} from './post-workout-analysis.js'
+import {postWorkoutAnalysis,nextRotationRoutine,postWorkoutAnalysisText} from './post-workout-analysis.js'
 
 const routine = (id,name,ex) => ({id,name,ex:ex.map(e=>({id:e,weight:70,reps:10}))})
 const s1 = (w,r,rir,done=true) => ({w,r,rir,done})
@@ -33,6 +33,14 @@ test('unknown effort is never invented and no previous comparison is fabricated'
  assert.equal(result.avgRir,null)
  assert.equal(result.rated,0)
  assert.equal(result.exercises[0].previousTop,null)
+})
+test('Coach keeps a readable local analysis without inventing missing RIR',()=>{
+ const report=postWorkoutAnalysisText(state,B)
+ assert.match(report,/Trainingsanalyse/)
+ assert.match(report,/Rudern/)
+ assert.match(report,/Plan C/)
+ const noEffort={...state,workouts:[training('unknown','2026-11-17',4000,['a'],[ex('x',[{w:50,r:10,done:true}])])]}
+ assert.match(postWorkoutAnalysisText(noEffort,noEffort.workouts[0]),/RIR nicht vollständig erfasst/)
 })
 test('post-workout summary and AI deep-dive are wired to exact finished session',()=>{
  const sheets=readFileSync(new URL('../sheets.jsx',import.meta.url),'utf8')
