@@ -1,0 +1,75 @@
+// Immediate, on-device debrief based only on completed training logs.
+// This is not a generative model response. It never overwrites workouts or routines.
+import { finishCompare } from './finish-compare.js'
+import { isWarmupRow } from './workout-model.js'
+import { rirOf } from './effort.js'
+import { workoutVolume } from './history.js'
+import { rotationIds } from './rotation.js'
+
+const round = x => Math.round(x * 10) / 10
+const valid = x => typeof x === 'number' && Number.isFinite(x)
+const workSets = e => (e?.sets || []).filter(s => s?.done && !isWarmupRow(s))
+const nameFor = (state, id) => (state.customEx || []).find(e => e.id === id)?.n || id
+
+/** The next planned A/B/C slot (or other explicit rotation) only when its sequence is known. */
+export function nextRotationRoutine(state, workout) {
+  const ids = rotationIds(state)
+  if (ids.length < 2) return null
+  const completed = (workout?.routineIds || (workout?.routineId ? [workout.routineId] : []))
+  const at = ids.findIndex(id => completed.includes(id))
+  if (at < 0) return null
+  return (state.routines || []).find(r => r.id === ids[(at + 1) % ids.length]) || null
+}
+
+/** Never infer perceived effort from reps or weight alone. */
+export function postWorkoutAnalysis(state, workout) {
+  if (!workout) return null
+  const previous = (state.workouts || []).filter(w => w && w.id !== workout.id && (Number(w.start) || 0) < (Number(workout.start) || Infinity))
+  const compare = new Map(finishCompare(state, workout).map(x => [x.id, x]))
+  const exercises = (workout.entries || []).map(entry => {
+    const done = workSets(entry)
+    if (!done.length) return null
+    const rated = done.map(rirOf).filter(valid)
+    const avgRir = rated.length ? round(rated.reduce((a,b)=>a+b,0) / rated.length) : null
+    const top = done.filter(s => valid(Number(s.w)) && Number(s.w) > 0).reduce((m,s)=>Math.max(m, Number(s.w)),0)
+    const last = [...previous].reverse().flatMap(w=>(w.entries||[]).filter(e=>e.id===entry.id)).find(e=>workSets(e).length)
+    const old = last ? workSets(last) : []
+    const earlierTop = old.reduce((m,s)=>Math.max(m, Number(s.w)||0),0)
+    const currentReps = done.reduce((n,s)=>n+(Number(s.r)||0),0)
+    const earlierReps = old.reduce((n,s)=>n+(Number(s.r)||0),0)
+    const trend = compare.get(entry.id)?.trend ?? null
+    const next = compare.get(entry.id)?.next ?? null
+    const warning = rated.length && avgRir <= 0.5
+      ? 'Sehr nah am Muskelversagen; Technik und Erholung prüfen.'
+      : rated.length && avgRir >= 4
+        ? 'Hohe gemeldete Reserve; Belastung beim nächsten Mal prüfen.'
+        : null
+    return {
+      id:entry.id, name:nameFor(state,entry.id), sets:done.length,
+      lines:done.map(s=>({w:Number(s.w)||0,r:Number(s.r)||0,rir:valid(rirOf(s))?rirOf(s):null})),
+      rated:rated.length, avgRir, top, previousTop:old.length?earlierTop:null,
+      repDelta:old.length && top===earlierTop ? currentReps-earlierReps : null,
+      trend, next, warning
+    }
+  }).filter(Boolean)
+  const rated = exercises.flatMap(e => e.lines.map(s=>s.rir).filter(valid))
+  const total = exercises.reduce((n,e)=>n+e.sets,0)
+  const nextRoutine = nextRotationRoutine(state,workout)
+  const nextExercises = nextRoutine ? (nextRoutine.ex || []).map(cfg=>{
+    const prev = [...(state.workouts||[])].reverse().flatMap(w=>w.entries||[]).find(en=>en.id===cfg.id && workSets(en).length)
+    const work = prev ? workSets(prev) : []
+    const lastSet=work[0]||null
+    return {id:cfg.id,name:nameFor(state,cfg.id), last: lastSet ? {w:Number(lastSet.w)||0,r:Number(lastSet.r)||0}:null,
+      target: {w:valid(Number(cfg.weight)) && Number(cfg.weight)>0 ? Number(cfg.weight):null,
+        reps: Number.isFinite(Number(cfg.reps)) && Number(cfg.reps)>0 ? Number(cfg.reps):null},
+      note:'Die endgültige Progression wird beim Start aus der Historie berechnet.'}
+  }) : []
+  return {
+    name:workout.name||'Training', date:workout.d, exercises,
+    sets:total, rated:rated.length, avgRir:rated.length?round(rated.reduce((a,b)=>a+b,0)/rated.length):null,
+    duration:valid(workout.end) && valid(workout.start) && workout.end>workout.start ? Math.round((workout.end-workout.start)/60000):null,
+    volume:valid(workout.vol) ? workout.vol : workoutVolume(workout),
+    positives:exercises.filter(e=>e.trend>0).length, regressions:exercises.filter(e=>e.trend<0).length,
+    nextRoutine:nextRoutine?.name||null,nextExercises
+  }
+}
