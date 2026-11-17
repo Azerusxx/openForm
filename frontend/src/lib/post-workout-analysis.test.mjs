@@ -24,6 +24,8 @@ test('next A B C is selected from stored rotation, not weekday assumptions',()=>
  assert.equal(postWorkoutAnalysis(state,B).nextRoutine,'Plan C')
  assert.equal(nextRotationRoutine(state,A).name,'Plan B')
  assert.equal(nextRotationRoutine(state,{...B,routineIds:[]}),null)
+ const withoutRotation={...state,rotation:null}
+ assert.equal(nextRotationRoutine(withoutRotation,B)?.name,'Plan C')
 })
 test('unknown effort is never invented and no previous comparison is fabricated',()=>{
  const x=training('first','2026-11-17',3000,['a'],[ex('z',[{w:40,r:12,done:true}])])
