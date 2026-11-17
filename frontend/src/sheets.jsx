@@ -3692,10 +3692,11 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
       </div>)}</div>
       {report.nextRoutine ? <>
         <h4 style={{margin:'14px 0 6px'}}>Als Nächstes: {report.nextRoutine}</h4>
-        <p className="small dim">Geplante Übungen aus deiner Rotation. Die konkreten neuen Gewichte berechnet openForm wie bisher beim Trainingsstart; letzte Werte sind keine automatische Steigerung.</p>
-        {report.nextExercises.map((e,i)=><div className="small" key={e.id+'-'+i}>
-          {EXIDX[e.id]?exerciseNameFor(EXIDX[e.id]):e.name}
-          {e.last ? ' · zuletzt '+fmtNum(e.last.w)+' '+st.unit+' × '+fmtNum(e.last.r) : ' · noch keine Leistung erfasst'}
+        <p className="small dim">Vorschau aus derselben Progressionslogik wie beim Trainingsstart. Änderungen am Plan oder neue Trainingsdaten können die Werte noch ändern.</p>
+        {report.nextExercises.map((e,i)=><div className="small" key={e.id+'-'+i} style={{padding:'5px 0'}}>
+          <strong>{EXIDX[e.id]?exerciseNameFor(EXIDX[e.id]):e.name}</strong>
+          {e.target.w!=null || e.target.reps!=null ? ' · Ziel '+(e.target.w!=null?fmtNum(e.target.w)+' '+st.unit:'')+(e.target.reps!=null?' × '+fmtNum(e.target.reps):'')+(e.target.sets!=null?' · '+e.target.sets+' Sätze':'') : ' · Ziel noch offen'}
+          {e.last ? <span className="dim"> · zuletzt '+fmtNum(e.last.w)+' '+st.unit+' × '+fmtNum(e.last.r)</span> : null}
         </div>)}
       </> : <p className="small dim">Kein eindeutiger nächster A/B/C-Plan aus der gespeicherten Rotation ableitbar.</p>}
     </section>}
