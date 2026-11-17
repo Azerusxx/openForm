@@ -156,3 +156,29 @@ export function postWorkoutAnalysis(state, workout) {
     nextRoutine:nextRoutine?.name||null,nextExercises
   }
 }
+
+/** Human-readable, data-backed note for the Coach history; no remote model required. */
+export function postWorkoutAnalysisText(state, workout) {
+  const r=postWorkoutAnalysis(state,workout)
+  if(!r)return ''
+  const unit=state.unit==='lb'?'lb':'kg'
+  const number=x=>String(round(x)).replace('.',',')
+  const details=r.exercises.map(ex=>{
+    const sets=ex.lines.map(s=>(s.w>0?number(s.w)+unit+'×':'')+number(s.r)+(s.rir!=null?' (RIR '+number(s.rir)+')':'')).join(', ')
+    const comparison=ex.previousTop!=null
+      ? 'Vorheriger Höchstwert '+number(ex.previousTop)+unit+'.'
+      : 'Noch keine vergleichbare Einheit.'
+    const progression=ex.next ? ' Nächstes Mal: '+(ex.next.w!=null?number(ex.next.w)+unit:'')+(ex.next.r!=null?' × '+number(ex.next.r):'')+' ('+ex.next.kind+').' : ''
+    return ex.name+': '+sets+'. '+comparison+(ex.warning?' '+ex.warning:'')+progression
+  })
+  const next=r.nextRoutine
+    ? ['Nächste Einheit: '+r.nextRoutine,...r.nextExercises.map(e=>e.name+': '+(e.target.w!=null?number(e.target.w)+unit:'Gewicht offen')+(e.target.reps!=null?' × '+e.target.reps:'')+(e.target.sets!=null?' ('+e.target.sets+' Sätze)':''))]
+    : ['Nächste Einheit nicht sicher aus dem gespeicherten Plan ableitbar.']
+  return ['🤙💪 Trainingsanalyse · '+r.name,
+    'Dauer '+(r.duration!=null?r.duration+' Min.':'unbekannt')+' · '+r.sets+' Arbeitssätze · Volumen '+number(r.volume)+' '+unit,
+    'RIR '+(r.avgRir!=null?'Ø '+number(r.avgRir)+' aus '+r.rated+' bewerteten Sätzen':'nicht vollständig erfasst'),
+    ...details,
+    ...next,
+    'Die Werte sind aus deinen gespeicherten Daten berechnet. Technik, Schmerzen und Erholung kann die App nicht allein daraus beurteilen.'
+  ].join('\n\n')
+}
