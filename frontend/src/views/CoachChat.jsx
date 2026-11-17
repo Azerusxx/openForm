@@ -100,6 +100,26 @@ export default function CoachChat() {
 
   useEffect(() => { if (typeof endRef.current?.scrollIntoView === 'function') endRef.current.scrollIntoView({ block: 'end' }) }, [S.coach?.chat?.length, !!job, !!pending])
 
+  // Explicitly opened from the finished-workout card, not an automatic charge:
+  // one debrief per click, for that exact saved session, then remove the query.
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('debrief')
+    if (!id || !storeReady || !ready || loading || autoDebriefStarted.current === id) return
+    if (job || pending || busy) return
+    const workout = (S.workouts || []).find(w => String(w.id) === id)
+    if (!workout) { nav('/coach', {replace:true}); return }
+    autoDebriefStarted.current = id
+    nav('/coach', {replace:true})
+    setBusy(true)
+    requestDebrief(workout.id).then(() => {
+      update(s => appendChat(s, {role:'user',kind:'text',text:'Analysiere mein abgeschlossenes Training „'+(workout.name||'Training')+'“ ausführlich: Übung für Übung, letzte Vergleichseinheit, RIR, Fortschritt und konkrete Vorbereitung der nächsten A/B/C-Einheit. Erfinde keine Messwerte.'}))
+      refresh()
+    }).catch(e => {
+      toast(JOB_ERRORS[e.data?.code] || e.message || t('Could not ask the Coach'))
+    }).finally(() => setBusy(false))
+  }, [location.search,storeReady,ready,loading,job,pending,busy,S.workouts])
+
+
   if (!ready) return null
   const coach = S.coach || emptyCoach()
   const community = !!config?.coach?.community && !DEMO && !(MOBILE && coachMode === 'byok')
@@ -149,24 +169,6 @@ export default function CoachChat() {
   const askDebrief = () => ask(() => requestDebrief(lastWorkout?.id || null), lastWorkout?.name
     ? t('How did my {0} session go?', lastWorkout.name)
     : t('How did my last workout go?'))
-  // Explicitly opened from the finished-workout card, not an automatic charge:
-  // one debrief per click, for that exact saved session, then remove the query.
-  useEffect(() => {
-    const id = new URLSearchParams(location.search).get('debrief')
-    if (!id || !storeReady || !ready || loading || autoDebriefStarted.current === id) return
-    if (job || pending || busy) return
-    const workout = (S.workouts || []).find(w => String(w.id) === id)
-    if (!workout) { nav('/coach', {replace:true}); return }
-    autoDebriefStarted.current = id
-    nav('/coach', {replace:true})
-    setBusy(true)
-    requestDebrief(workout.id).then(() => {
-      update(s => appendChat(s, {role:'user',kind:'text',text:'Analysiere mein abgeschlossenes Training „'+(workout.name||'Training')+'“ ausführlich: Übung für Übung, letzte Vergleichseinheit, RIR, Fortschritt und konkrete Vorbereitung der nächsten A/B/C-Einheit. Erfinde keine Messwerte.'}))
-      refresh()
-    }).catch(e => {
-      toast(JOB_ERRORS[e.data?.code] || e.message || t('Could not ask the Coach'))
-    }).finally(() => setBusy(false))
-  }, [location.search,storeReady,ready,loading,job,pending,busy,S.workouts])
 
   const askNewPlan = () => ask(() => requestPlan(coach.profile), t('Build me a fresh plan from my answers.'))
   const askImprove = r => ask(
