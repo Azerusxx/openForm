@@ -14,12 +14,81 @@ const nameFor = (state, id) => (state.customEx || []).find(e => e.id === id)?.n 
 
 /** The next planned A/B/C slot (or other explicit rotation) only when its sequence is known. */
 export function nextRotationRoutine(state, workout) {
-  const ids = rotationIds(state)
-  if (ids.length < 2) return null
   const completed = (workout?.routineIds || (workout?.routineId ? [workout.routineId] : []))
+  const routines = state.routines || []
+  let ids = rotationIds(state)
+  // Some users run separately saved "Plan A", "Plan B", "Plan C" without
+  // enabling the optional rotation mode. Only infer order when all three
+  // labels are unambiguous; otherwise do not pretend to know what's next.
+  if (ids.length < 2) {
+    const byLetter = ['A','B','C'].map(letter => routines.filter(r =>
+      new RegExp('^(?:plan|ganzk[oö]rper|training)\\s*'+letter+'
+}
+
+/** Never infer perceived effort from reps or weight alone. */
+export function postWorkoutAnalysis(state, workout) {
+  if (!workout) return null
+  const previous = (state.workouts || []).filter(w => w && w.id !== workout.id && (Number(w.start) || 0) < (Number(workout.start) || Infinity))
+  const compare = new Map(finishCompare(state, workout).map(x => [x.id, x]))
+  const exercises = (workout.entries || []).map(entry => {
+    const done = workSets(entry)
+    if (!done.length) return null
+    const rated = done.map(rirOf).filter(valid)
+    const avgRir = rated.length ? round(rated.reduce((a,b)=>a+b,0) / rated.length) : null
+    const top = done.filter(s => valid(Number(s.w)) && Number(s.w) > 0).reduce((m,s)=>Math.max(m, Number(s.w)),0)
+    const last = [...previous].reverse().flatMap(w=>(w.entries||[]).filter(e=>e.id===entry.id)).find(e=>workSets(e).length)
+    const old = last ? workSets(last) : []
+    const earlierTop = old.reduce((m,s)=>Math.max(m, Number(s.w)||0),0)
+    const currentReps = done.reduce((n,s)=>n+(Number(s.r)||0),0)
+    const earlierReps = old.reduce((n,s)=>n+(Number(s.r)||0),0)
+    const trend = compare.get(entry.id)?.trend ?? null
+    const next = compare.get(entry.id)?.next ?? null
+    const warning = rated.length && avgRir <= 0.5
+      ? 'Sehr nah am Muskelversagen; Technik und Erholung prüfen.'
+      : rated.length && avgRir >= 4
+        ? 'Hohe gemeldete Reserve; Belastung beim nächsten Mal prüfen.'
+        : null
+    return {
+      id:entry.id, name:nameFor(state,entry.id), sets:done.length,
+      lines:done.map(s=>({w:Number(s.w)||0,r:Number(s.r)||0,rir:valid(rirOf(s))?rirOf(s):null})),
+      rated:rated.length, avgRir, top, previousTop:old.length?earlierTop:null,
+      repDelta:old.length && top===earlierTop ? currentReps-earlierReps : null,
+      trend, next, warning
+    }
+  }).filter(Boolean)
+  const rated = exercises.flatMap(e => e.lines.map(s=>s.rir).filter(valid))
+  const total = exercises.reduce((n,e)=>n+e.sets,0)
+  const nextRoutine = nextRotationRoutine(state,workout)
+  const nextExercises = nextRoutine ? (nextRoutine.ex || []).map(cfg=>{
+    const prev = [...(state.workouts||[])].reverse().flatMap(w=>w.entries||[]).find(en=>en.id===cfg.id && workSets(en).length)
+    const work = prev ? workSets(prev) : []
+    const lastSet=work[0]||null
+    // This is the SAME progression builder the training-start flow uses; preview only.
+    let planned = null
+    try { planned = buildPlannedEntry(state,cfg,nextRoutine) } catch { /* unreadable config: don't invent values */ }
+    const target=planned?.target || {}
+    return {id:cfg.id,name:nameFor(state,cfg.id), last: lastSet ? {w:Number(lastSet.w)||0,r:Number(lastSet.r)||0}:null,
+      target: {w:valid(Number(target.weight)) && Number(target.weight)>0 ? Number(target.weight):null,
+        reps: Number.isFinite(Number(target.reps)) && Number(target.reps)>0 ? Number(target.reps):null,
+        sets:Number(target.sets)||null},
+      note:planned ? (planned.plan?.kind || 'plan') : 'Ohne sichere Progressionsdaten'}
+  }) : []
+  return {
+    name:workout.name||'Training', date:workout.d, exercises,
+    sets:total, rated:rated.length, avgRir:rated.length?round(rated.reduce((a,b)=>a+b,0)/rated.length):null,
+    duration:valid(workout.end) && valid(workout.start) && workout.end>workout.start ? Math.round((workout.end-workout.start)/60000):null,
+    volume:valid(workout.vol) ? workout.vol : workoutVolume(workout),
+    positives:exercises.filter(e=>e.trend>0).length, regressions:exercises.filter(e=>e.trend<0).length,
+    nextRoutine:nextRoutine?.name||null,nextExercises
+  }
+}
+, 'i').test(String(r.name||'').trim())))
+    if (byLetter.every(rows => rows.length === 1)) ids = byLetter.map(rows=>rows[0].id)
+  }
+  if (ids.length < 2) return null
   const at = ids.findIndex(id => completed.includes(id))
   if (at < 0) return null
-  return (state.routines || []).find(r => r.id === ids[(at + 1) % ids.length]) || null
+  return routines.find(r => r.id === ids[(at + 1) % ids.length]) || null
 }
 
 /** Never infer perceived effort from reps or weight alone. */
