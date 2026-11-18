@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { isCustomEx } from '../lib/exercises.js'
-import REPDB_IMAGE_MAP from '../lib/repdb-image-map.json'
 import FORK180_IMAGE_MAP from '../lib/fork180-image-map.json'
 import { exerciseStillUrl } from '../lib/media-url.js'
 import { MOBILE } from '../lib/mobile.js'
@@ -55,11 +54,10 @@ function ExerciseMediaWithOverride(p) {
 // (gifSize 'off') — then nothing renders here and the exercise card closes up, exactly like
 // an exercise without media. Any other/legacy value behaves as 'full'.
 // Built-in exercises no longer use the outdated openGym GIF/MP4 paths.
-// Optional copyright-cleared 180px noncommercial fork media only, otherwise RepDB.
+// Images are keyed by the original openGym exercise ID. No catalog substitution.
 function BuiltinMedia({ ex, id, compact, minimizable }) {
   const gifSize = useStore(s => s.S.gifSize)
-  const src = FORK180_IMAGE_MAP[ex?.id] ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id])
-    : REPDB_IMAGE_MAP[ex?.id] ? exerciseStillUrl('repdb', REPDB_IMAGE_MAP[ex.id]) : null
+  const src = FORK180_IMAGE_MAP[ex?.id] ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id]) : null
   const [failed, setFailed] = useState(false)
   useEffect(() => setFailed(false), [src])
   if (minimizable && (gifSize === 'off' || !src)) return null
@@ -142,8 +140,7 @@ function ExerciseThumbWithOverride(p) {
   return isCustomEx(p.ex) ? <CustomThumb {...p} /> : <BuiltinThumb {...p} />
 }
 function BuiltinThumb({ ex }) {
-  const src = FORK180_IMAGE_MAP[ex?.id] ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id])
-    : REPDB_IMAGE_MAP[ex?.id] ? exerciseStillUrl('repdb', REPDB_IMAGE_MAP[ex.id]) : null
+  const src = FORK180_IMAGE_MAP[ex?.id] ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id]) : null
   const [broken, setBroken] = useState(null)
   if (!src || broken === src) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
   return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={src} alt="" onError={() => setBroken(src)} />
