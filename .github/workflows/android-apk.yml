@@ -74,6 +74,9 @@ jobs:
           git clone --depth 1 https://github.com/RepDB/exercise-dataset.git "$RUNNER_TEMP/repdb"
           node scripts/catalogue/stage-repdb.mjs "$RUNNER_TEMP/repdb"
           test "$(find frontend/public/exercise-media/repdb -name '*.webp' | wc -l)" -ge 10
+          # Coverage is distinct from packaging success. Make the actual mapping visible
+          # to testers without claiming that all exercises have illustrations.
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync("repdb-coverage.json","utf8")); const msg="RepDB: "+r.mappedExercises+"/"+r.catalogSize+" exercise IDs mapped ("+Math.round(100*r.mappedExercises/r.catalogSize)+"%), "+r.imageFiles+" images; "+r.unmatchedCount+" unmatched, "+r.ambiguousCount+" ambiguous."; console.log(msg); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,msg+"\\n"); if(r.mappedExercises/r.catalogSize<0.25)console.log("::warning::RepDB media coverage under 25%. Many exercises will correctly have no bundled image.");'
 
       - name: RepDB Zuordnungsbericht hochladen
         if: always()
