@@ -69,11 +69,9 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js src/lib/nutrition-photo.test.js src/lib/supplement-reminders.test.js src/lib/nutrition-native-backup.test.js src/lib/update.test.js src/components/Media.test.jsx src/lib/back.test.js
 
-      # Personal, non-commercial openGym-derived openForm build. Keep the
-      # original 180px Gym visual media unmodified and ship the upstream notice.
-      # Pin the exact upstream commit so the build is reproducible.
-      # Never commit the proprietary assets to openForm's public Git tree.
-      - name: Offizielle openGym Medien fuer den nichtkommerziellen Fork holen
+      # For the user's non-commercial fork, retain 180px openGym media unchanged,
+      # with the original Gym visual notice. Pin source; never commit assets here.
+      - name: Originale openGym-Bilder und Clips holen
         uses: actions/checkout@v4
         with:
           repository: DuarteSantos8/openGym
@@ -85,7 +83,7 @@ jobs:
           filter: blob:none
           persist-credentials: false
 
-      - name: Originalmedien und Copyright-Hinweis kontrollieren
+      - name: Medienquelle und Copyright-Hinweis kontrollieren
         shell: bash
         run: |
           set -euo pipefail
@@ -95,10 +93,10 @@ jobs:
           grep -Eiq 'Gym visual|Aliaksandr Makatserchyk' .openform-source/catalogue/media/NOTICE.md
           originals=$(find .openform-source/catalogue/media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
           clips=$(find .openform-source/catalogue/media/clip -maxdepth 1 -type f -name '*.mp4' | wc -l)
-          echo "Originalmedien aus dem offiziellen openGym-Commit: $originals Bilder und $clips Clips"
+          echo "Offizielle Originalmedien: $originals Bilder und $clips Animationen"
           test "$originals" -ge 6000 && test "$clips" -ge 6000
 
-      - name: Originalmedien offline in openForm einbinden
+      - name: Originalbilder und Animationen offline einbauen
         shell: bash
         env:
           OPENFORM_FORK180_SOURCE: '.openform-source/catalogue/media'
@@ -110,8 +108,7 @@ jobs:
           test "$(find frontend/public/exercise-media/fork180 -maxdepth 1 -type f -name '*.webp' | wc -l)" -gt 4000
           test "$(find frontend/public/exercise-media/fork180/clip -maxdepth 1 -type f -name '*.mp4' | wc -l)" -gt 4000
 
-
-      - name: Uebungsbilder und Animationen mit Original-IDs testen
+      - name: Offline-Medien Regressionstests
         run: node --test scripts/catalogue/stage-fork180.test.mjs
 
       - name: Mobile Web-App bauen
@@ -223,21 +220,11 @@ jobs:
           actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/[^/]+[.]webp$' || true)
           echo "Freigegebene original-ID-Bilder im APK: $actual / $expected"
           test "$actual" -eq "$expected" || { echo "::error::Originalbilder fehlen in der APK"; exit 1; }
-          test "$expected" -gt 4000 || { echo "::error::Viel zu wenige originale Uebungsbilder enthalten"; exit 1; }
+          test "$expected" -gt 4000 || { echo "::error::Originalbilder fehlen im Paket"; exit 1; }
           expected_clips=$(find frontend/dist/exercise-media/fork180/clip -maxdepth 1 -type f -name '*.mp4' | wc -l)
-          actual_clips=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/clip/[^/]+[.]mp4
-
-      - name: APK als Artifact hochladen
-        uses: actions/upload-artifact@v4
-        with:
-          name: openForm-0.3.7h-debug
-          path: frontend/android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
- || true)
+          actual_clips=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/clip/[^/]+[.]mp4$' || true)
           echo "Originalanimationen im APK: $actual_clips / $expected_clips"
-          test "$expected_clips" -gt 4000 && test "$actual_clips" -eq "$expected_clips" || { echo "::error::Originalanimationen fehlen in der APK"; exit 1; }
-
+          test "$expected_clips" -gt 4000 && test "$actual_clips" -eq "$expected_clips" || { echo "::error::Originalanimationen fehlen im APK"; exit 1; }
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
