@@ -14,7 +14,7 @@ const catalog = Array.isArray(json.exercises) ? json.exercises : []
 const mediaDir = path.join(ROOT, 'frontend/public/exercise-media/repdb')
 fs.mkdirSync(mediaDir, { recursive: true })
 // Purge generated files from earlier local builds before re-staging the active set.
-for(const name of fs.readdirSync(mediaDir)) if(/^[a-z0-9_-]+\\.webp$/i.test(name)) fs.rmSync(path.join(mediaDir,name))
+for(const name of fs.readdirSync(mediaDir)) if(/^[a-z0-9_-]+\.webp$/i.test(name)) fs.rmSync(path.join(mediaDir,name))
 const mapping = {}
 const copied = new Set()
 const unmatched = []
