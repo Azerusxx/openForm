@@ -47,3 +47,5 @@ Voraussetzung für die Aussage „wiederhergestellt“.
 Weitere Details und die isolierten Fixtures:
 \`scripts/catalogue/stage-fork180.test.mjs\`,
 \`scripts/catalogue/verify-fork180-bundle.mjs\`.
+
+Prüfreferenz: ursprüngliche openGym-Übungskatalog-Medien; keine Fremdbilder aus RepDB.
