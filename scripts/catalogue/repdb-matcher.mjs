@@ -16,7 +16,7 @@ export function equipmentFamily(value) {
   if (/\bmachine\b|\bleverage\b|\bsled\b|\blever\b/.test(s)) return 'machine'
   return s
 }
-const tokens = str => clean(str).split(' ').filter(Boolean).map(t=>
+const tokens = str => clean(str).replace(/\bpull down\b/g,'pulldown').replace(/\bpush down\b/g,'pushdown').split(' ').filter(Boolean).map(t=>
   ({triceps:'tricep',biceps:'bicep',pressdown:'pushdown',pulldowns:'pulldown',
     presses:'press',extensions:'extension',curls:'curl',rows:'row',raises:'raise',
     dumbbells:'dumbbell',machines:'machine',levers:'lever'}[t]||t))
