@@ -190,6 +190,23 @@ jobs:
           actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/[^/]+[.]webp$' || true)
           echo "Freigegebene original-ID-Bilder im APK: $actual / $expected"
           test "$actual" -eq "$expected" || { echo "::error::Originalbilder fehlen in der APK"; exit 1; }
+          expected_clips=0
+          if [ -d frontend/dist/exercise-media/fork180/clip ]; then
+            expected_clips=$(find frontend/dist/exercise-media/fork180/clip -maxdepth 1 -type f \( -name '*.webp' -o -name '*.mp4' \) | wc -l)
+          fi
+          actual_clips=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/clip/[^/]+[.](webp|mp4)
+
+      - name: APK als Artifact hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: openForm-0.3.7h-debug
+          path: frontend/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+ || true)
+          echo "Freigegebene Originalanimationen im APK: $actual_clips / $expected_clips"
+          test "$actual_clips" -eq "$expected_clips" || { echo "::error::Lizenzierte Animationen fehlen in der APK"; exit 1; }
+
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
