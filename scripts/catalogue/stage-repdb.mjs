@@ -137,7 +137,7 @@ const report = {catalogSize:EXDB.length,repdbSize:catalog.length,
  mappedExercises:Object.keys(mapping).length,imageFiles:copied.size,
  unmatchedCount:unmatched.length,ambiguousCount:ambiguous.length,
  accepted,unmatched,ambiguous}
-fs.writeFileSync(path.join(ROOT,'repdb-coverage.json'),JSON.stringify(report,null,2)+'\\n')
+fs.writeFileSync(path.join(ROOT,'repdb-coverage.json'),JSON.stringify(report,null,2)+'\n')
 console.log('RepDB coverage:', JSON.stringify({ mapped: report.mappedExercises, total: report.catalogSize, files: report.imageFiles, unmatched: report.unmatchedCount, ambiguous: report.ambiguousCount }))
 console.log('Unmatched sample:', JSON.stringify(unmatched.slice(0, 12)))
 if (report.mappedExercises < 10) throw Error('Insufficient matching free exercise images')
