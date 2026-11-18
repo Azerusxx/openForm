@@ -69,17 +69,55 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js src/lib/nutrition-photo.test.js src/lib/supplement-reminders.test.js src/lib/nutrition-native-backup.test.js src/lib/update.test.js src/components/Media.test.jsx src/lib/back.test.js
 
-      # Only explicitly authorized, non-commercial 180px fork media may be
-      # staged. Never download the proprietary images from upstream or RepDB.
+      # For the user's non-commercial fork, retain 180px openGym media unchanged,
+      # with the original Gym visual notice. Pin source; never commit assets here.
+      # Keep the legacy own-history restore check, but the new official
+      # pinned source below is the actual source for images and clips.
       - name: Urspruengliche openForm-Bilder aus eigener Git-Historie wiederfinden
         shell: bash
         env:
           OPENFORM_NONCOMMERCIAL_FORK_RESTORE: '1'
         run: node scripts/catalogue/recover-fork180-history.mjs "$RUNNER_TEMP/openform-retained-media"
 
-      - name: Optionale Fork-Medien strikt pruefen
+      - name: Originale openGym-Bilder und Clips holen
+        uses: actions/checkout@v4
+        with:
+          repository: DuarteSantos8/openGym
+          ref: e4a68a94c42a3c17cbd560d66ce2e46a7048ab99
+          path: .openform-source
+          sparse-checkout: |
+            catalogue/media
+          sparse-checkout-cone-mode: false
+          filter: blob:none
+          persist-credentials: false
+
+      - name: Medienquelle und Copyright-Hinweis kontrollieren
         shell: bash
-        run: node scripts/catalogue/stage-fork180.mjs
+        run: |
+          set -euo pipefail
+          test -f .openform-source/catalogue/media/NOTICE.md
+          test -d .openform-source/catalogue/media/still
+          test -d .openform-source/catalogue/media/clip
+          grep -Eiq 'Gym visual|Aliaksandr Makatserchyk' .openform-source/catalogue/media/NOTICE.md
+          originals=$(find .openform-source/catalogue/media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
+          clips=$(find .openform-source/catalogue/media/clip -maxdepth 1 -type f -name '*.mp4' | wc -l)
+          echo "Offizielle Originalmedien: $originals Bilder und $clips Animationen"
+          test "$originals" -ge 6000 && test "$clips" -ge 6000
+
+      - name: Originalbilder und Animationen offline einbauen
+        shell: bash
+        env:
+          OPENFORM_FORK180_SOURCE: '.openform-source/catalogue/media'
+          OPENFORM_FORK180_LICENSE_CONFIRMED: '1'
+          OPENFORM_FORK180_CLIPS_LICENSE_CONFIRMED: '1'
+        run: |
+          set -euo pipefail
+          node scripts/catalogue/stage-fork180.mjs
+          test "$(find frontend/public/exercise-media/fork180 -maxdepth 1 -type f -name '*.webp' | wc -l)" -gt 4000
+          test "$(find frontend/public/exercise-media/fork180/clip -maxdepth 1 -type f -name '*.mp4' | wc -l)" -gt 4000
+
+      - name: Offline-Medien Regressionstests
+        run: node --test scripts/catalogue/stage-fork180.test.mjs
 
       - name: Mobile Web-App bauen
         working-directory: frontend
@@ -190,6 +228,11 @@ jobs:
           actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/[^/]+[.]webp$' || true)
           echo "Freigegebene original-ID-Bilder im APK: $actual / $expected"
           test "$actual" -eq "$expected" || { echo "::error::Originalbilder fehlen in der APK"; exit 1; }
+          test "$expected" -gt 4000 || { echo "::error::Originalbilder fehlen im Paket"; exit 1; }
+          expected_clips=$(find frontend/dist/exercise-media/fork180/clip -maxdepth 1 -type f -name '*.mp4' | wc -l)
+          actual_clips=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/clip/[^/]+[.]mp4$' || true)
+          echo "Originalanimationen im APK: $actual_clips / $expected_clips"
+          test "$expected_clips" -gt 4000 && test "$actual_clips" -eq "$expected_clips" || { echo "::error::Originalanimationen fehlen im APK"; exit 1; }
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4

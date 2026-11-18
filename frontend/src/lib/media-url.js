@@ -11,3 +11,9 @@ export function exerciseStillUrl(bucket, file, root = appRoot) {
   if (bucket !== 'fork180' || !safeName(file)) return null
   return new URL('exercise-media/' + bucket + '/' + file, root).href
 }
+
+/** Optional, explicitly licensed offline exercise animation, scoped to a known file type. */
+export function exerciseClipUrl(bucket, file, root = appRoot) {
+  if (bucket !== 'fork180' || typeof file !== 'string' || !/^[a-z0-9_-]+\.(mp4|webp)$/i.test(file)) return null
+  return new URL('exercise-media/' + bucket + '/clip/' + file, root).href
+}
