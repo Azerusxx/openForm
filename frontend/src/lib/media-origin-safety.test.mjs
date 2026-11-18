@@ -27,3 +27,15 @@ test('missing approved image yields no replacement rather than deleting an exerc
  assert.match(exercises,/FORK180_IMAGE_MAP\[ex\?\.id\]/)
  assert.match(exercises,/: null/)
 })
+
+test('historical restore reads only own Git blobs, never rewrites workout plans',()=>{
+ const restoration=source('../../../scripts/catalogue/recover-fork180-history.mjs')
+ assert.match(restoration,/git\(['"]/)
+ assert.match(restoration,/rev-list/)
+ assert.match(restoration,/catalogue\/media\//)
+ assert.match(restoration,/OPENFORM_NONCOMMERCIAL_FORK_RESTORE/)
+ assert.doesNotMatch(restoration,/github\.com|https:\/\/|git clone|localStorage|\.routines\s*=|\.workouts\s*=/)
+ const workflow=source('../../../.github/workflows/android-apk.yml')
+ assert.match(workflow,/fetch-depth: 0/)
+ assert.match(workflow,/recover-fork180-history\.mjs/)
+})
