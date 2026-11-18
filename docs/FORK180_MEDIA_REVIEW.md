@@ -28,6 +28,42 @@ npx cap sync android
 
 Do not run this on a source you copied out of an original APK or from an unauthorized mirror. Do not add proprietary media to a public Git commit merely to make CI work. GitHub Actions builds cannot automatically see local external source folders. Re-check NOTICE and obtain written licensing clarification before distribution.
 
+## Optional animated clips in an authorized private build
+
+The app can now stage and play original-ID clips from an independently licensed source.
+Clips must be expressly covered by the rights holder's permission; permission from an
+AI provider or a code contributor does **not** authorize Gym visual artwork.
+
+An authorized package must contain \`NOTICE.md\`, \`still/<exercise-id>.webp\`,
+and optionally \`clip/<exercise-id>.webp\` (180px **animated** WebP) or
+\`clip/<exercise-id>.mp4\` (a separately licensed MP4). The build keeps these
+files unchanged and copies them into the APK; it does not scrape openGym,
+extract old packages, or commit media into a public repository.
+
+\`\`\`sh
+OPENFORM_FORK180_SOURCE=/absolute/path/to/authorized-media \
+OPENFORM_FORK180_LICENSE_CONFIRMED=1 \
+OPENFORM_FORK180_CLIPS_LICENSE_CONFIRMED=1 \
+node scripts/catalogue/stage-fork180.mjs
+cd frontend
+VITE_MOBILE=1 npm run build
+cd ..
+node scripts/catalogue/verify-fork180-bundle.mjs
+cd frontend
+npx cap sync android
+\`\`\`
+
+Clip permission must be enabled *separately*; if the source includes clips but
+the gate is absent, staging fails rather than accidentally publishing them.
+The UI loops short offline MP4/WebP clips, allows a tap to switch to the still,
+and uses the still if playback fails. User-supplied pictures retain priority.
+No exercise IDs, routines, sets, workout history or nutrition records are modified.
+
+The public GitHub Actions runner does not have that local source directory.
+Without an authorized uploaded source and the appropriate opt-in, it correctly
+packages **zero** original stills and animations. This is not proof that
+the media feature is fully installed or that the user has a license.
+
 ## Work still pending
 - Clarify fork and reintroduction rights with copyright holder, including distribution to friends/testers.
 - If approved, securely stage from an authorized copy for a *separate opt-in, noncommercial artifact*, and verify the resulting APK media and NOTICE.
