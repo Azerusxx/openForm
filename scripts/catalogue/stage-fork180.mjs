@@ -16,7 +16,8 @@ if (!enabled) {
   if (source) throw Error('Media source supplied without explicit license confirmation')
   fs.rmSync(output, { recursive: true, force: true })
   fs.writeFileSync(target, '{}\n')
-  console.log('No 180px fork media: using RepDB images')
+  console.warn('::warning::openForm: 0 originale openGym-Übungsbilder eingebunden. Die Originaldateien wurden bisher nicht bereitgestellt. RepDB wurde entfernt; nur eigene Übungsfotos bleiben sichtbar.')
+  if(process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,'### openGym-Originalmedien\\n0 Originalbilder eingebunden. Für unveränderte 180px-Fork-Medien wird eine rechtmäßig vorhandene Quelle samt NOTICE benötigt. Keine Übungen, A/B/C-Pläne oder Trainingsdaten wurden verändert.\\n')
   process.exit(0)
 }
 if (!source) throw Error('OPENFORM_FORK180_SOURCE is required for approved non-commercial fork media')
