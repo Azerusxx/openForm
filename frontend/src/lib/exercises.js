@@ -1,7 +1,6 @@
 import { EXDB, EXALIAS } from './exercises-data.js'
 import MUSCLE_MAP from './exercise-muscle-map.json' with { type: 'json' }
 import V13_IDS from './catalogue-v13-ids.json' with { type: 'json' }
-import REPDB_IMAGE_MAP from './repdb-image-map.json' with { type: 'json' }
 import FORK180_IMAGE_MAP from './fork180-image-map.json' with { type: 'json' }
 import { exerciseStillUrl } from './media-url.js'
 import { t, getVersion, exerciseNameSearchText } from './i18n-core.js'
@@ -199,17 +198,13 @@ export const figureOf = S => (S?.exFigure === 'female' || S?.exFigure === 'male'
 const drawing = (ex, figure) => (figure === 'female' ? ex.fv : figure === 'male' ? ex.mv : null) || null
 export const imgSrc = (ex, figure) => FORK180_IMAGE_MAP[ex?.id]
   ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id])
-  : REPDB_IMAGE_MAP[ex?.id]
-    ? exerciseStillUrl('repdb', REPDB_IMAGE_MAP[ex.id])
-    : null
+  : null
 const clipFile = f => (CLIP_EXT !== '.mp4' && f.endsWith('.mp4') ? f.slice(0, -4) + CLIP_EXT : f)
-// The detail sheet primarily requests gifSrc. When a licensed animation is absent,
-// reuse the free RepDB still image instead of requesting a nonexistent MP4.
+// The detail sheet requests gifSrc; for an approved fork use its original-ID
+// still. If absent, return null rather than substituting another exercise.
 export const gifSrc = (ex, figure) => FORK180_IMAGE_MAP[ex?.id]
   ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id])
-  : REPDB_IMAGE_MAP[ex?.id]
-    ? exerciseStillUrl('repdb', REPDB_IMAGE_MAP[ex.id])
-    : null
+  : null
 // The catalogue's animations are short MP4 loops; a fork's or an older build's may still be GIFs.
 export const isVideoSrc = src => /\.(mp4|webm)(\?|$)/i.test(src || '')
 
