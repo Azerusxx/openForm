@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
+import {execFileSync} from 'node:child_process'
+import {fileURLToPath} from 'node:url'
 import {exerciseStillUrl, exerciseClipUrl} from './media-url.js'
 
 test('authorized openGym image URLs are stable across screen navigation',()=>{
@@ -41,4 +43,9 @@ test('explicitly licensed offline animations resolve only validated local paths'
    assert.equal(exerciseClipUrl('fork180',name,'https://localhost/'),null)
  }
  assert.equal(exerciseClipUrl('repdb','0027.mp4','https://localhost/'),null)
+})
+
+test('offline media staging fixtures pass with and without explicit clip rights',()=>{
+ const filename=fileURLToPath(new URL('../../../scripts/catalogue/stage-fork180.test.mjs',import.meta.url))
+ execFileSync(process.execPath,['--test',filename],{stdio:'pipe'})
 })
