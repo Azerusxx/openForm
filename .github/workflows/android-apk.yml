@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Projekt laden
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # inspect only our own historical media snapshots
 
       - name: Projektstruktur pruefen
         shell: bash
@@ -69,6 +71,12 @@ jobs:
 
       # Only explicitly authorized, non-commercial 180px fork media may be
       # staged. Never download the proprietary images from upstream or RepDB.
+      - name: Urspruengliche openForm-Bilder aus eigener Git-Historie wiederfinden
+        shell: bash
+        env:
+          OPENFORM_NONCOMMERCIAL_FORK_RESTORE: '1'
+        run: node scripts/catalogue/recover-fork180-history.mjs "$RUNNER_TEMP/openform-retained-media"
+
       - name: Optionale Fork-Medien strikt pruefen
         shell: bash
         run: node scripts/catalogue/stage-fork180.mjs
