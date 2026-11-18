@@ -6,7 +6,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EXDB } from '../../frontend/src/lib/exercises-data.js'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+// Isolated fixtures can exercise the packager without touching real build output.
+const ROOT = process.env.NODE_ENV === 'test' && process.env.OPENFORM_MEDIA_TEST_ROOT
+  ? path.resolve(process.env.OPENFORM_MEDIA_TEST_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const imageMapPath = path.join(ROOT, 'frontend/src/lib/fork180-image-map.json')
 const clipMapPath = path.join(ROOT, 'frontend/src/lib/fork180-clip-map.json')
 const output = path.join(ROOT, 'frontend/public/exercise-media/fork180')
