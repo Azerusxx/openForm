@@ -6,11 +6,13 @@ import { rirOf } from './effort.js'
 import { workoutVolume } from './history.js'
 import { rotationIds } from './rotation.js'
 import { buildPlannedEntry } from './session-start.js'
+import { EXIDX } from './exercises.js'
+import { exerciseNameFor } from './i18n-core.js'
 
 const round = x => Math.round(x * 10) / 10
 const valid = x => typeof x === 'number' && Number.isFinite(x)
 const workSets = e => (e?.sets || []).filter(s => s?.done && !isWarmupRow(s))
-const nameFor = (state, id) => (state.customEx || []).find(e => e.id === id)?.n || id
+const nameFor = (state, id) => (state.customEx || []).find(e => e.id === id)?.n || (EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id)
 
 /** The next planned A/B/C slot (or other explicit rotation) only when its sequence is known. */
 export function nextRotationRoutine(state, workout) {
@@ -36,7 +38,7 @@ export function nextRotationRoutine(state, workout) {
 /** Never infer perceived effort from reps or weight alone. */
 export function postWorkoutAnalysis(state, workout) {
   if (!workout) return null
-  const previous = (state.workouts || []).filter(w => w && w.id !== workout.id && (Number(w.start) || 0) < (Number(workout.start) || Infinity))
+  const previous = (state.workouts || []).filter(w => w && w.id !== workout.id && (Number(w.start) || 0) < (Number(workout.start) || Infinity)).sort((a,b)=>(Number(a.start)||0)-(Number(b.start)||0))
   const compare = new Map(finishCompare(state, workout).map(x => [x.id, x]))
   const exercises = (workout.entries || []).map(entry => {
     const done = workSets(entry)
