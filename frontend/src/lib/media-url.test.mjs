@@ -7,7 +7,8 @@ test('authorized openGym image URLs are stable across screen navigation',()=>{
  assert.equal(exerciseStillUrl('fork180','0027.webp','https://localhost/'),
    'https://localhost/exercise-media/fork180/0027.webp')
  const source=readFileSync(new URL('../components/Media.jsx',import.meta.url),'utf8')
- assert.match(source,/exerciseStillUrl\('fork180', FORK180_IMAGE_MAP\[ex\.id\]\)/)
+ assert.match(source,/exerciseStillUrl\('fork180', stillFile\)/)
+ assert.match(source,/exerciseClipUrl\('fork180', clipFile\)/)
  assert.doesNotMatch(source,/REPDB_IMAGE_MAP|repdb-image-map/)
 })
 test('media paths also work on subdirectory web installs',()=>{
