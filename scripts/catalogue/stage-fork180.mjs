@@ -14,6 +14,7 @@ const enabled = process.env.OPENFORM_FORK180_LICENSE_CONFIRMED === '1'
 const source = process.env.OPENFORM_FORK180_SOURCE
 if (!enabled) {
   if (source) throw Error('Media source supplied without explicit license confirmation')
+  fs.rmSync(output, { recursive: true, force: true })
   fs.writeFileSync(target, '{}\n')
   console.log('No 180px fork media: using RepDB images')
   process.exit(0)
@@ -44,8 +45,8 @@ function dimensions(data) {
   }
   throw Error('Unknown WebP chunk: '+type)
 }
+fs.rmSync(output, { recursive: true, force: true })
 fs.mkdirSync(output,{recursive:true})
-for(const file of fs.readdirSync(output))if(safe(file))fs.unlinkSync(path.join(output,file))
 const map={}
 let count=0
 for(const ex of EXDB){
