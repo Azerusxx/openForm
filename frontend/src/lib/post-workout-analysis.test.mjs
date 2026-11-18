@@ -58,3 +58,11 @@ test('analysis module stays syntactically singular and contains no orphaned dupl
  assert.equal((code.match(/export function nextRotationRoutine\(/g)||[]).length,1)
  assert.doesNotMatch(code,/^, 'i'\)\.test/m)
 })
+
+test('built-in exercise reports human-readable catalogue names instead of IDs',()=>{
+ const w=training('catalogue','2026-11-18',5000,['a'],[ex('0861',[s1(60,10,1)])])
+ const r=postWorkoutAnalysis({...state,workouts:[w]},w)
+ assert.equal(r.exercises.length,1)
+ assert.notEqual(r.exercises[0].name,'0861')
+ assert.match(postWorkoutAnalysisText({...state,workouts:[w]},w),/Trainingsanalyse/)
+})
