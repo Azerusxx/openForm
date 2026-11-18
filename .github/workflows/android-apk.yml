@@ -67,30 +67,8 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js src/lib/nutrition-photo.test.js src/lib/supplement-reminders.test.js src/lib/nutrition-native-backup.test.js src/lib/update.test.js src/components/Media.test.jsx src/lib/back.test.js
 
-      - name: RepDB Uebungszuordnung testen
-        run: node --test scripts/catalogue/repdb-matcher.test.mjs
-
-      - name: Kostenlose RepDB Uebungsbilder fuer APK laden
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone --depth 1 https://github.com/RepDB/exercise-dataset.git "$RUNNER_TEMP/repdb"
-          node scripts/catalogue/stage-repdb.mjs "$RUNNER_TEMP/repdb"
-          test "$(find frontend/public/exercise-media/repdb -name '*.webp' | wc -l)" -ge 10
-          # Coverage is distinct from packaging success. Make the actual mapping visible
-          # to testers without claiming that all exercises have illustrations.
-          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync("repdb-coverage.json","utf8")); const msg="RepDB: "+r.mappedExercises+"/"+r.catalogSize+" exercise IDs mapped ("+Math.round(100*r.mappedExercises/r.catalogSize)+"%), "+r.imageFiles+" images; "+r.unmatchedCount+" unmatched, "+r.ambiguousCount+" ambiguous."; console.log(msg); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,msg+"\\n"); if(r.mappedExercises/r.catalogSize<0.25)console.log("::warning::RepDB media coverage under 25%. Many exercises will correctly have no bundled image.");'
-
-      - name: RepDB Zuordnungsbericht hochladen
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: repdb-coverage
-          path: repdb-coverage.json
-          if-no-files-found: warn
-
-      # With no verified media source these optional slots remain empty; the already
-      # licensed RepDB illustrations are bundled instead. No automatic Gym visual download.
+      # Only explicitly authorized, non-commercial 180px fork media may be
+      # staged. Never download the proprietary images from upstream or RepDB.
       - name: Optionale Fork-Medien strikt pruefen
         shell: bash
         run: node scripts/catalogue/stage-fork180.mjs
@@ -101,11 +79,11 @@ jobs:
           VITE_MOBILE: '1'
         run: npm run build
 
-      - name: RepDB-Bildzuordnung und Mobile-Bundle validieren
+      - name: OpenGym-IDs und optionale Medienpruefung
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/catalogue/verify-repdb-bundle.mjs
+          node scripts/catalogue/verify-fork180-bundle.mjs
 
       - name: Capacitor Android synchronisieren
         working-directory: frontend
@@ -157,26 +135,6 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Optionale Gym-Medien in APK pruefen
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
-          if [ -d frontend/dist/exercise-media/still ]; then
-            expected=$(find frontend/dist/exercise-media/still -maxdepth 1 -type f -name '*.webp' | wc -l)
-          else
-            expected=0
-          fi
-          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/still/[^/]+[.]webp$' || true)
-          echo "Gym-Bilder im APK: $actual von $expected"
-          if [ "$actual" -ne "$expected" ]; then
-            echo "::error::Vorhandene Gym-Bilder wurden nicht vollstaendig ins APK gepackt."
-            exit 1
-          fi
-          if [ "$expected" -eq 0 ]; then
-            echo "::warning::APK enthaelt keine Gym-Bilder; Medien muessen separat und rechtmaessig bereitgestellt werden."
-          fi
-
       - name: APK-Signatur und Paket-Identität prüfen
         shell: bash
         run: |
@@ -208,16 +166,22 @@ jobs:
             exit 1
           fi
 
-      - name: RepDB Bilder im APK pruefen
+      - name: Originalbilder im APK nur bei Freigabe prüfen
         shell: bash
         run: |
           set -euo pipefail
           apk="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
-          expected=$(find frontend/public/exercise-media/repdb -type f -name '*.webp' | wc -l)
-          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/repdb/[^/]+[.]webp$' || true)
-          echo "RepDB Stills: $actual / $expected"
-          test "$expected" -ge 10
-          test "$expected" -eq "$actual" || { echo "::error::RepDB images missing in APK"; exit 1; }
+          if unzip -Z1 "$apk" | grep -Eq '^assets/public/exercise-media/repdb/'; then
+            echo "::error::RepDB-Bilder duerfen nicht mehr in der APK sein"
+            exit 1
+          fi
+          expected=0
+          if [ -d frontend/dist/exercise-media/fork180 ]; then
+            expected=$(find frontend/dist/exercise-media/fork180 -maxdepth 1 -name '*.webp' -type f | wc -l)
+          fi
+          actual=$(unzip -Z1 "$apk" | grep -Ec '^assets/public/exercise-media/fork180/[^/]+[.]webp$' || true)
+          echo "Freigegebene original-ID-Bilder im APK: $actual / $expected"
+          test "$actual" -eq "$expected" || { echo "::error::Originalbilder fehlen in der APK"; exit 1; }
 
       - name: APK als Artifact hochladen
         uses: actions/upload-artifact@v4
