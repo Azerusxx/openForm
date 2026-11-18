@@ -12,7 +12,9 @@ openForm vereint openGym als technische Basis mit einem neu implementierten Ern�
 
 ### Lizenzhinweis: Übungsmedien
 
-Die Dateien `catalogue/media/still` und `catalogue/media/clip` sind **NICHT** enthalten. Ihr ursprünglicher Rechteinhaber lizenziert sie gesondert nur für die openGym-App; sie dürfen nicht ohne eigene Lizenz in einer unabhängigen Anwendung wie openForm eingebunden werden. Daher fehlen in dieser Alpha einige Übungsbilder und Animationen. Ersetze sie erst nach Erwerb entsprechender Rechte oder durch eigenes Material. Weitere Hinweise stehen in `NOTICE.md`.
+Die originalen Gym-visual-Medien sind **nicht Teil der AGPL-Code-Lizenz**. openGym erlaubt laut seiner [aktuellen NOTICE](https://github.com/DuarteSantos8/openGym/blob/main/NOTICE.md) einem **nichtkommerziellen openGym-Fork**, dessen unveränderte Medien bis maximal **180 × 180 Pixel** zusammen mit dem Rechtehinweis beizubehalten. Größere APK-Medien, kommerzielle Nutzung und Weiterverwendung als KI-Trainings- oder Bildgenerierungsvorlage sind davon nicht abgedeckt. Ob eine spätere Wiederaufnahme entfernter Medien in der eigenständig benannten openForm-App unter die Fork-Ausnahme fällt, sollte mit dem Rechteinhaber schriftlich geklärt werden.
+
+Die offizielle Beta lädt deshalb derzeit **keine** Gym-visual-Dateien nach und baut weiterhin auf RepDB und eigenen Nutzerbildern auf. Ein strikt opt-in-fähiger 180-Pixel-Fork-Import ist vorbereitet, setzt aber eine rechtmäßig vorhandene Quelle und bewusste Lizenzbestätigung voraus. Die Schritte und Einschränkungen stehen in [docs/FORK180_MEDIA_REVIEW.md](docs/FORK180_MEDIA_REVIEW.md).
 
 ## Installation / GitHub
 
