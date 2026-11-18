@@ -30,7 +30,7 @@ test('missing approved image yields no replacement rather than deleting an exerc
 
 test('historical restore reads only own Git blobs, never rewrites workout plans',()=>{
  const restoration=source('../../../scripts/catalogue/recover-fork180-history.mjs')
- assert.match(restoration,/git\(['"]/)
+ assert.match(restoration,/git\(\[['"]/)
  assert.match(restoration,/rev-list/)
  assert.match(restoration,/catalogue\/media\//)
  assert.match(restoration,/OPENFORM_NONCOMMERCIAL_FORK_RESTORE/)
