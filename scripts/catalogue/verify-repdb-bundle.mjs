@@ -18,10 +18,21 @@ for(const [id,file] of Object.entries(mapping)){
 if(missing.length)throw Error('Mapped RepDB files missing: '+missing.slice(0,20).join(', '))
 const assetDir=path.join(distDir,'assets')
 const scripts=fs.readdirSync(assetDir).filter(name=>name.endsWith('.js'))
-let linked=false
-for(const name of scripts){
- const body=fs.readFileSync(path.join(assetDir,name),'utf8')
- if(body.includes('exercise-media/repdb/') && ids.some(id=>body.includes(mapping[id]))) linked=true
+if(!scripts.length)throw Error('No JavaScript assets in Vite output')
+// The URL builder receives bucket and filename as separate arguments:
+// exerciseStillUrl('repdb', filename). Vite therefore has no single literal
+// "exercise-media/repdb/" in the production JS. Checking that concatenated
+// string rejected valid bundles before Capacitor could package them.
+// Instead, verify that the actual mapped filenames survive bundling and the
+// runtime URL resolver is present. The filesystem checks above cover every file.
+const chunks=scripts.map(name=>fs.readFileSync(path.join(assetDir,name),'utf8'))
+const bundle=chunks.join('\\n')
+const filenames=[...new Set(Object.values(mapping))]
+const embedded=filenames.filter(file=>bundle.includes(JSON.stringify(file))||bundle.includes(file))
+if(embedded.length < Math.min(10,filenames.length)){
+ throw Error('RepDB image map missing from compiled JavaScript: '+embedded.length+'/'+filenames.length+' mapped filenames found')
 }
-if(!linked)throw Error('Bundled JavaScript does not reference the resolved RepDB image map')
-console.log('VERIFIED: '+ids.length+' mapped exercises with images in public/, dist/ and JavaScript bundle')
+if(!bundle.includes('exercise-media/') || !bundle.includes('repdb')){
+ throw Error('Exercise image URL resolver missing from compiled JavaScript')
+}
+console.log('VERIFIED: '+ids.length+' mapped exercises, '+filenames.length+' image files in public/ and dist/, '+embedded.length+' image filenames linked in '+scripts.length+' JS assets')
