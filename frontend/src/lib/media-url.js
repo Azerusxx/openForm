@@ -8,6 +8,6 @@ const safeName = x => typeof x === 'string' && /^[a-z0-9_-]+\.webp$/i.test(x)
 
 /** A URL that is stable across in-app navigation and Capacitor's local HTTPS origin. */
 export function exerciseStillUrl(bucket, file, root = appRoot) {
-  if (!bucket === 'fork180' || !safeName(file)) return null
+  if (bucket !== 'fork180' || !safeName(file)) return null
   return new URL('exercise-media/' + bucket + '/' + file, root).href
 }
