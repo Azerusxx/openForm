@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { isCustomEx } from '../lib/exercises.js'
 import REPDB_IMAGE_MAP from '../lib/repdb-image-map.json'
 import FORK180_IMAGE_MAP from '../lib/fork180-image-map.json'
+import { exerciseStillUrl } from '../lib/media-url.js'
 import { MOBILE } from '../lib/mobile.js'
 import { useStore } from '../store/useStore.js'
 import { t, exerciseNameFor } from '../lib/i18n.js'
@@ -57,8 +58,8 @@ function ExerciseMediaWithOverride(p) {
 // Optional copyright-cleared 180px noncommercial fork media only, otherwise RepDB.
 function BuiltinMedia({ ex, id, compact, minimizable }) {
   const gifSize = useStore(s => s.S.gifSize)
-  const src = FORK180_IMAGE_MAP[ex?.id] ? 'exercise-media/fork180/' + FORK180_IMAGE_MAP[ex.id]
-    : REPDB_IMAGE_MAP[ex?.id] ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id] : null
+  const src = FORK180_IMAGE_MAP[ex?.id] ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id])
+    : REPDB_IMAGE_MAP[ex?.id] ? exerciseStillUrl('repdb', REPDB_IMAGE_MAP[ex.id]) : null
   const [failed, setFailed] = useState(false)
   useEffect(() => setFailed(false), [src])
   if (minimizable && (gifSize === 'off' || !src)) return null
@@ -141,8 +142,8 @@ function ExerciseThumbWithOverride(p) {
   return isCustomEx(p.ex) ? <CustomThumb {...p} /> : <BuiltinThumb {...p} />
 }
 function BuiltinThumb({ ex }) {
-  const src = FORK180_IMAGE_MAP[ex?.id] ? 'exercise-media/fork180/' + FORK180_IMAGE_MAP[ex.id]
-    : REPDB_IMAGE_MAP[ex?.id] ? 'exercise-media/repdb/' + REPDB_IMAGE_MAP[ex.id] : null
+  const src = FORK180_IMAGE_MAP[ex?.id] ? exerciseStillUrl('fork180', FORK180_IMAGE_MAP[ex.id])
+    : REPDB_IMAGE_MAP[ex?.id] ? exerciseStillUrl('repdb', REPDB_IMAGE_MAP[ex.id]) : null
   const [broken, setBroken] = useState(null)
   if (!src || broken === src) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
   return <img className="thumb" loading="lazy" decoding="async" draggable={false} src={src} alt="" onError={() => setBroken(src)} />
