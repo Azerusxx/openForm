@@ -3,7 +3,7 @@
 // React Router may currently be on /workout/, /plan/, /nutrition/, etc.
 // In dev this module is /src/lib/media-url.js (two levels below web root).
 // In the production bundle it is under /assets/ (one level below app root).
-const appRoot = new URL(import.meta.env.DEV ? '../../' : '../', import.meta.url).href
+const appRoot = new URL(import.meta.env?.DEV ? '../../' : '../', import.meta.url).href
 const safeName = x => typeof x === 'string' && /^[a-z0-9_-]+\.webp$/i.test(x)
 
 /** A URL that is stable across in-app navigation and Capacitor's local HTTPS origin. */
