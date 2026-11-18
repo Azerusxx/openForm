@@ -69,6 +69,9 @@ jobs:
         working-directory: frontend
         run: npx vitest run src/lib/nutrition-hybrid.test.js src/lib/nutrition-photo.test.js src/lib/supplement-reminders.test.js src/lib/nutrition-native-backup.test.js src/lib/update.test.js src/components/Media.test.jsx src/lib/back.test.js
 
+      - name: Lizenz- und Offline-Medien-Paketierung testen
+        run: node --test scripts/catalogue/stage-fork180.test.mjs
+
       # Only explicitly authorized, non-commercial 180px fork media may be
       # staged. Never download the proprietary images from upstream or RepDB.
       - name: Urspruengliche openForm-Bilder aus eigener Git-Historie wiederfinden
