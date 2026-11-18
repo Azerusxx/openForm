@@ -51,3 +51,10 @@ test('post-workout summary and AI deep-dive are wired to exact finished session'
  assert.match(coach,/requestDebrief\(workout\.id\)/)
  assert.ok(coach.indexOf('const id = new URLSearchParams(location.search)') < coach.indexOf('if (!ready) return null'))
 })
+
+test('analysis module stays syntactically singular and contains no orphaned duplicate fragments',()=>{
+ const code=readFileSync(new URL('./post-workout-analysis.js',import.meta.url),'utf8')
+ assert.equal((code.match(/export function postWorkoutAnalysis\(/g)||[]).length,1)
+ assert.equal((code.match(/export function nextRotationRoutine\(/g)||[]).length,1)
+ assert.doesNotMatch(code,/^, 'i'\)\.test/m)
+})
