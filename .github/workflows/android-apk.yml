@@ -83,6 +83,12 @@ jobs:
           path: repdb-coverage.json
           if-no-files-found: warn
 
+      # With no verified media source these optional slots remain empty; the already
+      # licensed RepDB illustrations are bundled instead. No automatic Gym visual download.
+      - name: Optionale Fork-Medien strikt pruefen
+        shell: bash
+        run: node scripts/catalogue/stage-fork180.mjs
+
       - name: Mobile Web-App bauen
         working-directory: frontend
         env:
