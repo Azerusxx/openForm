@@ -71,6 +71,14 @@ jobs:
 
       # For the user's non-commercial fork, retain 180px openGym media unchanged,
       # with the original Gym visual notice. Pin source; never commit assets here.
+      # Keep the legacy own-history restore check, but the new official
+      # pinned source below is the actual source for images and clips.
+      - name: Urspruengliche openForm-Bilder aus eigener Git-Historie wiederfinden
+        shell: bash
+        env:
+          OPENFORM_NONCOMMERCIAL_FORK_RESTORE: '1'
+        run: node scripts/catalogue/recover-fork180-history.mjs "$RUNNER_TEMP/openform-retained-media"
+
       - name: Originale openGym-Bilder und Clips holen
         uses: actions/checkout@v4
         with:
