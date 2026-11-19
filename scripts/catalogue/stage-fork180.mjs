@@ -12,13 +12,15 @@ const ROOT = process.env.NODE_ENV === 'test' && process.env.OPENFORM_MEDIA_TEST_
   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const imageMapPath = path.join(ROOT, 'frontend/src/lib/fork180-image-map.json')
 const clipMapPath = path.join(ROOT, 'frontend/src/lib/fork180-clip-map.json')
+const figureMapPath = path.join(ROOT, 'frontend/src/lib/fork180-figure-map.json')
 const output = path.join(ROOT, 'frontend/public/exercise-media/fork180')
 const source = process.env.OPENFORM_FORK180_SOURCE
 const stillsApproved = process.env.OPENFORM_FORK180_LICENSE_CONFIRMED === '1'
 const clipsApproved = process.env.OPENFORM_FORK180_CLIPS_LICENSE_CONFIRMED === '1'
-const writeMaps = (images = {}, clips = {}) => {
+const writeMaps = (images = {}, clips = {}, figures = {}) => {
   fs.writeFileSync(imageMapPath, JSON.stringify(images, null, 2) + '\n')
   fs.writeFileSync(clipMapPath, JSON.stringify(clips, null, 2) + '\n')
+  fs.writeFileSync(figureMapPath, JSON.stringify(figures, null, 2) + '\n')
 }
 if (!stillsApproved) {
   if (source || clipsApproved) throw Error('Media source/clip permission supplied without original media license confirmation')
@@ -81,7 +83,7 @@ const readClip = f => {
 fs.rmSync(output, { recursive: true, force: true })
 fs.mkdirSync(output, { recursive: true })
 writeMaps()
-const images = {}, clips = {}, copiedStills = new Set(), copiedClips = new Set()
+const images = {}, clips = {}, figures = {}, copiedStills = new Set(), copiedClips = new Set()
 for (const ex of EXDB) {
   const stillCandidates = [ex.img, ex.mv && ex.mv+'.webp', ex.fv && ex.fv+'.webp'].filter(imageName)
   for (const f of stillCandidates) {
@@ -106,6 +108,21 @@ for (const ex of EXDB) {
   }
 }
 if (!Object.keys(images).length && !Object.keys(clips).length) throw Error('No usable licensed media files matched original exercise IDs')
+// Only map a gender-specific drawing when its original file really was staged.
+for (const ex of EXDB) {
+  for (const [figure, drawingId] of [['male', ex.mv], ['female', ex.fv]]) {
+    if (typeof drawingId !== 'string' || !/^[a-z0-9_-]+$/i.test(drawingId)) continue
+    const still = drawingId + '.webp'
+    const clip = [drawingId + '.mp4', drawingId + '.webp'].find(file => copiedClips.has(file))
+    const entry = {}
+    if (copiedStills.has(still)) entry.still = still
+    if (clip) entry.clip = clip
+    if (Object.keys(entry).length) {
+      if (!figures[ex.id]) figures[ex.id] = {}
+      figures[ex.id][figure] = entry
+    }
+  }
+}
 fs.copyFileSync(path.join(base,'NOTICE.md'),path.join(output,'NOTICE.md'))
-writeMaps(images, clips)
+writeMaps(images, clips, figures)
 console.log('Licensed local fork media: '+Object.keys(images).length+' still mappings / '+Object.keys(clips).length+' animated mappings; '+copiedStills.size+' still files / '+copiedClips.size+' clips. No workout data changed.')
