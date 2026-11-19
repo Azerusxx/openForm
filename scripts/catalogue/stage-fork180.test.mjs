@@ -23,7 +23,7 @@ function mp4() {
   b.writeUInt32BE(24, 0); b.write('ftyp', 4); b.write('isom', 8)
   return b
 }
-function fixture(clipFile) {
+function fixture(clipFile, alternateDrawing = null) {
   const root = mkdtempSync(path.join(tmpdir(), 'openform-media-test-'))
   const source = path.join(root, 'source')
   mkdirSync(path.join(root,'frontend/src/lib'), {recursive:true})
@@ -33,6 +33,10 @@ function fixture(clipFile) {
   writeFileSync(path.join(source,'NOTICE.md'), '© Aliaksandr Makatserchyk, Gym visual - test fixture\n')
   writeFileSync(path.join(source,'still',exercise.img), webp())
   if (clipFile) writeFileSync(path.join(source,'clip',clipFile), clipFile.endsWith('.mp4') ? mp4() : webp(true))
+  if (alternateDrawing) {
+    writeFileSync(path.join(source,'still',alternateDrawing+'.webp'),webp())
+    writeFileSync(path.join(source,'clip',alternateDrawing+'.mp4'),mp4())
+  }
   const env = {...process.env, NODE_ENV:'test', OPENFORM_MEDIA_TEST_ROOT:root,
     OPENFORM_FORK180_SOURCE:source, OPENFORM_FORK180_LICENSE_CONFIRMED:'1',
     OPENFORM_FORK180_CLIPS_LICENSE_CONFIRMED:'1'}
@@ -77,5 +81,21 @@ test('no source never creates a false positive media mapping',()=>{
     f.run({OPENFORM_FORK180_LICENSE_CONFIRMED:'0',OPENFORM_FORK180_CLIPS_LICENSE_CONFIRMED:'0',OPENFORM_FORK180_SOURCE:''})
     assert.deepEqual(f.map('fork180-image-map.json'),{})
     assert.deepEqual(f.map('fork180-clip-map.json'),{})
+    assert.deepEqual(f.map('fork180-figure-map.json'),{})
   }finally{f.remove()}
+})
+
+test('gender variants are mapped only when the separately approved original files exist',()=>{
+ const selected=EXDB.find(ex=>ex.id===exercise.id && (ex.mv || ex.fv))
+ assert.ok(selected,'First catalogue exercise should have a figure variant for this fixture')
+ const gender=selected.fv ? 'female' : 'male'
+ const drawing=selected.fv || selected.mv
+ const f=fixture(exercise.id+'.mp4',drawing)
+ try {
+   f.run()
+   assert.equal(f.map('fork180-figure-map.json')[selected.id][gender].still,drawing+'.webp')
+   assert.equal(f.map('fork180-figure-map.json')[selected.id][gender].clip,drawing+'.mp4')
+   assert.ok(existsSync(path.join(f.root,'frontend/public/exercise-media/fork180',drawing+'.webp')))
+   assert.ok(existsSync(path.join(f.root,'frontend/public/exercise-media/fork180/clip',drawing+'.mp4')))
+ }finally{f.remove()}
 })
