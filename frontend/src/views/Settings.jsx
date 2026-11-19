@@ -37,7 +37,7 @@ import { REST_MAX, REST_PAUSE_MIN, REST_PAUSE_MAX, fmtRest, fmtDuration } from '
 import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, dumbbellInventorySheet, menuSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import NutritionGoalsSettings from './NutritionGoalsSettings.jsx'
-import { loadNutrition, saveNutrition, mergeNutrition } from '../lib/nutrition.js'
+import { loadNutrition, saveNutrition, mergeNutrition, nutritionBackup } from '../lib/nutrition.js'
 import { createCompleteBackup, parseCompleteBackup } from '../lib/openform-backup.js'
 import { backupCounts, backupHasEntries, backupCountLabel, verifyRestoredBackup, verifyPersistedBackup } from '../lib/backup-review.js'
 import { durationSheet } from '../components/DurationWheel.jsx'
@@ -269,6 +269,18 @@ export default function Settings({ page = null, find = null, via = null }) {
     const blob = new Blob([json], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
     toast(t('Backup exported'))
+  }
+  const doNutritionExport = async () => {
+    try {
+      const json = nutritionBackup(loadNutrition())
+      const name = 'openform-ernaehrung-' + todayISO() + '.json'
+      if (MOBILE) { await shareExport(json, name); toast('Ernährungsbackup exportiert'); return }
+      const url = URL.createObjectURL(new Blob([json], { type:'application/json;charset=utf-8' }))
+      const a = document.createElement('a')
+      a.href = url; a.download = name; a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      toast('Ernährungsbackup exportiert')
+    } catch (e) { if (e?.name !== 'AbortError') toast(e?.message || 'Ernährungsbackup fehlgeschlagen') }
   }
   // Portable JSON for both domains. Legacy gym backups and the media ZIP remain supported.
   const doCompleteExport = async () => {
@@ -851,6 +863,7 @@ export default function Settings({ page = null, find = null, via = null }) {
       <Section title={t('Back up')}>
         <Row icon="share" iconTint="var(--green)" title="openForm Komplettbackup (JSON)" subtitle="Training + Ernährung, ohne Fotos/Videos" accessory="chevron" onClick={doCompleteExport} />
         <Row icon="share" iconTint="var(--blue)" title="Nur Training exportieren (alt)" subtitle="Kompatibel mit alten openGym-Backups" accessory="chevron" onClick={doExport} />
+        <Row icon="share" iconTint="var(--teal)" title="Nur Ernährung exportieren (JSON)" subtitle="Mahlzeiten, Wasser, Aktivitäten, Rezepte, Supplements und Ziele" accessory="chevron" onClick={doNutritionExport} />
 
         {hasMedia && <Row icon="share" iconTint="var(--blue)" title={t('Export with photos & videos (.zip)')} accessory="chevron" onClick={doExportZip} />}
         {/* 14 is AUTO_BACKUP_KEEP in lib/mobile.js, written out because the Settings tests mock

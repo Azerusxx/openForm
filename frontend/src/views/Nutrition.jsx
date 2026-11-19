@@ -5,7 +5,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import { useStore } from '../store/useStore.js'
 import { bwSheet } from '../sheets.jsx'
-import { MOBILE } from '../lib/mobile.js'
+import { MOBILE, shareExport, shareExportBlob } from '../lib/mobile.js'
+import { nutritionDayCardModel, nutritionDayCardImage } from '../lib/nutrition-card.js'
 import { scanCode } from '../lib/scan.js'
 import { analyzeFoodPhoto } from '../lib/nutrition-photo.js'
 import { dateLocal, loadNutrition, saveNutrition, createEntry, entryTotals,
@@ -79,6 +80,10 @@ export default function Nutrition() {
   const photoCameraInput = useRef(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const backupInput = useRef(null)
+  const [dayShare, setDayShare] = useState(null)
+  const [dayShareBusy, setDayShareBusy] = useState(false)
+  const daySharePreviewUrl = useRef(null)
+  useEffect(() => () => { if (daySharePreviewUrl.current) URL.revokeObjectURL(daySharePreviewUrl.current) }, [])
   const macroGoals = { ...data.goals, ...(() => { const kcal = Number(data.goals.kcal) || 2200; const protein = Number(data.goals.protein) || 150; const fat = Math.round(kcal * .28 / 9); const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)); return { carbs: data.goals.carbs ?? carbs, fat: data.goals.fat ?? fat } })() }
   const totals = dayTotals(data.entries, date)
   const drank = data.water?.[date] || 0
@@ -211,11 +216,59 @@ export default function Nutrition() {
     } catch (err) { setNotice(err?.message || 'Fotoanalyse fehlgeschlagen.') }
     finally { setBusy(false) }
   }
-  const exportBackup = () => {
-    const blob = new Blob([nutritionBackup(data)], { type: 'application/json;charset=utf-8' })
+  const downloadFile = (blob, filename) => {
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `openform-ernaehrung-${dateLocal()}.json`; a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const a = document.createElement('a')
+    a.href = url; a.download = filename; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  }
+  const exportBackup = async () => {
+    try {
+      const name = `openform-ernaehrung-${dateLocal()}.json`
+      const json = nutritionBackup(loadNutrition())
+      if (MOBILE) await shareExport(json, name)
+      else downloadFile(new Blob([json], { type: 'application/json;charset=utf-8' }), name)
+      setNotice('Ernährungsbackup zum Speichern bereitgestellt.')
+    } catch (err) {
+      if (err?.message) setNotice('Ernährungsbackup konnte nicht geteilt werden: ' + err.message)
+    }
+  }
+  const openDayShare = async () => {
+    if (dayShareBusy) return
+    setDayShareBusy(true)
+    try {
+      const model = nutritionDayCardModel(loadNutrition(), date)
+      const blob = await nutritionDayCardImage(model)
+      if (daySharePreviewUrl.current) URL.revokeObjectURL(daySharePreviewUrl.current)
+      const url = URL.createObjectURL(blob)
+      daySharePreviewUrl.current = url
+      setDayShare({ date:model.date, blob, url })
+    } catch (err) {
+      setNotice(err?.message || 'Der Tagesbericht konnte nicht erstellt werden.')
+    } finally {
+      setDayShareBusy(false)
+    }
+  }
+  const closeDayShare = () => {
+    setDayShare(null)
+    if (daySharePreviewUrl.current) URL.revokeObjectURL(daySharePreviewUrl.current)
+    daySharePreviewUrl.current = null
+  }
+  const shareDayImage = async () => {
+    if (!dayShare?.blob || dayShareBusy) return
+    setDayShareBusy(true)
+    try {
+      const name = `openform-essen-${dayShare.date}.png`
+      if (MOBILE) await shareExportBlob(dayShare.blob, name)
+      else {
+        const file = typeof File === 'function' ? new File([dayShare.blob], name, { type:'image/png' }) : null
+        if (file && navigator.canShare?.({ files:[file] })) await navigator.share({ files:[file], title:'openForm Ernährung' })
+        else downloadFile(dayShare.blob, name)
+      }
+      closeDayShare()
+    } catch (err) {
+      if (err?.name !== 'AbortError') setNotice(err?.message || 'Bild konnte nicht geteilt werden.')
+    } finally { setDayShareBusy(false) }
   }
   const importBackup = async file => {
     if (!file) return
@@ -334,9 +387,15 @@ export default function Nutrition() {
       </aside>
     </div>}
     {tab !== 'today' && <div className="of-subview-head"><button type="button" onClick={() => goSection('today')} aria-label="Zurück zur Ernährung"><Icon name="chevronLeft" /></button><h2>{tab === 'food' ? (foodDestination === 'recipe' ? 'Rezeptzutat auswählen' : showForm ? 'Mahlzeit erfassen' : 'Lebensmittel') : SECTIONS.find(([id]) => id === tab)?.[1]}</h2></div>}
-    {(tab === 'today' || tab === 'diary') && <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
-      <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
-      <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button></div>}
+    {(tab === 'today' || tab === 'diary') && <>
+      <div className="of-date of-date-032"><button onClick={() => setDate(v => shiftDay(v, -1))} aria-label="Vortag"><Icon name="chevronLeft" /></button>
+        <input aria-label="Tag" type="date" value={date} onChange={e => setDate(e.target.value || dateLocal())} />
+        <button onClick={() => setDate(v => shiftDay(v, 1))} aria-label="Nächster Tag"><Icon name="chevronRight" /></button>
+      </div>
+      <div className="of-day-export"><button type="button" disabled={dayShareBusy} onClick={openDayShare}>
+        <Icon name="share" /> {dayShareBusy ? 'Erstelle Tagesbild …' : 'Tagesbericht als Bild teilen'}
+      </button></div>
+    </>}
     <input hidden ref={galleryInput} type="file" accept="image/*" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
     <input hidden ref={photoCameraInput} type="file" accept="image/*" capture="environment" onChange={async e => {const file=e.target.files?.[0];e.target.value='';await fromPhoto(file)}} />
     {notice && <div className="of-notice" role="status">{notice}{deletedItem && <button type="button" onClick={undoRecipeDelete} style={{marginInlineStart:12,minHeight:44,fontWeight:700}}>Rückgängig</button>}</div>}
@@ -547,10 +606,21 @@ export default function Nutrition() {
     </>}
     {tab === 'backup' && <>
       <div className="card of-backup"><h2>Ernährungsbackup</h2><p>Dieser Export sichert ausschließlich Ernährung, inklusive Wasser, Aktivitäten, Mahlzeiten und Ziele. Das gemeinsame Training-und-Ernährung-Backup findest du in den allgemeinen openForm-Einstellungen.</p>
-        <div className="of-actions"><button onClick={exportBackup}><Icon name="share" /> Export</button><button onClick={() => backupInput.current?.click()}><Icon name="download" /> Import</button>
+        <div className="of-actions"><button onClick={exportBackup}><Icon name="share" /> Ernährung sichern (JSON)</button><button onClick={() => backupInput.current?.click()}><Icon name="download" /> Import</button><button onClick={openDayShare} disabled={dayShareBusy}><Icon name="share" /> Tagesbild teilen</button>
           <input hidden type="file" ref={backupInput} accept=".json,application/json" onChange={async e => { await importBackup(e.target.files?.[0]); e.target.value = '' }} /></div>
       </div>
     </>}
+    {dayShare && <div className="of-share-overlay" onClick={closeDayShare}>
+      <section className="of-share-dialog" role="dialog" aria-modal="true" aria-label="Ernährungsbericht teilen" onClick={e => e.stopPropagation()}>
+        <h2>Tagesbericht als Bild</h2>
+        <p>Vorschau · {dayShare.date} · nur Daten dieses Tages</p>
+        <img src={dayShare.url} alt="Vorschau des Ernährungsberichts" />
+        <div className="of-share-actions">
+          <button type="button" onClick={closeDayShare}>Abbrechen</button>
+          <button type="button" disabled={dayShareBusy} onClick={shareDayImage}><Icon name="share" /> {dayShareBusy ? 'Teilen …' : 'Bild teilen / speichern'}</button>
+        </div>
+      </section>
+    </div>}
   </div>
 }
 function Progress({ value, max }) { return <div className="of-bar" role="progressbar" aria-valuenow={value} aria-valuemin="0" aria-valuemax={max || 0}><span style={{ width: `${Math.min(100, max > 0 ? 100 * value / max : 0)}%` }} /></div> }
