@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createEntry, entryTotals, dayTotals, normalizedNutrition, mergeNutrition, nutritionBackup, readNutritionBackup, parseOpenFoodFacts, dateLocal } from './nutrition.js'
+import { nutritionDayCardModel } from './nutrition-card.js'
+import { readFileSync } from 'node:fs'
 
 test('150 g food: correct macro totals', () => {
   const meal = createEntry({ name: 'Quark', date: '2026-10-24', quantity: 150, per100: { kcal: 70, protein: 12, carbs: 4, fat: 0.5 } })
@@ -34,4 +36,43 @@ test('OFF only accepts records with macro values', () => {
 test('invalid storage falls back to sensible goals', () => {
   assert.equal(normalizedNutrition({}).goals.kcal, 2200)
   assert.match(dateLocal(new Date(2026, 9, 24)), /^2026-10-24$/)
+})
+
+test('daily nutrition image uses the selected date, exact portions and macro values without changing the diary', () => {
+  const food = createEntry({ name:'Skyr', date:'2026-11-19', mealType:'breakfast', quantity:250,
+    per100:{kcal:60, protein:10, carbs:4, fat:0} })
+  const otherDay = createEntry({ name:'Brot', date:'2026-11-18', quantity:100,
+    per100:{kcal:250, protein:7, carbs:49, fat:3} })
+  const original = normalizedNutrition({ schemaVersion:1,entries:[food,otherDay],
+    water:{'2026-11-19':1250},activities:[{id:'walk',date:'2026-11-19',name:'Weg',kcal:85}],
+    goals:{kcal:2200,protein:150},supplements:[] })
+  const frozen = JSON.stringify(original)
+  const card = nutritionDayCardModel(original,'2026-11-19')
+  assert.equal(card.date,'2026-11-19')
+  assert.equal(card.entryCount,1)
+  assert.equal(card.totals.kcal,150)
+  assert.equal(card.totals.protein,25)
+  assert.equal(card.totals.carbs,10)
+  assert.equal(card.goals.kcal,2200)
+  assert.equal(card.groups[0].title,'Frühstück')
+  assert.equal(card.groups[0].items[0].name,'Skyr')
+  assert.equal(card.groups[0].items[0].amount,'250 g')
+  assert.equal(card.waterMl,1250)
+  assert.equal(card.activityKcal,85)
+  assert.equal(card.groups.some(g=>g.items.some(item=>item.name==='Brot')),false)
+  assert.equal(JSON.stringify(original),frozen)
+})
+
+test('food card and JSON backup remain separate: daily image has no full restore semantics', () => {
+ const empty=nutritionDayCardModel({schemaVersion:1,entries:[]},'2026-11-19')
+ assert.equal(empty.entryCount,0)
+ assert.deepEqual(empty.groups,[])
+ assert.deepEqual(empty.totals,{kcal:0,protein:0,carbs:0,fat:0})
+ const view=readFileSync(new URL('../views/Nutrition.jsx',import.meta.url),'utf8')
+ const settings=readFileSync(new URL('../views/Settings.jsx',import.meta.url),'utf8')
+ assert.match(view,/Tagesbericht als Bild teilen/)
+ assert.match(view,/shareExportBlob\(dayShare.blob, name\)/)
+ assert.match(view,/nutritionBackup\(loadNutrition\(\)\)/)
+ assert.match(settings,/Nur Ernährung exportieren \(JSON\)/)
+ assert.match(settings,/shareExport\(json, name\)/)
 })
