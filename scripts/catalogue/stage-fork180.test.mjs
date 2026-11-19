@@ -23,7 +23,7 @@ function mp4() {
   b.writeUInt32BE(24, 0); b.write('ftyp', 4); b.write('isom', 8)
   return b
 }
-function fixture(clipFile, alternateDrawing = null) {
+function fixture(clipFile, alternateDrawing = null, sourceExercise = exercise) {
   const root = mkdtempSync(path.join(tmpdir(), 'openform-media-test-'))
   const source = path.join(root, 'source')
   mkdirSync(path.join(root,'frontend/src/lib'), {recursive:true})
@@ -31,7 +31,7 @@ function fixture(clipFile, alternateDrawing = null) {
   mkdirSync(path.join(source, 'still'), {recursive:true})
   mkdirSync(path.join(source, 'clip'), {recursive:true})
   writeFileSync(path.join(source,'NOTICE.md'), '© Aliaksandr Makatserchyk, Gym visual - test fixture\n')
-  writeFileSync(path.join(source,'still',exercise.img), webp())
+  writeFileSync(path.join(source,'still',sourceExercise.img), webp())
   if (clipFile) writeFileSync(path.join(source,'clip',clipFile), clipFile.endsWith('.mp4') ? mp4() : webp(true))
   if (alternateDrawing) {
     writeFileSync(path.join(source,'still',alternateDrawing+'.webp'),webp())
@@ -86,11 +86,11 @@ test('no source never creates a false positive media mapping',()=>{
 })
 
 test('gender variants are mapped only when the separately approved original files exist',()=>{
- const selected=EXDB.find(ex=>ex.id===exercise.id && (ex.mv || ex.fv))
- assert.ok(selected,'First catalogue exercise should have a figure variant for this fixture')
+ const selected=EXDB.find(ex=>(ex.mv || ex.fv) && typeof ex.img==='string')
+ assert.ok(selected,'Catalogue should have an exercise with a separate drawing')
  const gender=selected.fv ? 'female' : 'male'
  const drawing=selected.fv || selected.mv
- const f=fixture(exercise.id+'.mp4',drawing)
+ const f=fixture(selected.id+'.mp4',drawing,selected)
  try {
    f.run()
    assert.equal(f.map('fork180-figure-map.json')[selected.id][gender].still,drawing+'.webp')
