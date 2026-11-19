@@ -17,3 +17,16 @@ export function exerciseClipUrl(bucket, file, root = appRoot) {
   if (bucket !== 'fork180' || typeof file !== 'string' || !/^[a-z0-9_-]+\.(mp4|webp)$/i.test(file)) return null
   return new URL('exercise-media/' + bucket + '/clip/' + file, root).href
 }
+
+/**
+ * An openGym exercise may have a second drawing ID for a different figure.
+ * Only choose the alternate when the licensed packager verified that file;
+ * otherwise keep the original ID's still/clip. Never change exercise IDs.
+ */
+export function selectFigureMediaFile(ex, figure, originalFile, verifiedFigures, kind) {
+  if (figure !== 'male' && figure !== 'female') return originalFile
+  const candidate = verifiedFigures?.[ex?.id]?.[figure]?.[kind]
+  if (kind === 'still') return safeName(candidate) ? candidate : originalFile
+  if (kind === 'clip') return typeof candidate === 'string' && /^[a-z0-9_-]+\.(mp4|webp)$/i.test(candidate) ? candidate : originalFile
+  return originalFile
+}

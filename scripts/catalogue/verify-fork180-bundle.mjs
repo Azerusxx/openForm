@@ -10,6 +10,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..')
 const front=path.join(ROOT,'frontend')
 const mapping=JSON.parse(fs.readFileSync(path.join(front,'src/lib/fork180-image-map.json'),'utf8'))
 const clipMapping=JSON.parse(fs.readFileSync(path.join(front,'src/lib/fork180-clip-map.json'),'utf8'))
+const figureMapping=JSON.parse(fs.readFileSync(path.join(front,'src/lib/fork180-figure-map.json'),'utf8'))
 const ids=new Set(EXDB.map(e=>String(e.id)))
 const publicDir=path.join(front,'public/exercise-media/fork180')
 const distDir=path.join(front,'dist/exercise-media/fork180')
@@ -45,9 +46,23 @@ for(const [id,file] of clips){
     if(!fs.existsSync(filename) || !fs.statSync(filename).size) throw Error('Authorized clip missing: '+id+'/'+file+' in '+dir)
   }
 }
+for (const [id, variants] of Object.entries(figureMapping)) {
+  if (!ids.has(id)) throw Error('Unknown exercise ID in figure map: '+id)
+  for (const [figure, media] of Object.entries(variants)) {
+    if (!['male','female'].includes(figure) || !media || typeof media !== 'object') throw Error('Unknown figure variant: '+id+'/'+figure)
+    for (const [kind, file] of Object.entries(media)) {
+      if (kind !== 'still' && kind !== 'clip') throw Error('Unknown figure media category: '+kind)
+      if (!new RegExp('^[a-z0-9_-]+\\.'+(kind==='still'?'webp':'(?:mp4|webp)')+'$', 'i').test(file)) throw Error('Invalid figure media filename: '+file)
+      for (const dir of [publicDir,distDir]) {
+        const filename=path.join(dir,kind==='clip'?'clip':'',file)
+        if (!fs.existsSync(filename)) throw Error('Missing verified figure media: '+id+'/'+figure+'/'+file)
+      }
+    }
+  }
+}
 if(clips.length && !files.length) console.warn('::warning::Animations are supplied without still previews.')
 if(clips.length) for(const dir of [publicDir,distDir]) {
   if(!fs.existsSync(path.join(dir,'NOTICE.md')))throw Error('Missing clip copyright notice at '+dir)
 }
 if(fs.existsSync(path.join(front,'dist/exercise-media/repdb')))throw Error('RepDB files unexpectedly packaged')
-console.log('VERIFIED: '+files.length+' authorized stills, '+clips.length+' authorized animations bound to unchanged exercise IDs. '+(!files.length&&!clips.length?'No license-approved media supplied. No replacements performed.':''))
+console.log('VERIFIED: '+files.length+' authorized stills, '+clips.length+' authorized animations, '+Object.keys(figureMapping).length+' exercises with verified alternate figure drawings, bound to unchanged exercise IDs. '+(!files.length&&!clips.length?'No license-approved media supplied. No replacements performed.':''))
