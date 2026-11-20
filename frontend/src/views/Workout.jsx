@@ -22,6 +22,7 @@ import { insertionIndexAfterCurrentUnit, nextUnfinishedUnit, setProgressHighWate
 import Media from '../components/Media.jsx'
 import WorkoutScrollAnchor from '../components/WorkoutScrollAnchor.jsx'
 import WorkoutChips from '../components/WorkoutChips.jsx'
+import { repCounterSheet } from '../components/RepCounterSheet.jsx'
 import { supersetMeta } from '../lib/superset-meta.js'
 import WorkoutThumb, { hasWorkoutMedia } from '../components/WorkoutThumb.jsx'
 import { workoutSettingsSheet } from '../components/WorkoutSettingsSheet.jsx'
@@ -397,6 +398,21 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // The exercise's own rest, or the default it falls back to (lib/supersetFlow.js restSecFor).
   const ownRest = entry.target?.restSec > 0 ? entry.target.restSec : 0
   const restSub = ownRest ? fmtRest(ownRest) : t('Default ({0})', fmtRest(S.restSec))
+  // This sensor is ONLY for the normal bilateral repetition row of a guided
+  // machine. No free weights, unilateral exercises, holds, cardio, or drops.
+  const supportedMachine = /cable|lever|machine|smith|sled|assisted/i.test(String(ex.eq || ''))
+  const sensorSetIdx = !editing && mode === 'reps' && !perSide && supportedMachine
+    ? entry.sets.findIndex(row => !row.done && !isWarmupRow(row) && !isSideSet(row) && !isDropSet(row) && !isRestPauseSet(row))
+    : -1
+  const openSensorRepCounter = () => {
+    if (sensorSetIdx < 0) return
+    const row = entry.sets[sensorSetIdx]
+    repCounterSheet({
+      sessionId: S.active.id, entryIdx, setIdx: sensorSetIdx,
+      exId: entry.id, initialReps: row.r,
+      onApply: reps => onField(sensorSetIdx, 'r', reps),
+    })
+  }
   const openMore = () => menuSheet({
     title: exerciseNameFor(ex),
     titleClass: exerciseNameClass(ex),
@@ -405,6 +421,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
         onSwap && { icon: 'swap', label: t('Swap exercise'), onClick: onSwap, disabled: busy },
         onOccupied && { icon: 'shuffle', label: 'Gerät belegt – Alternative finden', onClick: onOccupied, disabled: busy },
         onDeviceScan && { icon: 'qr', label: 'Gerät scannen', sub: 'Studioübergreifender QR-Gerätepass', onClick: onDeviceScan, disabled: busy },
+        sensorSetIdx >= 0 && { icon: 'gauge', label: 'Wiederholungen per Handy-Sensor (Beta)', sub: 'Geführte Maschinen · Kalibrierung und Kontrolle nötig', onClick: openSensorRepCounter },
         { icon: 'sunrise', label: t('Add warm-up set'), onClick: onAddWarmup },
         { icon: 'note', label: entry.note ? t('Edit note') : t('Add note'), sub: entry.note || undefined, onClick: () => exerciseNoteSheet(entryIdx) },
         onNoProg && { icon: 'chartLineSlash', label: t('Don’t count for progression'), sub: t('This exercise, this session only'), on: entry.noProg === true, onClick: () => onNoProg(entry.noProg !== true) },
