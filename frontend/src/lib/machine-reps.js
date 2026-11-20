@@ -74,7 +74,7 @@ export class MachineRepDetector {
   finishCalibration() {
     if (this.samples.length < 55) return {ok:false,reason:'Zu wenig Sensordaten. Drei vollständige, langsame Wiederholungen erfassen.'}
     const values = this.samples.map(s=>s.a)
-    const high = percentile(values,.83)
+    const high = percentile(values,.92)
     if (high < .38) return {ok:false,reason:'Kaum Bewegung erkannt. Befestigung und Sensor prüfen.'}
     const threshold = clamp(high * .58,.28,4)
     const peaks = extractBursts(this.samples,threshold)
