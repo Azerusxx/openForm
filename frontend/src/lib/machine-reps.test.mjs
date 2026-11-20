@@ -68,7 +68,7 @@ test('rep counter is opt-in, Android native, restricted to machines and cannot a
  assert.match(sheet,/row\.r !== initialReps/)
  assert.match(sheet,/!row \|\| row\.done/)
  assert.match(sheet,/Ich habe eine sichere Befestigung geprüft/)
- assert.match(sheet,/phase === 'review'/)
+ assert.match(sheet,/phase\s*===\s*'review'/)
  assert.match(native,/TYPE_LINEAR_ACCELERATION/)
  assert.match(native,/handleOnStop/)
  assert.match(main,/registerPlugin\(RepMotionPlugin\.class\)/)
