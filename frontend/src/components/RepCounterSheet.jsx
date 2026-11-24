@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { MachineRepDetector } from '../lib/machine-reps.js'
 import { HeightRepDetector } from '../lib/height-reps.js'
-import { repHeightStatus, startRepHeight } from '../lib/rep-height.js'
+import { repHeightStatus, repHeightDiagnostics, startRepHeight } from '../lib/rep-height.js'
 import { repMotionStatus, startRepMotion } from '../lib/rep-motion.js'
 
 const noteStyle = {fontSize:13, lineHeight:1.45}
@@ -32,6 +32,9 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
   const [heightCm, setHeightCm] = useState(null)
   const [amplitudeCm, setAmplitudeCm] = useState(null)
   const [notice, setNotice] = useState('')
+  const [live, setLive] = useState({received:0, heightCm:null, maxCm:0, pressureHpa:null, acceleration:null})
+  const [nativeHealth, setNativeHealth] = useState(null)
+  const [liveSeconds, setLiveSeconds] = useState(0)
   const detectorRef = useRef(new MachineRepDetector())
   const heightRef = useRef(new HeightRepDetector())
   const sensorDetector = () => sensorMode === 'height' ? heightRef.current : detectorRef.current
@@ -61,7 +64,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       detectorRef.current.stop()
       heightRef.current.stop()
       if (alive.current) {
-        setPhase(p => p === 'counting' ? 'review' : p === 'calibrating' ? 'idle' : p)
+        setPhase(p => p === 'counting' ? 'review' : (p === 'calibrating' || p === 'diagnosing') ? 'idle' : p)
         setNotice('Messung durch Hintergrundwechsel unterbrochen. Anzahl kontrollieren oder neu kalibrieren.')
       }
     }
@@ -76,6 +79,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
   }, [])
 
   const switchMode = next => {
+    if (phase === 'diagnosing') return
     if (phase === 'calibrating' || phase === 'counting') return
     setSensorMode(next)
     detectorRef.current.resetCalibration()
@@ -87,7 +91,71 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
     setHeightCm(null)
     setAmplitudeCm(null)
     setNotice('')
+    setNativeHealth(null)
+    setLive({received:0,heightCm:null,maxCm:0,pressureHpa:null,acceleration:null})
   }
+
+  // Independent hardware check: no calibration, no mounting checkbox, and
+  // absolutely no writes to workout state. This is safe for handheld testing.
+  const startLiveTest = async () => {
+    if (!available || phase === 'calibrating' || phase === 'counting' || phase === 'diagnosing') return
+    setNotice('Live-Test aktiv. Smartphone ruhig halten und langsam um etwa einen Meter anheben und wieder absenken. Die Rohwerte müssen sich ändern.')
+    setLive({received:0,heightCm:null,maxCm:0,pressureHpa:null,acceleration:null})
+    setNativeHealth(null)
+    setLiveSeconds(0)
+    try {
+      const stop = await (sensorMode === 'height'
+        ? startRepHeight(point => {
+            if (!alive.current) return
+            const value = Number(point?.h)
+            const pressure = Number(point?.p)
+            if (!Number.isFinite(value)) return
+            const h = value * 100
+            setLive(prev => ({
+              received: prev.received+1,
+              heightCm: h,
+              maxCm: Math.max(prev.maxCm,Math.abs(h)),
+              pressureHpa: Number.isFinite(pressure) ? pressure : null,
+              acceleration:null,
+            }))
+          })
+        : startRepMotion(point => {
+            if (!alive.current) return
+            const x=Number(point?.x),y=Number(point?.y),z=Number(point?.z)
+            if (![x,y,z].every(Number.isFinite)) return
+            const magnitude=Math.sqrt(x*x+y*y+z*z)
+            setLive(prev=>({...prev,received:prev.received+1,acceleration:magnitude}))
+          }))
+      if (!alive.current) { await stop(); return }
+      stopRef.current = stop
+      setPhase('diagnosing')
+    } catch(e) {
+      setNotice(e?.message || 'Live-Sensor konnte nicht gestartet werden.')
+    }
+  }
+
+  const finishLiveTest = async () => {
+    await stopStream()
+    if (!alive.current) return
+    setPhase('idle')
+    setNotice('Live-Test beendet. Die Messung verändert keine Trainingsdaten.')
+  }
+
+  useEffect(() => {
+    if (phase !== 'diagnosing') return
+    let alivePoll=true
+    const poll=async()=>{
+      if (sensorMode !== 'height') return
+      const health=await repHeightDiagnostics()
+      if (alivePoll) setNativeHealth(health)
+    }
+    poll()
+    const interval=setInterval(()=>{
+      setLiveSeconds(old=>old+1)
+      poll()
+    },1000)
+    return ()=>{alivePoll=false;clearInterval(interval)}
+  },[phase,sensorMode])
 
   const startCalibration = async () => {
     if (!secured || !available) return
@@ -191,9 +259,9 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       <span>Ich habe eine sichere Befestigung geprüft und die Verwendung an diesem Gerät ist erlaubt.</span>
     </label>
     <div role="group" aria-label="Messmethode auswählen" style={{display:'flex',gap:8,margin:'12px 0',flexWrap:'wrap'}}>
-      <button type="button" aria-pressed={sensorMode==='height'} disabled={phase==='calibrating'||phase==='counting'}
+      <button type="button" aria-pressed={sensorMode==='height'} disabled={phase==='calibrating'||phase==='counting'||phase==='diagnosing'}
         style={sensorMode==='height'?accent:action} onClick={()=>switchMode('height')}>Höhenmessung (Barometer)</button>
-      <button type="button" aria-pressed={sensorMode==='motion'} disabled={phase==='calibrating'||phase==='counting'}
+      <button type="button" aria-pressed={sensorMode==='motion'} disabled={phase==='calibrating'||phase==='counting'||phase==='diagnosing'}
         style={sensorMode==='motion'?accent:action} onClick={()=>switchMode('motion')}>Bewegungssensor</button>
     </div>
     {sensorMode==='height' && <p className="muted small" style={noteStyle}>
@@ -213,12 +281,38 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
           : <p role="alert" style={{...noteStyle,margin:'6px 0',color:'var(--orange)'}}>
               {(sensorMode==='height'?heightStatus:status)?.reason} Bitte {sensorMode==='height'?'zum Bewegungssensor wechseln':'den Sensor prüfen'}.
             </p>}
-      <button type="button" disabled={phase==='calibrating'||phase==='counting'} onClick={checkSensor}
+      <button type="button" disabled={phase==='calibrating'||phase==='counting'||phase==='diagnosing'} onClick={checkSensor}
         style={{...action,padding:'8px 12px',marginTop:7}}>Sensor erneut prüfen</button>
     </div>
+    <div style={{border:'1px solid var(--sep)',borderRadius:12,padding:12,margin:'10px 0'}}>
+      <strong style={{fontSize:13}}>Sensor-Livetest · unabhängig vom Training</strong>
+      <p className="muted small" style={noteStyle}>
+        Funktioniert beim sicheren Halten in der Hand. Für den Test ist keine Befestigung erforderlich.
+        Halte das Handy erst ruhig, hebe es dann etwa einen Meter hoch und wieder herunter.
+      </p>
+      {phase!=='diagnosing' && <button type="button" style={action} disabled={!available||phase==='calibrating'||phase==='counting'} onClick={startLiveTest}>Sensor live testen</button>}
+      {phase==='diagnosing' && <>
+        {sensorMode==='height'
+          ? <div style={{fontVariantNumeric:'tabular-nums'}}>
+              <div><strong>Höhenänderung:</strong> {live.heightCm === null ? 'Noch keine Daten' : live.heightCm.toFixed(1)+' cm'}</div>
+              <div><strong>Maximaler Ausschlag:</strong> {live.maxCm.toFixed(1)} cm</div>
+              <div><strong>Luftdruck:</strong> {live.pressureHpa === null ? 'Noch keine Daten' : live.pressureHpa.toFixed(4)+' hPa'}</div>
+            </div>
+          : <div><strong>Beschleunigung:</strong> {live.acceleration === null ? 'Noch keine Daten' : live.acceleration.toFixed(2)+' m/s²'}</div>}
+        <div className="muted small">In der App empfangene Messwerte: {live.received} · Live-Test: {liveSeconds} s</div>
+        {sensorMode==='height' && nativeHealth && <>
+          <div className="muted small">Android-Sensorereignisse: {nativeHealth.nativeSamples} · Gesendet: {nativeHealth.emittedSamples} · Nullpunkt: {nativeHealth.baselineSamples}/8</div>
+          {nativeHealth.error && <p role="alert" className="muted small">{nativeHealth.error}</p>}
+          {liveSeconds >= 4 && nativeHealth.nativeSamples === 0 && <p role="alert" className="muted small">Der Sensor wird erkannt, liefert aber keine Rohdaten. Bitte Android-Sensoren prüfen und die App neu starten.</p>}
+          {liveSeconds >= 4 && nativeHealth.nativeSamples > 8 && live.received === 0 && <p role="alert" className="muted small">Android misst Luftdruck, aber die Werte kommen nicht in der App an. Das ist ein Fehler in der Sensoranbindung.</p>}
+        </>}
+        {liveSeconds >= 4 && live.received > 0 && sensorMode==='height' && live.maxCm < 8 && <p className="muted small">Es kommen Daten an, aber bisher kaum Höhenänderung. Prüfe, ob du den Barometer-Livetest bei der Bewegung beobachtest.</p>}
+        <button type="button" style={action} onClick={finishLiveTest}>Livetest stoppen</button>
+      </>}
+    </div>
     <div style={{border:'1px solid var(--sep)',background:'var(--surface)',borderRadius:16,padding:18,textAlign:'center',margin:'12px 0'}}>
-      <div style={{fontSize:12,color:'var(--label-2)',fontWeight:650}}>{phase==='calibrating'?'KALIBRIERUNG · 3 WIEDERHOLUNGEN':phase==='counting'?'AUTOMATISCH GESCHÄTZT':'WIEDERHOLUNGEN'}</div>
-      <div aria-live="polite" style={{fontSize:62,fontWeight:750,fontVariantNumeric:'tabular-nums'}}>{phase==='calibrating'?'3':count}</div>
+      <div style={{fontSize:12,color:'var(--label-2)',fontWeight:650}}>{phase==='calibrating'?'KALIBRIERUNG · 3 WDH. (NOCH KEINE ZÄHLUNG)':phase==='counting'?'AUTOMATISCH GESCHÄTZT':'WIEDERHOLUNGEN'}</div>
+      <div aria-live="polite" style={{fontSize:62,fontWeight:750,fontVariantNumeric:'tabular-nums'}}>{phase==='calibrating'?'–':count}</div>
       {tempo && <p className="muted small">Gelernter Rhythmus: etwa {tempo.toLocaleString('de-AT')} Sekunden pro Wiederholung</p>}
       {sensorMode==='height' && heightCm !== null && <p className="muted small" aria-live="off">Aktuelle relative Höhe: {heightCm} cm</p>}
       {sensorMode==='height' && amplitudeCm !== null && <p className="muted small">Kalibrierter Hub: etwa {amplitudeCm} cm</p>}
