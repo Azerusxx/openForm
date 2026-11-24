@@ -79,7 +79,7 @@ test('Android reads real TYPE_PRESSURE height, UI exposes optional barometer mod
   assert.match(bridge,/export async function startRepHeight/)
   assert.match(ui,/Höhenmessung \(Barometer\)/)
   assert.match(ui,/Aktuelle relative Höhe/)
-  assert.match(ui,/sensorMode==='height' \? heightRef\.current/)
+  assert.match(ui,/sensorMode\s*===\s*'height'\s*\?\s*heightRef\.current/)
   assert.match(ui,/sensorMode === 'height'/)
   assert.match(ui,/!row \|\| row\.done/)
   assert.doesNotMatch(native,/TYPE_MAGNETIC_FIELD|TYPE_ROTATION_VECTOR|ACCESS_FINE_LOCATION/)
