@@ -311,8 +311,8 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       </>}
     </div>
     <div style={{border:'1px solid var(--sep)',background:'var(--surface)',borderRadius:16,padding:18,textAlign:'center',margin:'12px 0'}}>
-      <div style={{fontSize:12,color:'var(--label-2)',fontWeight:650}}>{phase==='calibrating'?'KALIBRIERUNG · 3 WIEDERHOLUNGEN':phase==='counting'?'AUTOMATISCH GESCHÄTZT':'WIEDERHOLUNGEN'}</div>
-      <div aria-live="polite" style={{fontSize:62,fontWeight:750,fontVariantNumeric:'tabular-nums'}}>{phase==='calibrating'?'3':count}</div>
+      <div style={{fontSize:12,color:'var(--label-2)',fontWeight:650}}>{phase==='calibrating'?'KALIBRIERUNG · 3 WDH. (NOCH KEINE ZÄHLUNG)':phase==='counting'?'AUTOMATISCH GESCHÄTZT':'WIEDERHOLUNGEN'}</div>
+      <div aria-live="polite" style={{fontSize:62,fontWeight:750,fontVariantNumeric:'tabular-nums'}}>{phase==='calibrating'?'–':count}</div>
       {tempo && <p className="muted small">Gelernter Rhythmus: etwa {tempo.toLocaleString('de-AT')} Sekunden pro Wiederholung</p>}
       {sensorMode==='height' && heightCm !== null && <p className="muted small" aria-live="off">Aktuelle relative Höhe: {heightCm} cm</p>}
       {sensorMode==='height' && amplitudeCm !== null && <p className="muted small">Kalibrierter Hub: etwa {amplitudeCm} cm</p>}
