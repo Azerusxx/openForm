@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { MachineRepDetector } from '../lib/machine-reps.js'
-import { repMotionAvailable, startRepMotion } from '../lib/rep-motion.js'
+import { repMotionStatus, startRepMotion } from '../lib/rep-motion.js'
 
 const noteStyle = {fontSize:13, lineHeight:1.45}
 const actions = {display:'flex', flexWrap:'wrap', gap:8, marginTop:12}
@@ -16,7 +16,8 @@ const accent = { ...action,background:'var(--acc)',color:'var(--bg)' }
  * workouts, sets or persistence until the user explicitly confirms.
  */
 export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, initialReps, onApply }) {
-  const [available, setAvailable] = useState(null)
+  const [status, setStatus] = useState(null)
+  const available = status?.available === true
   const [secured, setSecured] = useState(false)
   const [phase, setPhase] = useState('idle')
   const [count, setCount] = useState(0)
@@ -33,9 +34,14 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
     if (stop) try { await stop() } catch { /* still unregister on close */ }
   }
 
+  const checkSensor = async () => {
+    const next = await repMotionStatus()
+    if (alive.current) setStatus(next)
+  }
+
   useEffect(() => {
     alive.current = true
-    repMotionAvailable().then(ok => { if (alive.current) setAvailable(ok) })
+    checkSensor()
     const onHide = () => {
       if (!document.hidden) return
       stopStream()
@@ -55,7 +61,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
   }, [])
 
   const startCalibration = async () => {
-    if (!secured || available !== true) return
+    if (!secured || !available) return
     setNotice('Genau drei vollständige Wiederholungen langsam ausführen. Danach bei stillstehendem Gerät „Kalibrierung stoppen“ drücken.')
     setFrames(0);setCount(0);setTempo(null)
     detectorRef.current.resetCalibration()
@@ -74,7 +80,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
     await stopStream()
     const result = detectorRef.current.finishCalibration()
     if (!alive.current) return
-    if (!result.ok) {setNotice(result.reason);setPhase('idle');return}
+    if (!result.ok) {setNotice(result.reason + (frames < 12 ? ' Falls keine Messpunkte erscheinen, Sensordiagnose prüfen.' : ''));setPhase('idle');return}
     setTempo(Math.round(result.periodMs / 100) / 10)
     setNotice('Kalibrierung akzeptiert. Setze die Maschine zurück und beginne einen NEUEN Satz. Der Zähler startet bei 0.')
     setPhase('ready')
@@ -88,6 +94,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       const stop = await startRepMotion(point => {
         if (!alive.current) return
         const next = detectorRef.current.push(point)
+        setFrames(old => old + 1)
         setCount(old => old === next ? old : next)
       })
       if (!alive.current) { await stop(); return }
@@ -135,16 +142,29 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       <input type="checkbox" checked={secured} disabled={phase==='calibrating'||phase==='counting'} onChange={e=>setSecured(e.target.checked)} />
       <span>Ich habe eine sichere Befestigung geprüft und die Verwendung an diesem Gerät ist erlaubt.</span>
     </label>
-    {available === null && <p className="muted small">Prüfe Bewegungssensor …</p>}
-    {available === false && <p role="status" style={noteStyle}>Kein nutzbarer Android-Bewegungssensor gefunden. Der normale Trainingsmodus bleibt unverändert.</p>}
+    <div style={{border:'1px solid var(--sep)',borderRadius:12,padding:12,margin:'10px 0'}}>
+      <strong style={{fontSize:13}}>Sensor-Diagnose</strong>
+      {status === null
+        ? <p role="status" className="muted small">Prüfe Bewegungssensor …</p>
+        : status.available
+          ? <p role="status" className="muted small" style={{marginBottom:4}}>
+              Sensor erkannt: {status.mode === 'accelerometer' ? 'Beschleunigungssensor (Fallback mit Schwerkraftfilter)' : 'Linearer Beschleunigungssensor'}
+              {status.sensorName ? ` · ${status.sensorName}` : ''}. Keine Berechtigung nötig.
+            </p>
+          : <p role="alert" style={{...noteStyle,margin:'6px 0',color:'var(--orange)'}}>
+              {status.reason} Der Start bleibt gesperrt, bis ein Sensor erkannt wurde.
+            </p>}
+      <button type="button" disabled={phase==='calibrating'||phase==='counting'} onClick={checkSensor}
+        style={{...action,padding:'8px 12px',marginTop:7}}>Sensor erneut prüfen</button>
+    </div>
     <div style={{border:'1px solid var(--sep)',background:'var(--surface)',borderRadius:16,padding:18,textAlign:'center',margin:'12px 0'}}>
       <div style={{fontSize:12,color:'var(--label-2)',fontWeight:650}}>{phase==='calibrating'?'KALIBRIERUNG · 3 WIEDERHOLUNGEN':phase==='counting'?'AUTOMATISCH GESCHÄTZT':'WIEDERHOLUNGEN'}</div>
       <div aria-live="polite" style={{fontSize:62,fontWeight:750,fontVariantNumeric:'tabular-nums'}}>{phase==='calibrating'?'3':count}</div>
       {tempo && <p className="muted small">Gelernter Rhythmus: etwa {tempo.toLocaleString('de-AT')} Sekunden pro Wiederholung</p>}
-      {phase==='calibrating' && <p className="muted small">{frames} Sensormesspunkte</p>}
+      {(phase==='calibrating'||phase==='counting') && <p className="muted small">Sensor-Messwerte: {frames}{frames===0 ? ' · Keine Daten empfangen' : ' · Sensor liefert Daten'}</p>}
     </div>
     {notice && <p role="status" style={{...noteStyle,color:'var(--label-2)'}}>{notice}</p>}
-    {phase==='idle' && <div style={actions}><button style={accent} disabled={!secured || available!==true} onClick={startCalibration}>3 Wiederholungen kalibrieren</button><button style={action} onClick={cancel}>Abbrechen</button></div>}
+    {phase==='idle' && <div style={actions}><button style={accent} disabled={!secured || !available} onClick={startCalibration}>3 Wiederholungen kalibrieren</button><button style={action} onClick={cancel}>Abbrechen</button></div>}
     {phase==='calibrating' && <div style={actions}><button style={accent} onClick={finishCalibration}>Kalibrierung stoppen</button><button style={action} onClick={cancel}>Abbrechen</button></div>}
     {phase==='ready' && <div style={actions}><button style={accent} disabled={!secured} onClick={startCount}>Neuen Satz zählen</button><button style={action} onClick={startCalibration}>Neu kalibrieren</button><button style={action} onClick={cancel}>Schließen</button></div>}
     {phase==='counting' && <div style={actions}><button style={accent} onClick={finishCount}>Messung beenden</button><button style={action} onClick={cancel}>Verwerfen</button></div>}
