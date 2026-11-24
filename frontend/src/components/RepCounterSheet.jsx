@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { MachineRepDetector } from '../lib/machine-reps.js'
+import { HeightRepDetector } from '../lib/height-reps.js'
+import { repHeightStatus, startRepHeight } from '../lib/rep-height.js'
 import { repMotionStatus, startRepMotion } from '../lib/rep-motion.js'
 
 const noteStyle = {fontSize:13, lineHeight:1.45}
@@ -17,14 +19,22 @@ const accent = { ...action,background:'var(--acc)',color:'var(--bg)' }
  */
 export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, initialReps, onApply }) {
   const [status, setStatus] = useState(null)
-  const available = status?.available === true
+  const [heightStatus, setHeightStatus] = useState(null)
+  // Height is the preferred mode for a flat phone carried by the weight stack.
+  // The old acceleration counter remains a manual fallback without a barometer.
+  const [sensorMode, setSensorMode] = useState('height')
+  const available = (sensorMode === 'height' ? heightStatus : status)?.available === true
   const [secured, setSecured] = useState(false)
   const [phase, setPhase] = useState('idle')
   const [count, setCount] = useState(0)
   const [frames, setFrames] = useState(0)
   const [tempo, setTempo] = useState(null)
+  const [heightCm, setHeightCm] = useState(null)
+  const [amplitudeCm, setAmplitudeCm] = useState(null)
   const [notice, setNotice] = useState('')
   const detectorRef = useRef(new MachineRepDetector())
+  const heightRef = useRef(new HeightRepDetector())
+  const sensorDetector = () => sensorMode === 'height' ? heightRef.current : detectorRef.current
   const stopRef = useRef(null)
   const alive = useRef(true)
 
@@ -35,8 +45,11 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
   }
 
   const checkSensor = async () => {
-    const next = await repMotionStatus()
-    if (alive.current) setStatus(next)
+    const [nextMotion, nextHeight] = await Promise.all([repMotionStatus(),repHeightStatus()])
+    if (alive.current) {
+      setStatus(nextMotion)
+      setHeightStatus(nextHeight)
+    }
   }
 
   useEffect(() => {
@@ -46,6 +59,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       if (!document.hidden) return
       stopStream()
       detectorRef.current.stop()
+      heightRef.current.stop()
       if (alive.current) {
         setPhase(p => p === 'counting' ? 'review' : p === 'calibrating' ? 'idle' : p)
         setNotice('Messung durch Hintergrundwechsel unterbrochen. Anzahl kontrollieren oder neu kalibrieren.')
@@ -57,19 +71,44 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       document.removeEventListener('visibilitychange',onHide)
       stopStream()
       detectorRef.current.stop()
+      heightRef.current.stop()
     }
   }, [])
 
+  const switchMode = next => {
+    if (phase === 'calibrating' || phase === 'counting') return
+    setSensorMode(next)
+    detectorRef.current.resetCalibration()
+    heightRef.current.resetCalibration()
+    setPhase('idle')
+    setFrames(0)
+    setCount(0)
+    setTempo(null)
+    setHeightCm(null)
+    setAmplitudeCm(null)
+    setNotice('')
+  }
+
   const startCalibration = async () => {
     if (!secured || !available) return
-    setNotice('Genau drei vollständige Wiederholungen langsam ausführen. Danach bei stillstehendem Gerät „Kalibrierung stoppen“ drücken.')
-    setFrames(0);setCount(0);setTempo(null)
-    detectorRef.current.resetCalibration()
+    setNotice(sensorMode === 'height'
+      ? 'Gewichtsblock unten ruhig halten, dann drei vollständige Auf-und-ab-Bewegungen. Zum Schluss wieder ganz absetzen und Kalibrierung stoppen.'
+      : 'Genau drei vollständige Wiederholungen langsam ausführen. Danach bei stillstehendem Gerät „Kalibrierung stoppen“ drücken.')
+    setFrames(0);setCount(0);setTempo(null);setHeightCm(null);setAmplitudeCm(null)
+    sensorDetector().resetCalibration()
     try {
-      const stop = await startRepMotion(point => {
-        if (!alive.current) return
-        if (detectorRef.current.collect(point) && detectorRef.current.samples.length % 12 === 0) setFrames(detectorRef.current.samples.length)
-      })
+      const stop = await (sensorMode === 'height'
+        ? startRepHeight(point => {
+            if (!alive.current) return
+            if (heightRef.current.collect(point)) {
+              setFrames(old => old+1)
+              setHeightCm(Math.round(heightRef.current.height*100))
+            }
+          })
+        : startRepMotion(point => {
+            if (!alive.current) return
+            if (detectorRef.current.collect(point) && detectorRef.current.samples.length % 12 === 0) setFrames(detectorRef.current.samples.length)
+          }))
       if (!alive.current) { await stop();return }
       stopRef.current = stop
       setPhase('calibrating')
@@ -78,30 +117,39 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
 
   const finishCalibration = async () => {
     await stopStream()
-    const result = detectorRef.current.finishCalibration()
+    const result = sensorDetector().finishCalibration()
     if (!alive.current) return
     if (!result.ok) {setNotice(result.reason + (frames < 12 ? ' Falls keine Messpunkte erscheinen, Sensordiagnose prüfen.' : ''));setPhase('idle');return}
     setTempo(Math.round(result.periodMs / 100) / 10)
+    setAmplitudeCm(result.heightCm ?? null)
     setNotice('Kalibrierung akzeptiert. Setze die Maschine zurück und beginne einen NEUEN Satz. Der Zähler startet bei 0.')
     setPhase('ready')
   }
 
   const startCount = async () => {
-    if (!detectorRef.current.start()) return
+    if (!sensorDetector().start()) return
     setNotice('Wiederholungen kontrolliert ausführen. Die Zahl ist nur eine Schätzung.')
     setCount(0);setFrames(0)
     try {
-      const stop = await startRepMotion(point => {
-        if (!alive.current) return
-        const next = detectorRef.current.push(point)
-        setFrames(old => old + 1)
-        setCount(old => old === next ? old : next)
-      })
+      const stop = await (sensorMode === 'height'
+        ? startRepHeight(point => {
+            if (!alive.current) return
+            const next = heightRef.current.push(point)
+            setHeightCm(Math.round(heightRef.current.height*100))
+            setFrames(old => old+1)
+            setCount(old => old===next?old:next)
+          })
+        : startRepMotion(point => {
+            if (!alive.current) return
+            const next = detectorRef.current.push(point)
+            setFrames(old => old+1)
+            setCount(old => old===next?old:next)
+          }))
       if (!alive.current) { await stop(); return }
       stopRef.current = stop
       setPhase('counting')
     } catch(e) {
-      detectorRef.current.stop()
+      sensorDetector().stop()
       setPhase('ready')
       setNotice(e?.message || 'Sensor konnte nicht gestartet werden.')
     }
@@ -109,7 +157,7 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
 
   const finishCount = async () => {
     await stopStream()
-    const n=detectorRef.current.stop()
+    const n=sensorDetector().stop()
     if (!alive.current) return
     setCount(n)
     setPhase('review')
@@ -137,22 +185,33 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
   const cancel = () => {stopStream();close()}
   return <section className="rep-motion-sheet" aria-label="Sensor-Wiederholungszähler">
     <h3 style={{marginBottom:6}}>Sensor-Wiederholungszähler <small style={{color:'var(--label-2)'}}>Beta</small></h3>
-    <p className="muted small" style={noteStyle}>Nur für geeignete Maschinen mit sicherer, freigegebener Befestigung am beweglichen Teil. <strong>Handy niemals lose auf Gewichte legen, in Quetschstellen oder in den Bewegungsweg bringen.</strong> Bei Unsicherheit den Modus nicht verwenden.</p>
+    <p className="muted small" style={noteStyle}>Für geführte Maschinen: Das Handy darf <strong>flach auf dem beweglichen Gewichtsblock</strong> liegen, wenn es mit einer sicheren, vom Studio erlaubten Halterung befestigt ist. Ein Magnet allein ist bei Ruckbewegungen möglicherweise nicht ausreichend. <strong>Niemals lose auflegen, in Quetschstellen oder in den Bewegungsweg bringen.</strong> Magnetfelder können den Kompass stören, der Höhenmodus verwendet ihn nicht.</p>
     <label style={{display:'flex',gap:10,alignItems:'start',fontSize:14,margin:'14px 0'}}>
       <input type="checkbox" checked={secured} disabled={phase==='calibrating'||phase==='counting'} onChange={e=>setSecured(e.target.checked)} />
       <span>Ich habe eine sichere Befestigung geprüft und die Verwendung an diesem Gerät ist erlaubt.</span>
     </label>
+    <div role="group" aria-label="Messmethode auswählen" style={{display:'flex',gap:8,margin:'12px 0',flexWrap:'wrap'}}>
+      <button type="button" aria-pressed={sensorMode==='height'} disabled={phase==='calibrating'||phase==='counting'}
+        style={sensorMode==='height'?accent:action} onClick={()=>switchMode('height')}>Höhenmessung (Barometer)</button>
+      <button type="button" aria-pressed={sensorMode==='motion'} disabled={phase==='calibrating'||phase==='counting'}
+        style={sensorMode==='motion'?accent:action} onClick={()=>switchMode('motion')}>Bewegungssensor</button>
+    </div>
+    {sensorMode==='height' && <p className="muted small" style={noteStyle}>
+      Misst die relative Höhe des Gewichtsblocks unabhängig davon, ob das Handy flach liegt.
+      Nur mit Barometer; bei kurzen Hüben oder Luftdruckrauschen kann die Kalibrierung scheitern.
+      Am unteren Anschlag vor dem Start ca. 1 Sekunde stillhalten.
+    </p>}
     <div style={{border:'1px solid var(--sep)',borderRadius:12,padding:12,margin:'10px 0'}}>
-      <strong style={{fontSize:13}}>Sensor-Diagnose</strong>
-      {status === null
-        ? <p role="status" className="muted small">Prüfe Bewegungssensor …</p>
-        : status.available
+      <strong style={{fontSize:13}}>Sensor-Diagnose · {sensorMode==='height'?'Höhe':'Bewegung'}</strong>
+      {(sensorMode==='height'?heightStatus:status) === null
+        ? <p role="status" className="muted small">Prüfe Sensor …</p>
+        : available
           ? <p role="status" className="muted small" style={{marginBottom:4}}>
-              Sensor erkannt: {status.mode === 'accelerometer' ? 'Beschleunigungssensor (Fallback mit Schwerkraftfilter)' : 'Linearer Beschleunigungssensor'}
-              {status.sensorName ? ` · ${status.sensorName}` : ''}. Keine Berechtigung nötig.
+              Sensor erkannt: {sensorMode==='height'?'Barometer (relativer Luftdruck)':status.mode === 'accelerometer' ? 'Beschleunigungssensor (Fallback mit Schwerkraftfilter)' : 'Linearer Beschleunigungssensor'}
+              {(sensorMode==='height'?heightStatus:status)?.sensorName ? ` · ${(sensorMode==='height'?heightStatus:status).sensorName}` : ''}. Keine Berechtigung nötig.
             </p>
           : <p role="alert" style={{...noteStyle,margin:'6px 0',color:'var(--orange)'}}>
-              {status.reason} Der Start bleibt gesperrt, bis ein Sensor erkannt wurde.
+              {(sensorMode==='height'?heightStatus:status)?.reason} Bitte {sensorMode==='height'?'zum Bewegungssensor wechseln':'den Sensor prüfen'}.
             </p>}
       <button type="button" disabled={phase==='calibrating'||phase==='counting'} onClick={checkSensor}
         style={{...action,padding:'8px 12px',marginTop:7}}>Sensor erneut prüfen</button>
@@ -161,6 +220,8 @@ export function RepCounterSheet({ close, sessionId, entryIdx, setIdx, exId, init
       <div style={{fontSize:12,color:'var(--label-2)',fontWeight:650}}>{phase==='calibrating'?'KALIBRIERUNG · 3 WIEDERHOLUNGEN':phase==='counting'?'AUTOMATISCH GESCHÄTZT':'WIEDERHOLUNGEN'}</div>
       <div aria-live="polite" style={{fontSize:62,fontWeight:750,fontVariantNumeric:'tabular-nums'}}>{phase==='calibrating'?'3':count}</div>
       {tempo && <p className="muted small">Gelernter Rhythmus: etwa {tempo.toLocaleString('de-AT')} Sekunden pro Wiederholung</p>}
+      {sensorMode==='height' && heightCm !== null && <p className="muted small" aria-live="off">Aktuelle relative Höhe: {heightCm} cm</p>}
+      {sensorMode==='height' && amplitudeCm !== null && <p className="muted small">Kalibrierter Hub: etwa {amplitudeCm} cm</p>}
       {(phase==='calibrating'||phase==='counting') && <p className="muted small">Sensor-Messwerte: {frames}{frames===0 ? ' · Keine Daten empfangen' : ' · Sensor liefert Daten'}</p>}
     </div>
     {notice && <p role="status" style={{...noteStyle,color:'var(--label-2)'}}>{notice}</p>}

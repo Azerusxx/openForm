@@ -26,6 +26,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PrintPlugin.class);
         registerPlugin(RestAlertPlugin.class);
         registerPlugin(RepMotionPlugin.class);
+        registerPlugin(RepHeightPlugin.class);
         registerPlugin(BackupFolderPlugin.class);
         registerPlugin(SystemBarsPlugin.class);
         super.onCreate(savedInstanceState);
