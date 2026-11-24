@@ -35,6 +35,27 @@ export async function repHeightStatus() {
   }
 }
 
+// Native event counters expose whether the Android sensor fired even when
+// no samples crossed the Capacitor bridge. Used only by the opt-in live test.
+export async function repHeightDiagnostics() {
+  try {
+    const p = await plugin()
+    const result = await p.diagnostics()
+    return {
+      available: result?.available === true,
+      listening: result?.listening === true,
+      nativeSamples: Number(result?.nativeSamples) || 0,
+      emittedSamples: Number(result?.emittedSamples) || 0,
+      baselineSamples: Number(result?.baselineSamples) || 0,
+      baselineReady: result?.baselineReady === true,
+      pressureHpa: Number.isFinite(result?.pressureHpa) ? result.pressureHpa : null,
+      error: '',
+    }
+  } catch (error) {
+    return {available:false,listening:false,nativeSamples:0,emittedSamples:0,baselineSamples:0,baselineReady:false,pressureHpa:null,error:errorText(error)}
+  }
+}
+
 export async function startRepHeight(onSample) {
   const p=await plugin()
   const status=await p.available()
