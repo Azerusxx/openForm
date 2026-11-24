@@ -28,6 +28,10 @@ public class RepHeightPlugin extends Plugin implements SensorEventListener {
     private float initialSum = 0;
     private float basePressure = 0;
     private long lastEmittedNs = 0;
+    private volatile int nativeSamples = 0;
+    private volatile int emittedSamples = 0;
+    private volatile float lastPressureHpa = 0;
+    private volatile long lastSensorTimeNs = 0;
 
     @Override
     public void load() {
@@ -49,6 +53,25 @@ public class RepHeightPlugin extends Plugin implements SensorEventListener {
         call.resolve(result);
     }
 
+    /**
+     * Counts native pressure events separately from JS-delivered ones. This
+     * distinguishes disabled/unresponsive hardware from WebView bridge problems
+     * without recording motion, raw logs or any location history.
+     */
+    @PluginMethod
+    public void diagnostics(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("available", pressure != null);
+        result.put("listening", listening);
+        result.put("nativeSamples", nativeSamples);
+        result.put("emittedSamples", emittedSamples);
+        result.put("baselineSamples", initialCount);
+        result.put("baselineReady", initialCount >= 8);
+        result.put("pressureHpa", lastPressureHpa);
+        result.put("sensorTimeMs", lastSensorTimeNs / 1_000_000.0);
+        call.resolve(result);
+    }
+
     @PluginMethod
     public synchronized void start(PluginCall call) {
         if (pressure == null || manager == null) {
@@ -60,6 +83,10 @@ public class RepHeightPlugin extends Plugin implements SensorEventListener {
         initialSum = 0;
         basePressure = 0;
         lastEmittedNs = 0;
+        nativeSamples = 0;
+        emittedSamples = 0;
+        lastPressureHpa = 0;
+        lastSensorTimeNs = 0;
         // Request ~10 Hz; actual rate varies by hardware.
         listening = manager.registerListener(this, pressure, 100_000);
         if (!listening) call.reject("Barometersensor konnte nicht aktiviert werden.");
@@ -81,6 +108,9 @@ public class RepHeightPlugin extends Plugin implements SensorEventListener {
     public void onSensorChanged(SensorEvent event) {
         if (!listening || event.sensor.getType() != Sensor.TYPE_PRESSURE) return;
         float p = event.values[0]; // hPa
+        nativeSamples++;
+        lastPressureHpa = p;
+        lastSensorTimeNs = event.timestamp;
         if (!Float.isFinite(p) || p < 300 || p > 1100) return;
         if (initialCount < 8) {
             // Caller must keep the weight stack at rest for the first 8 samples.
@@ -97,7 +127,11 @@ public class RepHeightPlugin extends Plugin implements SensorEventListener {
         JSObject sample = new JSObject();
         sample.put("t", t / 1_000_000.0);
         sample.put("h", height); // metres ABOVE the resting baseline
-        if (listening) notifyListeners("heightSample", sample);
+        sample.put("p", p); // hPa, for live diagnostics only; never stored
+        if (listening) {
+            emittedSamples++;
+            notifyListeners("heightSample", sample);
+        }
     }
 
     @Override
